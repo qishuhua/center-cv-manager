@@ -1,0 +1,45 @@
+global:
+  resolve_timeout: 5m
+
+templates:
+  - /etc/alertmanager/templates/*.tmpl
+
+route:
+  receiver: feishu
+  # Group GPUs/filesystems together; keep queues and business services separate.
+  group_by: [alertname, instance, vhost, queue, service]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - receiver: feishu
+      matchers:
+        - alertname="BusinessContainerRestartDetected"
+      group_by: [alertname, name]
+      group_wait: 0s
+      group_interval: 15s
+      repeat_interval: 4h
+    - receiver: feishu
+      matchers:
+        - alertname="BusinessContainerOomKilled"
+      group_by: [alertname, name]
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 4h
+  # Edit these two display values on each server. They do not contain secrets.
+  labels:
+    server_name: "cv-gpu-01 / 请填写服务器IP"
+    keyword: "服务器告警"
+
+receivers:
+  - name: feishu
+    webhook_configs:
+      - url_file: /run/secrets/feishu-webhook-url
+        send_resolved: true
+        max_alerts: 0
+        timeout: 30s
+        http_config:
+          follow_redirects: false
+        # Render the complete JSON object once. A plain text leaf beginning with
+        # [keyword] can otherwise be reinterpreted as a YAML array by Alertmanager.
+        payload: '{{ template "feishu.payload" . }}'

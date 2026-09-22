@@ -1,0 +1,55 @@
+groups:
+  - name: host-resources
+    rules:
+      - alert: HostCpuHigh
+        expr: 100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{job="node-exporter",mode="idle"}[5m]))) > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 宿主机 CPU 利用率持续偏高
+          description: '最近 5 分钟平均 CPU 利用率 {{ printf "%.1f" $value }}%，超过 85% 持续 5 分钟。'
+
+      - alert: HostMemoryHigh
+        expr: 100 * (1 - node_memory_MemAvailable_bytes{job="node-exporter"} / node_memory_MemTotal_bytes{job="node-exporter"}) > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 宿主机内存可用容量不足
+          description: '内存使用率 {{ printf "%.1f" $value }}%，超过 90% 持续 5 分钟。'
+
+      - alert: HostDiskSpaceLow
+        expr: |
+          (100 * node_filesystem_avail_bytes{job="node-exporter",fstype!~"tmpfs|devtmpfs|overlay|squashfs|nsfs|ramfs|tracefs",mountpoint!~"/(proc|sys|dev|run)($|/.*)"}
+          / node_filesystem_size_bytes{job="node-exporter"} < 15)
+          and on (instance, device, mountpoint) (node_filesystem_readonly{job="node-exporter"} == 0)
+          and on (instance, device, mountpoint) (node_filesystem_size_bytes{job="node-exporter"} > 0)
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 磁盘剩余空间不足
+          description: '{{ $labels.mountpoint }} 可用空间剩余 {{ printf "%.1f" $value }}%，低于 15% 持续 5 分钟。'
+
+      - alert: HostDiskInodesLow
+        expr: |
+          (100 * node_filesystem_files_free{job="node-exporter",fstype!~"tmpfs|devtmpfs|overlay|squashfs|nsfs|ramfs|tracefs",mountpoint!~"/(proc|sys|dev|run)($|/.*)"}
+          / node_filesystem_files{job="node-exporter"} < 10)
+          and on (instance, device, mountpoint) (node_filesystem_readonly{job="node-exporter"} == 0)
+          and on (instance, device, mountpoint) (node_filesystem_files{job="node-exporter"} > 0)
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 磁盘可用 inode 不足
+          description: '{{ $labels.mountpoint }} 可用 inode 剩余 {{ printf "%.1f" $value }}%，低于 10% 持续 5 分钟。'
+
+      - alert: ResourceExporterDown
+        expr: up{job=~"node-exporter|nvidia-dcgm|denglin-gpu|log-metrics"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: 资源指标采集失败
+          description: '{{ $labels.job }} 已连续 2 分钟无法采集，CPU/GPU/磁盘/日志指标无数据不代表正常。'

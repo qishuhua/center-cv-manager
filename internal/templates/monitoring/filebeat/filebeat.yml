@@ -1,0 +1,57 @@
+filebeat.inputs:
+  - type: filestream
+    id: center-cv-service-business-logs-v2
+    enabled: true
+    paths:
+      - /data/logs/center-cv-service.log
+      - /data/logs/center-cv-service.*.log
+      - /data/logs/center-cv-service-*.log
+      - /data/logs/center-cv-service-*.*.log
+    fields:
+      service.name: center-cv-service
+      event.dataset: center-cv-service
+    fields_under_root: true
+
+  - type: filestream
+    id: center-cv-ingress-business-logs-v2
+    enabled: true
+    paths:
+      - /data/logs/center-cv-ingress.log
+      - /data/logs/center-cv-ingress.*.log
+      - /data/logs/center-cv-ingress-*.log
+      - /data/logs/center-cv-ingress-*.*.log
+    fields:
+      service.name: center-cv-ingress
+      event.dataset: center-cv-ingress
+    fields_under_root: true
+
+  - type: filestream
+    id: video-transcode-service-business-logs-v1
+    enabled: true
+    paths:
+      - /data/logs/video-transcode-service.log
+      - /data/logs/video-transcode-service.*.log
+      - /data/logs/video-transcode-service-*.log
+      - /data/logs/video-transcode-service-*.*.log
+    fields:
+      service.name: video-transcode-service
+      event.dataset: video-transcode-service
+    fields_under_root: true
+
+processors:
+  - add_host_metadata: ~
+
+output.elasticsearch:
+  hosts:
+    - http://127.0.0.1:9200
+  index: center-cv-logs
+
+setup.template.name: center-cv-logs
+setup.template.pattern: center-cv-logs
+setup.template.overwrite: true
+setup.template.settings:
+  index.lifecycle.name: center-cv-logs-retention
+setup.ilm.enabled: false
+
+logging.level: info
+logging.metrics.enabled: true

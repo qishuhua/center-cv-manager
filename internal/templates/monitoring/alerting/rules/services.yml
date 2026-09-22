@@ -1,0 +1,71 @@
+groups:
+  - name: service-availability
+    rules:
+      - alert: ServiceHttpHealthCheckFailed
+        expr: probe_success{job="service-http-health"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 业务服务 HTTP 探活失败
+          description: 'HTTP 探活目标 {{ $labels.instance }} 已连续 1 分钟无法返回成功状态。'
+
+      - alert: ServiceTcpHealthCheckFailed
+        expr: probe_success{job="service-tcp-health"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 服务端口 TCP 探活失败
+          description: 'TCP 探活目标 {{ $labels.instance }} 已连续 1 分钟无法建立连接。'
+
+      - alert: ServiceMetricsScrapeDown
+        expr: up{job=~"prometheus|center-cv-service|center-cv-ingress|rabbitmq|rabbitmq-per-object"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: 服务指标采集失败
+          description: '{{ $labels.job }} 的指标目标 {{ $labels.instance }} 已连续 2 分钟无法采集；指标无数据不代表服务正常。'
+
+  - name: container-events
+    rules:
+      # Only locally built business images are in scope. Aggregate by the
+      # stable container name so both docker restart (same ID) and Compose
+      # recreation (new ID) are detected without treating first discovery as
+      # a restart.
+      - record: business_container:start_time_seconds
+        expr: max by (name) (label_replace(container_start_time_seconds{job="cadvisor",name=~"/?(center-cv-service-[0-7]|center-cv-ingress|video-transcode-service)"}, "name", "$1", "name", "/?(.+)"))
+
+      # Use the probe sample time: readiness from before this restart cannot
+      # resolve its alert. A failed scrape must not count as ready either.
+      - record: business_container:ready_observed_seconds
+        expr: max by (name) (timestamp(probe_success{job="service-readiness"}) and on (job, instance, name) (probe_success{job="service-readiness"} == 1) and on (job, instance, name) (up{job="service-readiness"} == 1))
+
+      - alert: BusinessContainerRestartDetected
+        # Retain active alerts past the detection window until ready. Remember
+        # recovery within that window to avoid reporting the same restart again.
+        expr: |
+          (
+            changes(business_container:start_time_seconds[10m]) > 0
+            or on (name)
+            max by (name) (ALERTS{alertname="BusinessContainerRestartDetected",alertstate="firing"})
+          )
+          unless on (name)
+          (
+            max_over_time(business_container:ready_observed_seconds[10m])
+            >= on (name) business_container:start_time_seconds
+          )
+        labels:
+          severity: critical
+        annotations:
+          summary: 业务容器发生重启
+          description: '业务容器 {{ $labels.name }} 检测到重启，尚未确认本次启动后的 ready 检查成功；ready 后自动恢复，请检查容器日志、退出原因和在途任务。'
+
+      - alert: BusinessContainerOomKilled
+        expr: increase(container_oom_events_total{job="cadvisor",name=~"/?(center-cv-service-[0-7]|center-cv-ingress|video-transcode-service)"}[10m]) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: 自研业务容器异常退出（OOM）
+          description: '自研业务容器 {{ $labels.name }} 发生 OOM 异常；告警已立即触发，请检查退出日志和内存占用。'

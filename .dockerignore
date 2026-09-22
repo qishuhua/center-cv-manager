@@ -1,0 +1,10 @@
+.git
+.gitignore
+.env
+.cache
+build
+data
+web/node_modules
+web/dist
+cmd/server/web_dist/assets
+*.log

@@ -1,0 +1,16 @@
+apiVersion: 1
+
+datasources:
+  - name: Center CV Logs
+    uid: center-cv-logs
+    type: elasticsearch
+    access: proxy
+    url: http://127.0.0.1:9200
+    editable: false
+    jsonData:
+      index: center-cv-logs*
+      timeField: '@timestamp'
+      logMessageField: message
+      esVersion: 8.19.0
+      maxConcurrentShardRequests: 5
+      timeInterval: 15s

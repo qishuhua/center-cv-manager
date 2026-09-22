@@ -1,0 +1,229 @@
+package center
+
+import (
+	"fmt"
+	"strings"
+	"time"
+
+	"center-cv-manager/internal/centerpath"
+	"center-cv-manager/internal/domain"
+	"center-cv-manager/internal/secret"
+	"center-cv-manager/internal/sshx"
+	"github.com/google/uuid"
+)
+
+const Mask = "********"
+
+type Repository interface {
+	ListCenters() ([]domain.Center, error)
+	GetCenter(string) (domain.Center, error)
+	SaveCenter(domain.Center) error
+	DeleteCenter(string) error
+}
+type Service struct {
+	repo   Repository
+	cipher *secret.Cipher
+}
+
+func New(repo Repository, c *secret.Cipher) *Service { return &Service{repo: repo, cipher: c} }
+
+func validate(v domain.Center) error {
+	if strings.TrimSpace(v.Name) == "" || strings.TrimSpace(v.Host) == "" || strings.TrimSpace(v.Username) == "" {
+		return fmt.Errorf("名称、主机和用户名不能为空")
+	}
+	if v.Port < 1 || v.Port > 65535 {
+		return fmt.Errorf("SSH 端口无效")
+	}
+	if v.AuthType != "password" && v.AuthType != "private_key" {
+		return fmt.Errorf("认证方式必须是 password 或 private_key")
+	}
+	if v.Accelerator != "auto" && v.Accelerator != "nvidia" && v.Accelerator != "denglin" && v.Accelerator != "cpu" {
+		return fmt.Errorf("加速卡类型必须是 auto、nvidia、denglin 或 cpu")
+	}
+	if !centerpath.ValidRemoteFile(v.ComposeFile) {
+		return fmt.Errorf("Compose 文件必须是中心服务器上的绝对路径或 ~/ 开头的家目录路径")
+	}
+	return nil
+}
+func (s *Service) List() ([]domain.Center, error) {
+	v, e := s.repo.ListCenters()
+	if e != nil {
+		return nil, e
+	}
+	for i := range v {
+		s.mask(&v[i])
+	}
+	return v, nil
+}
+func (s *Service) GetPublic(id string) (domain.Center, error) {
+	v, e := s.repo.GetCenter(id)
+	if e == nil {
+		s.mask(&v)
+	}
+	return v, e
+}
+func (s *Service) Save(input domain.Center) (domain.Center, error) {
+	if input.Port == 0 {
+		input.Port = 22
+	}
+	if input.DockerSocket == "" {
+		input.DockerSocket = "/var/run/docker.sock"
+	}
+	if input.Accelerator == "" {
+		input.Accelerator = "auto"
+	}
+	if input.ComposeFile == "" {
+		input.ComposeFile = centerpath.DefaultComposeFile
+	}
+	now := time.Now()
+	var old domain.Center
+	var exists bool
+	if input.ID != "" {
+		old, exists = func() (domain.Center, bool) { v, e := s.repo.GetCenter(input.ID); return v, e == nil }()
+	} else {
+		input.ID = uuid.NewString()
+	}
+	if exists {
+		input.CreatedAt = old.CreatedAt
+		input.DetectedAccelerator = old.DetectedAccelerator
+		input.CPUCount = old.CPUCount
+		input.GPUCount = old.GPUCount
+		input.ComposeContent = old.ComposeContent
+		input.InitializedAt = old.InitializedAt
+		if input.Host != old.Host || input.Port != old.Port {
+			input.HostKey = ""
+		}
+		if input.Password == "" || input.Password == Mask {
+			input.Password = old.Password
+		} else {
+			input.Password = s.encrypt(input.Password)
+		}
+		if input.PrivateKey == "" || input.PrivateKey == Mask {
+			input.PrivateKey = old.PrivateKey
+		} else {
+			input.PrivateKey = s.encrypt(input.PrivateKey)
+		}
+		if input.Passphrase == "" || input.Passphrase == Mask {
+			input.Passphrase = old.Passphrase
+		} else {
+			input.Passphrase = s.encrypt(input.Passphrase)
+		}
+		if input.HostKey == "" && input.Host == old.Host && input.Port == old.Port {
+			input.HostKey = old.HostKey
+		}
+	} else {
+		input.CreatedAt = now
+		input.Password = s.encrypt(input.Password)
+		input.PrivateKey = s.encrypt(input.PrivateKey)
+		input.Passphrase = s.encrypt(input.Passphrase)
+	}
+	input.UpdatedAt = now
+	if err := validate(input); err != nil {
+		return domain.Center{}, err
+	}
+	if input.AuthType == "password" && input.Password == "" {
+		return domain.Center{}, fmt.Errorf("密码认证需要填写密码")
+	}
+	if input.AuthType == "private_key" && input.PrivateKey == "" {
+		return domain.Center{}, fmt.Errorf("私钥认证需要填写私钥")
+	}
+	if err := s.repo.SaveCenter(input); err != nil {
+		return domain.Center{}, err
+	}
+	s.mask(&input)
+	return input, nil
+}
+
+func (s *Service) UpdateRuntime(id, accelerator string, cpuCount, gpuCount int, composeFile, composeContent string) error {
+	v, err := s.repo.GetCenter(id)
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	v.DetectedAccelerator = accelerator
+	v.CPUCount = cpuCount
+	v.GPUCount = gpuCount
+	v.ComposeFile = composeFile
+	v.ComposeContent = composeContent
+	v.InitializedAt = &now
+	v.UpdatedAt = now
+	return s.repo.SaveCenter(v)
+}
+
+// UpdateHardware refreshes detected hardware without marking the center as
+// initialized or changing its Compose configuration.
+func (s *Service) UpdateHardware(id, accelerator string, cpuCount, gpuCount int) error {
+	v, err := s.repo.GetCenter(id)
+	if err != nil {
+		return err
+	}
+	v.DetectedAccelerator = accelerator
+	v.CPUCount = cpuCount
+	v.GPUCount = gpuCount
+	v.UpdatedAt = time.Now()
+	return s.repo.SaveCenter(v)
+}
+
+func (s *Service) Delete(id string) error { return s.repo.DeleteCenter(id) }
+func (s *Service) Connection(id string) (sshx.Config, string, domain.Center, error) {
+	v, e := s.repo.GetCenter(id)
+	if e != nil {
+		return sshx.Config{}, "", v, e
+	}
+	password, e := s.decrypt(v.Password)
+	if e != nil {
+		return sshx.Config{}, "", v, e
+	}
+	key, e := s.decrypt(v.PrivateKey)
+	if e != nil {
+		return sshx.Config{}, "", v, e
+	}
+	pass, e := s.decrypt(v.Passphrase)
+	if e != nil {
+		return sshx.Config{}, "", v, e
+	}
+	return sshx.Config{Host: v.Host, Port: v.Port, Username: v.Username, Password: password, PrivateKey: key, Passphrase: pass, HostKey: v.HostKey}, v.DockerSocket, v, nil
+}
+
+func (s *Service) RememberHostKey(v domain.Center, fp string) error {
+	if v.HostKey == "" && fp != "" {
+		v.HostKey = fp
+		v.UpdatedAt = time.Now()
+		return s.repo.SaveCenter(v)
+	}
+	return nil
+}
+func (s *Service) Test(id string) (string, error) {
+	cfg, socket, v, e := s.Connection(id)
+	if e != nil {
+		return "", e
+	}
+	remote, fp, e := sshx.NewDocker(cfg, socket)
+	if e != nil {
+		return fp, e
+	}
+	defer remote.Close()
+	if e = s.RememberHostKey(v, fp); e != nil {
+		return fp, e
+	}
+	return fp, nil
+}
+func (s *Service) encrypt(v string) string {
+	out, e := s.cipher.Encrypt(v)
+	if e != nil {
+		panic(e)
+	}
+	return out
+}
+func (s *Service) decrypt(v string) (string, error) { return s.cipher.Decrypt(v) }
+func (s *Service) mask(v *domain.Center) {
+	if v.Password != "" {
+		v.Password = Mask
+	}
+	if v.PrivateKey != "" {
+		v.PrivateKey = Mask
+	}
+	if v.Passphrase != "" {
+		v.Passphrase = Mask
+	}
+}

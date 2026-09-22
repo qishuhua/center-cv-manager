@@ -1,0 +1,10 @@
+groups:
+  - name: business-logs
+    rules:
+      - alert: BusinessLogErrorsHigh
+        expr: sum by (service) (increase(center_cv_log_errors_total{job="log-metrics"}[5m])) > 100
+        labels:
+          severity: warning
+        annotations:
+          summary: 业务服务错误日志数量偏高
+          description: '{{ $labels.service }} 最近 5 分钟新增错误日志 {{ printf "%.0f" $value }} 条，超过 100 条。'

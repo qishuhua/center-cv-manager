@@ -1,0 +1,12 @@
+apiVersion: 1
+
+# host 网络 Grafana 专用数据源：登临及 NVIDIA 模式均使用 network_mode: host。
+# Docker 服务名 DNS 在 host 网络中不生效，因此通过宿主机回环访问 Prometheus。
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://127.0.0.1:9090/prometheus
+    isDefault: true
+    editable: false

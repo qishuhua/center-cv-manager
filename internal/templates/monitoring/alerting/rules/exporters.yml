@@ -1,0 +1,22 @@
+groups:
+  - name: monitoring-exporters
+    rules:
+      - alert: CadvisorExporterDown
+        expr: up{job="cadvisor"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: cAdvisor 容器指标采集失败
+          description: 'cAdvisor 已连续 2 分钟无法采集，容器重启、OOM 和资源指标可能缺失。'
+
+      # Target failures return probe_success=0 while the scrape remains up.
+      # If every probe scrape is down, the exporter itself is unavailable.
+      - alert: BlackboxExporterDown
+        expr: max(up{job=~"service-http-health|service-tcp-health"}) == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Blackbox 探活采集器不可用
+          description: '所有 HTTP/TCP 探活指标已连续 2 分钟无法采集，无法判断业务服务是否正常。'

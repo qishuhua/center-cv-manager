@@ -1,0 +1,53 @@
+{{ define "feishu.payload" -}}
+{{- $firing := len .Alerts.Firing -}}
+{{- $resolved := len .Alerts.Resolved -}}
+{{- $theme := "red" -}}
+{{- $state := "告警触发" -}}
+{{- if eq $firing 0 -}}
+  {{- $theme = "green" -}}
+  {{- $state = "告警恢复" -}}
+{{- else if gt $resolved 0 -}}
+  {{- $theme = "orange" -}}
+  {{- $state = "部分恢复" -}}
+{{- end -}}
+{{- $heading := printf "[%s] %s" (routeLabels "keyword") $state -}}
+{{- $overview := printf "服务器：%s\n告警中：%d，已恢复：%d" (routeLabels "server_name") $firing $resolved -}}
+{{- $elements := list (dict "tag" "div" "text" (dict "tag" "plain_text" "content" $overview)) -}}
+{{- $labelTitles := dict "gpu" "GPU" "gpu_index" "GPU" "UUID" "GPU UUID" "gpu_uuid" "GPU UUID" "device" "设备" "mountpoint" "挂载点" "vhost" "VHost" "queue" "消费队列" "service" "业务服务" -}}
+{{- range .Alerts -}}
+  {{- $alert := . -}}
+  {{- $status := "告警中" -}}
+  {{- $detailTitle := "详情" -}}
+  {{- if eq .Status "resolved" -}}
+    {{- $status = "已恢复" -}}
+    {{- $detailTitle = "触发时详情（非当前值）" -}}
+  {{- end -}}
+  {{- $summary := printf "[%s] %s" $status (or .Annotations.summary .Labels.alertname) -}}
+  {{- $fields := list
+    (dict "is_short" true "text" (dict "tag" "plain_text" "content" (printf "级别\n%s" .Labels.severity)))
+    (dict "is_short" true "text" (dict "tag" "plain_text" "content" (printf "规则\n%s" .Labels.alertname)))
+    (dict "is_short" false "text" (dict "tag" "plain_text" "content" (printf "采集目标\n%s" .Labels.instance)))
+  -}}
+  {{- range $key := stringSlice "gpu" "gpu_index" "UUID" "gpu_uuid" "device" "mountpoint" "vhost" "queue" "service" -}}
+    {{- with index $alert.Labels $key -}}
+      {{- $fields = append $fields (dict "is_short" true "text" (dict "tag" "plain_text" "content" (printf "%s\n%s" (index $labelTitles $key) .))) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $elements = append $elements
+    (dict "tag" "hr")
+    (dict "tag" "div" "text" (dict "tag" "plain_text" "content" $summary) "fields" $fields)
+    (dict "tag" "div" "text" (dict "tag" "plain_text" "content" (printf "%s\n%s" $detailTitle .Annotations.description)))
+  -}}
+  {{- $times := printf "开始：%s" (.StartsAt | tz "Asia/Shanghai" | date "2006-01-02 15:04:05 -07:00") -}}
+  {{- if eq .Status "resolved" -}}
+    {{- $times = printf "%s\n恢复：%s" $times (.EndsAt | tz "Asia/Shanghai" | date "2006-01-02 15:04:05 -07:00") -}}
+  {{- end -}}
+  {{- $elements = append $elements (dict "tag" "note" "elements" (list (dict "tag" "plain_text" "content" $times))) -}}
+{{- end -}}
+{{- $card := dict
+  "config" (dict "wide_screen_mode" true)
+  "header" (dict "template" $theme "title" (dict "tag" "plain_text" "content" $heading))
+  "elements" $elements
+-}}
+{{- dict "msg_type" "interactive" "card" $card | toJson -}}
+{{- end }}
