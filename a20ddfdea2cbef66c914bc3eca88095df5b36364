@@ -1,0 +1,247 @@
+.dockerignore
+  fc1dd67169a103a2 1-10
+.gitignore
+  fc1dd67169a103a2 1-9
+CLAUDE.md
+  fc1dd67169a103a2 1-77
+Dockerfile
+  fc1dd67169a103a2 1-28
+Makefile
+  fc1dd67169a103a2 1-18
+README.md
+  fc1dd67169a103a2 1-158
+cmd/server/main.go
+  fc1dd67169a103a2 1-74
+compose.yaml
+  fc1dd67169a103a2 1-25
+go.mod
+  fc1dd67169a103a2 1-80
+go.sum
+  fc1dd67169a103a2 1-256
+internal/alerting/service.go
+  fc1dd67169a103a2 1-86
+internal/alerting/service_test.go
+  fc1dd67169a103a2 1-48
+internal/api/auth.go
+  fc1dd67169a103a2 1-92
+internal/api/release_test.go
+  fc1dd67169a103a2 1-99
+internal/api/server.go
+  fc1dd67169a103a2 1-1710
+internal/api/task_actions.go
+  fc1dd67169a103a2 1-142
+internal/api/task_actions_test.go
+  fc1dd67169a103a2 1-69
+internal/api/terminal.go
+  fc1dd67169a103a2 1-116
+internal/api/terminal_test.go
+  fc1dd67169a103a2 1-24
+internal/auth/manager.go
+  fc1dd67169a103a2 1-194
+internal/auth/manager_test.go
+  fc1dd67169a103a2 1-82
+internal/baseimage/service.go
+  fc1dd67169a103a2 1-694
+internal/baseimage/service_test.go
+  fc1dd67169a103a2 1-123
+internal/build/service.go
+  fc1dd67169a103a2 1-289
+internal/build/service_test.go
+  fc1dd67169a103a2 1-57
+internal/center/service.go
+  fc1dd67169a103a2 1-229
+internal/centeraction/service.go
+  fc1dd67169a103a2 1-541
+internal/centeraction/service_test.go
+  fc1dd67169a103a2 1-130
+internal/centerlock/registry.go
+  fc1dd67169a103a2 1-30
+internal/centerlock/registry_test.go
+  fc1dd67169a103a2 1-24
+internal/centerpath/paths.go
+  fc1dd67169a103a2 1-76
+internal/centerpath/paths_test.go
+  fc1dd67169a103a2 1-40
+internal/deploy/service.go
+  fc1dd67169a103a2 1-499
+internal/deploy/service_test.go
+  fc1dd67169a103a2 1-183
+internal/domain/models.go
+  fc1dd67169a103a2 1-83
+internal/modelasset/delete.go
+  fc1dd67169a103a2 1-56
+internal/modelasset/delete_test.go
+  fc1dd67169a103a2 1-33
+internal/modelasset/health.go
+  fc1dd67169a103a2 1-76
+internal/modelasset/health_test.go
+  fc1dd67169a103a2 1-49
+internal/modelasset/release.go
+  fc1dd67169a103a2 1-814
+internal/modelasset/release_test.go
+  fc1dd67169a103a2 1-164
+internal/modelasset/remote.go
+  fc1dd67169a103a2 1-101
+internal/modelasset/remote_test.go
+  fc1dd67169a103a2 1-140
+internal/modelasset/repository.go
+  fc1dd67169a103a2 1-596
+internal/modelasset/repository_integration_test.go
+  fc1dd67169a103a2 1-204
+internal/modelasset/repository_test.go
+  fc1dd67169a103a2 1-262
+internal/modelasset/service.go
+  fc1dd67169a103a2 1-370
+internal/modelasset/service_test.go
+  fc1dd67169a103a2 1-39
+internal/modelasset/upload.go
+  fc1dd67169a103a2 1-313
+internal/modelasset/upload_test.go
+  fc1dd67169a103a2 1-109
+internal/provision/service.go
+  fc1dd67169a103a2 1-1038
+internal/provision/service_test.go
+  fc1dd67169a103a2 1-148
+internal/secret/cipher.go
+  fc1dd67169a103a2 1-75
+internal/secret/cipher_test.go
+  fc1dd67169a103a2 1-21
+internal/source/service.go
+  fc1dd67169a103a2 1-495
+internal/source/service_test.go
+  fc1dd67169a103a2 1-187
+internal/sshx/client.go
+  fc1dd67169a103a2 1-53
+internal/sshx/docker.go
+  fc1dd67169a103a2 1-50
+internal/store/sqlite.go
+  fc1dd67169a103a2 1-541
+internal/store/sqlite_test.go
+  fc1dd67169a103a2 1-223
+internal/task/manager.go
+  fc1dd67169a103a2 1-291
+internal/task/manager_test.go
+  fc1dd67169a103a2 1-161
+internal/templates/compose/docker-compose.business.yml
+  fc1dd67169a103a2 1-52
+internal/templates/compose/docker-compose.denglin.yml
+  fc1dd67169a103a2 1-509
+internal/templates/compose/docker-compose.nvidia.yml
+  fc1dd67169a103a2 1-487
+internal/templates/embed.go
+  fc1dd67169a103a2 1-509
+internal/templates/embed_test.go
+  fc1dd67169a103a2 1-381
+internal/templates/monitoring/alerting/alertmanager.yml
+  fc1dd67169a103a2 1-45
+internal/templates/monitoring/alerting/feishu-webhook-url.example
+  fc1dd67169a103a2 1
+internal/templates/monitoring/alerting/rules/exporters.yml
+  fc1dd67169a103a2 1-22
+internal/templates/monitoring/alerting/rules/gpu.yml
+  fc1dd67169a103a2 1-85
+internal/templates/monitoring/alerting/rules/host.yml
+  fc1dd67169a103a2 1-55
+internal/templates/monitoring/alerting/rules/logs.yml
+  fc1dd67169a103a2 1-10
+internal/templates/monitoring/alerting/rules/rabbitmq.yml
+  fc1dd67169a103a2 1-12
+internal/templates/monitoring/alerting/rules/services.yml
+  fc1dd67169a103a2 1-71
+internal/templates/monitoring/alerting/templates/feishu.tmpl
+  fc1dd67169a103a2 1-53
+internal/templates/monitoring/blackbox/blackbox.yml
+  fc1dd67169a103a2 1-11
+internal/templates/monitoring/denglin-gpu-exporter/denglin-gpu-exporter.json
+  fc1dd67169a103a2 1-13
+internal/templates/monitoring/elasticsearch/center-cv-logs-ilm-policy.json
+  fc1dd67169a103a2 1-19
+internal/templates/monitoring/filebeat/filebeat.yml
+  fc1dd67169a103a2 1-57
+internal/templates/monitoring/grafana/dashboards/center-cv-overview.denglin.json
+  fc1dd67169a103a2 1-2755
+internal/templates/monitoring/grafana/dashboards/center-cv-overview.nvidia.json
+  fc1dd67169a103a2 1-2814
+internal/templates/monitoring/grafana/provisioning/dashboards-denglin/dashboards.yml
+  fc1dd67169a103a2 1-13
+internal/templates/monitoring/grafana/provisioning/dashboards/dashboards.yml
+  fc1dd67169a103a2 1-11
+internal/templates/monitoring/grafana/provisioning/datasources-host/elasticsearch.yml
+  fc1dd67169a103a2 1-16
+internal/templates/monitoring/grafana/provisioning/datasources-host/prometheus.yml
+  fc1dd67169a103a2 1-12
+internal/templates/monitoring/grafana/provisioning/datasources/prometheus.yml
+  fc1dd67169a103a2 1-10
+internal/templates/monitoring/kibana/init.sh
+  fc1dd67169a103a2 1-28
+internal/templates/monitoring/mtail/log_errors.mtail
+  fc1dd67169a103a2 1-10
+internal/templates/monitoring/prometheus/prometheus.denglin.yml
+  fc1dd67169a103a2 1-161
+internal/templates/monitoring/prometheus/prometheus.nvidia.yml
+  fc1dd67169a103a2 1-161
+internal/templates/monitoring/rabbitmq/enabled_plugins
+  fc1dd67169a103a2 1
+internal/templates/monitoring/rabbitmq/init.sh
+  fc1dd67169a103a2 1-88
+internal/templates/monitoring/rabbitmq/rabbitmq.conf
+  fc1dd67169a103a2 1-10
+internal/templates/nginx/nginx.conf
+  fc1dd67169a103a2 1-163
+internal/templates/nginx/nginx.full.conf
+  fc1dd67169a103a2 1-164
+internal/templates/secrets/grafana-logs.htpasswd
+  fc1dd67169a103a2 1
+web/index.html
+  fc1dd67169a103a2 1
+web/package-lock.json
+  fc1dd67169a103a2 1-2286
+web/package.json
+  fc1dd67169a103a2 1-28
+web/src/App.vue
+  fc1dd67169a103a2 1-583
+web/src/ModelCatalog.vue
+  fc1dd67169a103a2 1-157
+web/src/ModelUploadDialog.vue
+  fc1dd67169a103a2 1-91
+web/src/TerminalPage.vue
+  fc1dd67169a103a2 1-162
+web/src/YamlEditor.vue
+  fc1dd67169a103a2 1-49
+web/src/api.ts
+  fc1dd67169a103a2 1-16
+web/src/main.ts
+  fc1dd67169a103a2 1-6
+web/src/modelGroups.ts
+  fc1dd67169a103a2 1-21
+web/src/style.css
+  fc1dd67169a103a2 1-20
+web/src/types.ts
+  fc1dd67169a103a2 1-24
+web/tsconfig.json
+  fc1dd67169a103a2 1
+web/tsconfig.node.json
+  fc1dd67169a103a2 1
+web/vite.config.ts
+  fc1dd67169a103a2 1-3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a20ddfdea2cbef66c914bc3eca88095df5b36364",
+  "prompts": {
+    "fc1dd67169a103a2": {
+      "agent_id": {
+        "tool": "claude-code",
+        "id": "manual-a20ddfdea2cbef66c914bc3eca88095df5b36364",
+        "model": "manual"
+      },
+      "human_author": "henry.qi <henry.qi@jtexpress.com>",
+      "messages": [],
+      "total_additions": 25263,
+      "total_deletions": 0,
+      "accepted_lines": 25263,
+      "overriden_lines": 0
+    }
+  }
+}
