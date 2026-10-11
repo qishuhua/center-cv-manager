@@ -1,4 +1,4 @@
-export interface Center {id?:string;name:string;host:string;port:number;username:string;auth_type:'password'|'private_key';password?:string;private_key?:string;passphrase?:string;host_key?:string;docker_socket:string;accelerator:'auto'|'nvidia'|'denglin'|'cpu';detected_accelerator?:string;cpu_count:number;gpu_count:number;compose_file:string;initialized_at?:string;description:string;updated_at?:string}
+export interface Center {deployment?:{migration?:{completed:boolean};root:string;status:string;modules:ComposeModule[]};id?:string;name:string;host:string;port:number;username:string;auth_type:'password'|'private_key';password?:string;private_key?:string;passphrase?:string;host_key?:string;docker_socket:string;accelerator:'auto'|'nvidia'|'denglin'|'cpu';detected_accelerator?:string;cpu_count:number;gpu_count:number;compose_file:string;initialized_at?:string;description:string;updated_at?:string}
 export interface Source {id?:string;name:string;repository:string;description:string;updated_at?:string}
 export interface GitCredential {base_url:string;username:string;token?:string;configured:boolean;updated_at?:string}
 export interface Version {ref:string;commit:string;kind:'branch'|'tag'}
@@ -22,3 +22,5 @@ export interface ComposeDocument {center_id:string;path:string;content:string}
 export interface HardwareGPU {model:string;count:number;memory_bytes?:number}
 export interface HardwareDisk {device:string;mount_point:string;total_bytes:number;used_bytes:number;available_bytes:number;usage:string}
 export interface HardwareInfo {accelerator:string;cpu:{model:string;sockets:number;physical_cores:number;logical_cores:number};gpus:HardwareGPU[];memory:{total_bytes:number};disks:HardwareDisk[];detected_at:string}
+
+export interface ComposeModule {id:string;name:string;project:string;compose_file:string;enabled:boolean;depends_on:string[];init_services:string[];model_services:string[];ready_urls:string[];timeout:number;status:string;error?:string;revision:string;applied_revision:string;updated_at:string}

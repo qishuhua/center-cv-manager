@@ -5,8 +5,10 @@ import (
 	"strings"
 	"time"
 
+	"center-cv-manager/internal/centerlock"
 	"center-cv-manager/internal/centerpath"
 	"center-cv-manager/internal/domain"
+	"center-cv-manager/internal/modular"
 	"center-cv-manager/internal/secret"
 	"center-cv-manager/internal/sshx"
 	"github.com/google/uuid"
@@ -63,6 +65,10 @@ func (s *Service) GetPublic(id string) (domain.Center, error) {
 	return v, e
 }
 func (s *Service) Save(input domain.Center) (domain.Center, error) {
+	if input.ID != "" {
+		release := centerlock.Acquire(input.ID)
+		defer release()
+	}
 	if input.Port == 0 {
 		input.Port = 22
 	}
@@ -85,6 +91,10 @@ func (s *Service) Save(input domain.Center) (domain.Center, error) {
 	}
 	if exists {
 		input.CreatedAt = old.CreatedAt
+		input.Deployment = old.Deployment
+		if old.Deployment != nil && input.ComposeFile != old.ComposeFile {
+			return domain.Center{}, fmt.Errorf("模块化中心不能通过连接设置移动部署目录")
+		}
 		input.DetectedAccelerator = old.DetectedAccelerator
 		input.CPUCount = old.CPUCount
 		input.GPUCount = old.GPUCount
@@ -113,6 +123,7 @@ func (s *Service) Save(input domain.Center) (domain.Center, error) {
 		}
 	} else {
 		input.CreatedAt = now
+		input.Deployment = modular.NewDeployment(input.ComposeFile, 1)
 		input.Password = s.encrypt(input.Password)
 		input.PrivateKey = s.encrypt(input.PrivateKey)
 		input.Passphrase = s.encrypt(input.Passphrase)
@@ -145,7 +156,9 @@ func (s *Service) UpdateRuntime(id, accelerator string, cpuCount, gpuCount int, 
 	v.GPUCount = gpuCount
 	v.ComposeFile = composeFile
 	v.ComposeContent = composeContent
-	v.InitializedAt = &now
+	if v.Deployment == nil {
+		v.InitializedAt = &now
+	}
 	v.UpdatedAt = now
 	return s.repo.SaveCenter(v)
 }
@@ -187,6 +200,9 @@ func (s *Service) Connection(id string) (sshx.Config, string, domain.Center, err
 
 func (s *Service) RememberHostKey(v domain.Center, fp string) error {
 	if v.HostKey == "" && fp != "" {
+		if repo, ok := s.repo.(interface{ RememberCenterHostKey(string, string) error }); ok {
+			return repo.RememberCenterHostKey(v.ID, fp)
+		}
 		v.HostKey = fp
 		v.UpdatedAt = time.Now()
 		return s.repo.SaveCenter(v)
@@ -226,4 +242,20 @@ func (s *Service) mask(v *domain.Center) {
 	if v.Passphrase != "" {
 		v.Passphrase = Mask
 	}
+}
+
+// UpdateDeployment is called under the center operation lock.
+func (s *Service) UpdateDeployment(id string, deployment *domain.Deployment) error {
+	v, err := s.repo.GetCenter(id)
+	if err != nil {
+		return err
+	}
+	wasReady := v.Deployment != nil && v.Deployment.Status == "ready"
+	v.Deployment = deployment
+	v.UpdatedAt = time.Now()
+	if deployment != nil && deployment.Status == "ready" && (!wasReady || v.InitializedAt == nil) {
+		now := time.Now()
+		v.InitializedAt = &now
+	}
+	return s.repo.SaveCenter(v)
 }

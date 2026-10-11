@@ -181,3 +181,27 @@ func TestCombineSSHOutput(t *testing.T) {
 		}
 	}
 }
+
+func TestReleasePreservesInheritedLabelsAndUnselectedConfiguration(t *testing.T) {
+	base := `# retain comment
+x-common: &common
+  image: worker:old
+  labels:
+    com.center-manager.image.repository: worker-source
+    custom: retained
+services:
+  worker:
+    <<: *common
+  other:
+    image: other:${VERSION:-stable}
+`
+	result, err := renderComposeRelease(base, nil, []Item{{SourceID: "source", Ref: "main"}}, map[string]string{"source": "worker:new"}, map[string][]string{"source": {"worker"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"retain comment", "${VERSION:-stable}", "custom: retained", "com.center-manager.image.repository: worker-source", "worker:new"} {
+		if !strings.Contains(result, expected) {
+			t.Fatalf("lost %q in %s", expected, result)
+		}
+	}
+}

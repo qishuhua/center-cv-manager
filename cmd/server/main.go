@@ -1,10 +1,8 @@
 package main
 
 import (
-	"embed"
 	"flag"
 	"fmt"
-	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -23,15 +21,18 @@ import (
 	"center-cv-manager/internal/source"
 	"center-cv-manager/internal/store"
 	"center-cv-manager/internal/task"
+	"center-cv-manager/internal/templates"
 )
-
-//go:embed web_dist
-var webFS embed.FS
 
 func main() {
 	listen := flag.String("listen", "127.0.0.1:8099", "监听地址")
 	dataDir := flag.String("data", "./data", "数据目录")
+	webDir := flag.String("web", "./web/dist", "前端静态文件目录")
+	templatesDir := flag.String("templates", "./internal/templates", "部署模板目录")
 	flag.Parse()
+	if err := templates.SetDirectory(*templatesDir); err != nil {
+		log.Fatal(err)
+	}
 	abs, e := filepath.Abs(*dataDir)
 	if e != nil {
 		log.Fatal(e)
@@ -65,7 +66,7 @@ func main() {
 	provisioning := provision.New(centers, alerts)
 	baseImages := baseimage.New(st, cipher, centers)
 	models := modelasset.New(st, cipher, centers)
-	var static fs.FS = webFS
+	static := os.DirFS(*webDir)
 	server := api.New(authManager, centers, centerActions, sources, builds, deployments, provisioning, baseImages, models, alerts, st, tasks, filepath.Join(abs, "sources"), static)
 	fmt.Printf("中心数字化管理平台 listening on http://%s\n", *listen)
 	if e = server.Router().Run(*listen); e != nil {

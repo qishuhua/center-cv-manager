@@ -1,7 +1,6 @@
 package provision
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io/fs"
@@ -20,6 +19,7 @@ import (
 	"center-cv-manager/internal/centerlock"
 	"center-cv-manager/internal/centerpath"
 	"center-cv-manager/internal/domain"
+	"center-cv-manager/internal/modular"
 	"center-cv-manager/internal/sshx"
 	"center-cv-manager/internal/templates"
 	containertypes "github.com/docker/docker/api/types/container"
@@ -148,6 +148,13 @@ func (s *Service) Initialize(ctx context.Context, centerID string, forceTemplate
 			r.Logf("发现已有 Compose，将保留原文件并同步其余内置模板：%s", composeFile)
 		}
 	}
+	if preserveCompose && stored.Deployment != nil && stored.Deployment.Status == "preparing" && allPending(stored.Deployment.Modules) {
+		if err = s.centers.UpdateDeployment(centerID, nil); err != nil {
+			return err
+		}
+		stored.Deployment = nil
+		r.Log("发现原有单 Compose，已按兼容模式接管；可在运行详情中单独生成迁移计划")
+	}
 	if accelerator == "cpu" && !preserveCompose {
 		return fmt.Errorf("当前内置完整部署模板需要 NVIDIA 或登临 GPU")
 	}
@@ -198,6 +205,12 @@ func (s *Service) Initialize(ctx context.Context, centerID string, forceTemplate
 		return fmt.Errorf("创建中心用户数据目录失败: %s %w", strings.TrimSpace(output), prepareErr)
 	}
 	r.Logf("中心工作目录：%s", centerpath.WorkspaceRoot(composeFile))
+	if stored.Deployment != nil {
+		return s.prepareModules(ctx, remote, stored, composeFile, accelerator, cpuCount, gpuCount, templates.RenderOptions{
+			Workers: workers, CPUSets: cpuSets, ModelsRoot: modelsRoot, LogsRoot: logsRoot, MediaResourcesRoot: mediaResourcesRoot,
+			ServerName: stored.Name, FeishuWebhook: alertConfig.FeishuWebhook,
+		}, r)
+	}
 	if err = templates.Render(mode, root, templates.RenderOptions{
 		Workers: workers, CPUSets: cpuSets, ModelsRoot: modelsRoot, LogsRoot: logsRoot, MediaResourcesRoot: mediaResourcesRoot,
 		WorkerEnv: map[string]string{"TZ": "Asia/Shanghai"}, ServerName: stored.Name, FeishuWebhook: alertConfig.FeishuWebhook,
@@ -510,6 +523,9 @@ func (s *Service) ReadCompose(ctx context.Context, centerID string) (ComposeDocu
 		return ComposeDocument{}, err
 	}
 	defer remote.Close()
+	if stored.Deployment != nil {
+		return ComposeDocument{}, fmt.Errorf("模块化中心请在模块列表中选择 Compose")
+	}
 	content, err := readRemoteFile(ctx, remote.SSH, stored.ComposeFile)
 	if err != nil {
 		return ComposeDocument{}, fmt.Errorf("读取中心 Compose 失败: %w", err)
@@ -531,6 +547,9 @@ func (s *Service) SaveCompose(ctx context.Context, centerID, content string) (Co
 		return ComposeDocument{}, err
 	}
 	defer remote.Close()
+	if stored.Deployment != nil {
+		return ComposeDocument{}, fmt.Errorf("模块化中心请在模块列表中选择 Compose")
+	}
 	temporary := stored.ComposeFile + ".validate." + strconv.FormatInt(time.Now().UnixNano(), 10)
 	if err = uploadRemoteFile(ctx, remote.SSH, temporary, content, "0600"); err != nil {
 		return ComposeDocument{}, err
@@ -1001,28 +1020,7 @@ func uploadRemoteFile(ctx context.Context, client *ssh.Client, remotePath, conte
 }
 
 func runSSH(ctx context.Context, client *ssh.Client, command, stdin string) (string, error) {
-	session, err := client.NewSession()
-	if err != nil {
-		return "", err
-	}
-	defer session.Close()
-	var stdout, stderr bytes.Buffer
-	session.Stdout, session.Stderr = &stdout, &stderr
-	if stdin != "" {
-		session.Stdin = strings.NewReader(stdin)
-	}
-	if err = session.Start(command); err != nil {
-		return combineSSHOutput(stdout.String(), stderr.String()), err
-	}
-	done := make(chan error, 1)
-	go func() { done <- session.Wait() }()
-	select {
-	case <-ctx.Done():
-		_ = session.Close()
-		return combineSSHOutput(stdout.String(), stderr.String()), ctx.Err()
-	case err = <-done:
-		return combineSSHOutput(stdout.String(), stderr.String()), err
-	}
+	return modular.Run(ctx, client, command, stdin)
 }
 
 func combineSSHOutput(stdout, stderr string) string {

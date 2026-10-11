@@ -74,6 +74,9 @@ func (s *Service) Run(ctx context.Context, centerID, action, containerID string,
 	case RemoveAllContainers:
 		return removeAllContainers(ctx, remote, r)
 	default:
+		if center.Deployment != nil {
+			return fmt.Errorf("模块化中心请在模块列表中选择目标模块操作")
+		}
 		return runComposeAction(ctx, remote, cfg.Password, center.ComposeFile, action, r)
 	}
 }
@@ -401,7 +404,7 @@ func composeCommand(action string) (string, string) {
 	case RestartCompose:
 		return "restart", "正在重启整套 Compose"
 	case RedeployCompose:
-		return "up -d --remove-orphans", "正在重新部署整套 Compose"
+		return "up -d", "正在重新部署整套 Compose"
 	case StopCompose:
 		return "stop", "正在停止整套 Compose"
 	default:

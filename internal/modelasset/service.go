@@ -17,6 +17,7 @@ import (
 	"center-cv-manager/internal/centerlock"
 	"center-cv-manager/internal/centerpath"
 	"center-cv-manager/internal/domain"
+	"center-cv-manager/internal/modular"
 	"center-cv-manager/internal/secret"
 	"center-cv-manager/internal/sshx"
 	aliyunoss "github.com/aliyun/aliyun-oss-go-sdk/oss"
@@ -117,7 +118,7 @@ func (s *Service) SyncCenter(ctx context.Context, centerID string, keys []string
 	}
 	defer client.Close()
 	_ = s.centers.RememberHostKey(stored, fingerprint)
-	targetRoot := centerpath.ModelsRoot(stored.ComposeFile)
+	targetRoot := modular.ModelsRoot(stored)
 	files, err := prepareRemoteFiles(ctx, client, cfg.Password, targetRoot, r)
 	if err != nil {
 		return err

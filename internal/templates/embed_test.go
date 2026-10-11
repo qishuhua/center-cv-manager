@@ -1,6 +1,7 @@
 package templates
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -47,7 +48,7 @@ func TestRenderDynamicDenglinWorkers(t *testing.T) {
 }
 
 func TestRenderEightDenglinPhysicalGPUsCover32LogicalDevices(t *testing.T) {
-	content, err := embedded.ReadFile("compose/docker-compose.denglin.yml")
+	content, err := fs.ReadFile(templateFiles, "compose/docker-compose.denglin.yml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +74,7 @@ func TestRenderEightDenglinPhysicalGPUsCover32LogicalDevices(t *testing.T) {
 
 func TestActualComposeTemplatesRenderDetectedTopology(t *testing.T) {
 	for _, mode := range []string{"denglin", "tensorrt"} {
-		content, err := embedded.ReadFile("compose/" + composeForMode(mode))
+		content, err := fs.ReadFile(templateFiles, "compose/"+composeForMode(mode))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -125,7 +126,7 @@ func TestActualComposeTemplatesRenderDetectedTopology(t *testing.T) {
 
 func TestStandardEightWorkerTemplatesHave26Services(t *testing.T) {
 	for _, mode := range []string{"denglin", "tensorrt"} {
-		content, err := embedded.ReadFile("compose/" + composeForMode(mode))
+		content, err := fs.ReadFile(templateFiles, "compose/"+composeForMode(mode))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -145,7 +146,7 @@ func TestVideoTranscodeReadinessEndpoint(t *testing.T) {
 	const expected = `http://127.0.0.1:8092/readyz`
 	const obsolete = `http://127.0.0.1:8092/api/readyz`
 	for _, name := range []string{"prometheus.denglin.yml", "prometheus.nvidia.yml"} {
-		content, err := embedded.ReadFile("monitoring/prometheus/" + name)
+		content, err := fs.ReadFile(templateFiles, "monitoring/prometheus/"+name)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -160,7 +161,7 @@ func TestVideoTranscodeReadinessEndpoint(t *testing.T) {
 }
 
 func TestLogTemplatesUseMatchingDataStreamAndCreateDataView(t *testing.T) {
-	filebeat, err := embedded.ReadFile("monitoring/filebeat/filebeat.yml")
+	filebeat, err := fs.ReadFile(templateFiles, "monitoring/filebeat/filebeat.yml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +177,7 @@ func TestLogTemplatesUseMatchingDataStreamAndCreateDataView(t *testing.T) {
 	if strings.Contains(text, "log.source:") || !strings.Contains(text, "event.dataset: center-cv-service") {
 		t.Fatal("Filebeat custom fields must not conflict with the ECS log.source object")
 	}
-	initScript, err := embedded.ReadFile("monitoring/kibana/init.sh")
+	initScript, err := fs.ReadFile(templateFiles, "monitoring/kibana/init.sh")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +189,7 @@ func TestLogTemplatesUseMatchingDataStreamAndCreateDataView(t *testing.T) {
 }
 
 func TestBusinessTemplateIncludesCurrentAlarmReporter(t *testing.T) {
-	content, err := embedded.ReadFile("compose/docker-compose.business.yml")
+	content, err := fs.ReadFile(templateFiles, "compose/docker-compose.business.yml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,7 +200,7 @@ func TestBusinessTemplateIncludesCurrentAlarmReporter(t *testing.T) {
 
 func TestComposeTemplatesUseSharedMediaResourcesPath(t *testing.T) {
 	for _, name := range []string{"docker-compose.business.yml", "docker-compose.denglin.yml", "docker-compose.nvidia.yml"} {
-		content, err := embedded.ReadFile("compose/" + name)
+		content, err := fs.ReadFile(templateFiles, "compose/"+name)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -304,7 +305,7 @@ func TestRenderDynamicPrometheus(t *testing.T) {
 
 func TestPrometheusHealthEndpointsHaveNoAPIPrefix(t *testing.T) {
 	for _, name := range []string{"prometheus.denglin.yml", "prometheus.nvidia.yml"} {
-		content, err := embedded.ReadFile("monitoring/prometheus/" + name)
+		content, err := fs.ReadFile(templateFiles, "monitoring/prometheus/"+name)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -327,7 +328,7 @@ func TestPrometheusHealthEndpointsHaveNoAPIPrefix(t *testing.T) {
 
 func TestPrometheusTemplatesTrackVideoTranscodeEndpoints(t *testing.T) {
 	for _, name := range []string{"prometheus.denglin.yml", "prometheus.nvidia.yml"} {
-		content, err := embedded.ReadFile("monitoring/prometheus/" + name)
+		content, err := fs.ReadFile(templateFiles, "monitoring/prometheus/"+name)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -348,7 +349,7 @@ func TestPrometheusTemplatesTrackVideoTranscodeEndpoints(t *testing.T) {
 }
 
 func TestRenderUsesOneWorkerEnvironment(t *testing.T) {
-	content, err := embedded.ReadFile("compose/docker-compose.nvidia.yml")
+	content, err := fs.ReadFile(templateFiles, "compose/docker-compose.nvidia.yml")
 	if err != nil {
 		t.Fatal(err)
 	}

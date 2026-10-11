@@ -21,10 +21,11 @@ import (
 	"center-cv-manager/internal/build"
 	"center-cv-manager/internal/center"
 	"center-cv-manager/internal/centeraction"
-	"center-cv-manager/internal/centerpath"
+	"center-cv-manager/internal/centerlock"
 	"center-cv-manager/internal/deploy"
 	"center-cv-manager/internal/domain"
 	"center-cv-manager/internal/modelasset"
+	"center-cv-manager/internal/modular"
 	"center-cv-manager/internal/provision"
 	"center-cv-manager/internal/source"
 	"center-cv-manager/internal/sshx"
@@ -91,6 +92,17 @@ func (s *Server) Router() *gin.Engine {
 	api.POST("/centers/:id/detect", s.detectCenter)
 	api.POST("/centers/:id/initialize", s.initializeCenter)
 	api.POST("/centers/:id/actions", s.runCenterAction)
+	api.GET("/centers/:id/modules", s.listModules)
+	api.POST("/centers/:id/migration/plan", s.migrationPlan)
+	api.POST("/centers/:id/migration", s.migrateCenter)
+	api.POST("/centers/:id/modules", s.saveModuleMetadata)
+	api.PUT("/centers/:id/modules/:module", s.saveModuleMetadata)
+	api.DELETE("/centers/:id/modules/:module", s.deleteModule)
+	api.GET("/centers/:id/modules/:module/revisions", s.moduleHistory)
+	api.GET("/centers/:id/modules/:module/compose", s.readModule)
+	api.PUT("/centers/:id/modules/:module/compose", s.saveModule)
+	api.POST("/centers/:id/modules/:module/actions", s.moduleAction)
+	api.POST("/centers/:id/modules/:module/plan", s.planModule)
 	api.GET("/centers/:id/compose", s.getCenterCompose)
 	api.PUT("/centers/:id/compose", s.saveCenterCompose)
 	api.GET("/centers/:id/images", s.centerImages)
@@ -141,9 +153,9 @@ func (s *Server) Router() *gin.Engine {
 			if path == "/" {
 				path = "/index.html"
 			}
-			data, err := fs.ReadFile(s.static, "web_dist"+path)
+			data, err := fs.ReadFile(s.static, strings.TrimPrefix(path, "/"))
 			if err != nil {
-				data, err = fs.ReadFile(s.static, "web_dist/index.html")
+				data, err = fs.ReadFile(s.static, "index.html")
 			}
 			if err != nil {
 				c.Status(404)
@@ -194,22 +206,25 @@ func (s *Server) saveCenter(c *gin.Context) {
 func (s *Server) submitCenterInitialization(v domain.Center, forceTemplate, downloadImages bool) *domain.Task {
 	params := map[string]string{"center_id": v.ID, "center_name": v.Name, "force_template": strconv.FormatBool(forceTemplate), "download_images": strconv.FormatBool(downloadImages)}
 	return s.tasks.Submit("INITIALIZE_CENTER", params, func(ctx context.Context, h *task.Handle) error {
-		if err := s.provisioning.Initialize(ctx, v.ID, forceTemplate, h); err != nil {
-			return err
-		}
-		if !downloadImages {
-			return nil
-		}
-		credential, err := s.baseImages.Credential()
-		if err != nil || !credential.Configured {
-			h.Log("尚未配置 OSS 基础镜像仓库，已跳过自动镜像同步")
-			return nil
-		}
-		s.tasks.Submit("BASE_IMAGE_UPDATE", map[string]string{"center_id": v.ID, "center_name": v.Name, "restart_stack": "false", "automatic": "true"}, func(imageCtx context.Context, imageHandle *task.Handle) error {
-			return s.baseImages.UpgradeCenter(imageCtx, v.ID, false, imageHandle)
+		return centerlock.Within(ctx, v.ID, func(ctx context.Context) error {
+			if err := s.provisioning.Initialize(ctx, v.ID, forceTemplate, h); err != nil {
+				return err
+			}
+			if downloadImages {
+				credential, err := s.baseImages.Credential()
+				if err != nil {
+					return err
+				}
+				if credential.Configured {
+					if err = s.baseImages.UpgradeCenter(ctx, v.ID, false, h); err != nil {
+						return err
+					}
+				} else {
+					h.Log("尚未配置 OSS，使用中心已有镜像或 Compose 镜像拉取策略")
+				}
+			}
+			return s.provisioning.ResumeModules(ctx, v.ID, h)
 		})
-		h.Log("已创建适配当前显卡的基础镜像同步任务")
-		return nil
 	})
 }
 
@@ -471,7 +486,7 @@ func (s *Server) centerOverview(c *gin.Context) {
 		}
 		return value, ""
 	}()
-	item.Models, err = modelasset.CurrentVersionsOnClient(ctx, remote.SSH, centerpath.ModelsRoot(storedCenter.ComposeFile))
+	item.Models, err = modelasset.CurrentVersionsOnClient(ctx, remote.SSH, modular.ModelsRoot(storedCenter))
 	if err != nil {
 		item.Models = []modelasset.CurrentVersion{}
 		item.ModelsError = err.Error()
@@ -877,6 +892,9 @@ func (s *Server) releaseModels(c *gin.Context) {
 }
 
 func (s *Server) runModelRelease(ctx context.Context, centerID string, items []modelasset.ReleaseItem, restartStack bool, h *task.Handle) error {
+	return centerlock.Within(ctx, centerID, func(ctx context.Context) error { return s.runModelReleaseLocked(ctx, centerID, items, restartStack, h) })
+}
+func (s *Server) runModelReleaseLocked(ctx context.Context, centerID string, items []modelasset.ReleaseItem, restartStack bool, h *task.Handle) error {
 	if !restartStack {
 		return s.models.ReleaseCenter(ctx, centerID, items, h)
 	}
@@ -884,8 +902,11 @@ func (s *Server) runModelRelease(ctx context.Context, centerID string, items []m
 	if err := s.models.ReleaseCenter(ctx, centerID, items, phaseReporter{reporter: h, prefix: "阶段 1/2：模型发布", start: 0, end: 75}); err != nil {
 		return err
 	}
-	h.Log("阶段 2/2：重启中心 Compose，使运行进程重新加载模型")
-	return s.centerActions.Run(ctx, centerID, centeraction.RestartCompose, "", phaseReporter{reporter: h, prefix: "阶段 2/2：应用模型", start: 75, end: 100})
+	h.Log("阶段 2/2：仅重启使用模型的服务")
+	if err := s.centerActions.RestartModels(ctx, centerID, nil, h); err != nil {
+		return err
+	}
+	return s.finishModuleInitialization(ctx, centerID, h)
 }
 
 func (s *Server) syncModels(c *gin.Context) {
@@ -1160,6 +1181,7 @@ func (s *Server) prepareDeploymentItems(selections []deploymentSelection) ([]dep
 }
 
 type releaseCenterPlan struct {
+	ServiceMappings map[string][]string    `json:"service_mappings"`
 	Center          domain.Center          `json:"center"`
 	Ready           bool                   `json:"ready"`
 	BuildRequired   bool                   `json:"build_required"`
@@ -1180,6 +1202,7 @@ func (s *Server) checkUnifiedRelease(ctx context.Context, centerID string, softw
 		plan.Images = check.Images
 		plan.MissingImages = check.MissingImages
 		plan.MissingServices = check.MissingServices
+		plan.ServiceMappings = check.ServiceMappings
 		softwareReady = check.Error == "" && len(check.MissingServices) == 0
 		if check.Error != "" {
 			errors = append(errors, check.Error)
@@ -1423,6 +1446,9 @@ func readyReleaseCenters(centers []domain.Center, plans []releaseCenterPlan) ([]
 }
 
 func (s *Server) runRelease(ctx context.Context, centerID string, items []deploy.Item, modelItems []modelasset.ReleaseItem, h *task.Handle) error {
+	return centerlock.Within(ctx, centerID, func(ctx context.Context) error { return s.runReleaseLocked(ctx, centerID, items, modelItems, h) })
+}
+func (s *Server) runReleaseLocked(ctx context.Context, centerID string, items []deploy.Item, modelItems []modelasset.ReleaseItem, h *task.Handle) error {
 	if len(items) == 0 && len(modelItems) == 0 {
 		return fmt.Errorf("发布任务没有软件或模型版本快照")
 	}
@@ -1438,19 +1464,37 @@ func (s *Server) runRelease(ctx context.Context, centerID string, items []deploy
 		return s.runModelRelease(ctx, centerID, modelItems, true, h)
 	}
 
+	if err := s.prepareSoftwareRelease(ctx, centerID, items, h); err != nil {
+		return err
+	}
+	before, err := s.centerActions.RuntimeSnapshot(ctx, centerID)
+	if err != nil {
+		return err
+	}
 	h.Message("阶段 1/3：发布模型版本")
 	if err := s.models.ReleaseCenter(ctx, centerID, modelItems, phaseReporter{reporter: h, prefix: "阶段 1/3：模型发布", start: 0, end: 25}); err != nil {
 		return err
 	}
 	h.Message("阶段 2/3：发布软件版本")
-	if err := s.runSoftwareRelease(ctx, centerID, items, phaseReporter{reporter: h, prefix: "阶段 2/3：软件发布", start: 25, end: 90}); err != nil {
+	if err := s.deployments.Run(ctx, centerID, items, phaseReporter{reporter: h, prefix: "阶段 2/3：软件发布", start: 25, end: 90}); err != nil {
 		return err
 	}
-	h.Log("阶段 3/3：重启中心 Compose，使全部运行进程加载目标模型")
-	return s.centerActions.Run(ctx, centerID, centeraction.RestartCompose, "", phaseReporter{reporter: h, prefix: "阶段 3/3：应用模型", start: 90, end: 100})
+	if err := s.centerActions.RestartModels(ctx, centerID, before, h); err != nil {
+		return err
+	}
+	return s.finishModuleInitialization(ctx, centerID, h)
 }
 
 func (s *Server) runSoftwareRelease(ctx context.Context, centerID string, items []deploy.Item, r releaseReporter) error {
+	if err := s.prepareSoftwareRelease(ctx, centerID, items, r); err != nil {
+		return err
+	}
+	if err := s.deployments.Run(ctx, centerID, items, r); err != nil {
+		return err
+	}
+	return s.finishModuleInitialization(ctx, centerID, r)
+}
+func (s *Server) prepareSoftwareRelease(ctx context.Context, centerID string, items []deploy.Item, r releaseReporter) error {
 	r.Message("阶段 1/4：正在检查发布条件")
 	r.Progress(3)
 	check := s.deployments.Check(ctx, centerID, items)
@@ -1491,7 +1535,7 @@ func (s *Server) runSoftwareRelease(ctx context.Context, centerID string, items 
 		}
 	}
 	r.Log("阶段 4/4：开始部署已锁定的镜像")
-	return s.deployments.Run(ctx, centerID, items, phaseReporter{reporter: r, prefix: "阶段 4/4：部署", start: 68, end: 100})
+	return nil
 }
 
 type releaseReporter interface {
@@ -1707,4 +1751,15 @@ func (s *Server) storeError(c *gin.Context, e error) {
 	} else {
 		fail(c, 500, e)
 	}
+}
+
+func (s *Server) finishModuleInitialization(ctx context.Context, id string, r releaseReporter) error {
+	c, err := s.centers.GetPublic(id)
+	if err != nil {
+		return err
+	}
+	if c.Deployment != nil && c.Deployment.Status != "ready" {
+		return s.provisioning.ResumeModules(ctx, id, r)
+	}
+	return nil
 }

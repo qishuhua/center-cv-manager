@@ -129,6 +129,22 @@ func (s *Server) retryTask(c *gin.Context) {
 		run = func(ctx context.Context, h *task.Handle) error {
 			return s.runRelease(ctx, p["center_id"], items, modelItems, h)
 		}
+	case "MODULE_MIGRATION":
+		run = func(ctx context.Context, h *task.Handle) error {
+			if p["action"] == "rollback" {
+				return s.provisioning.RollbackMigration(ctx, p["center_id"], h)
+			}
+			return s.provisioning.Migrate(ctx, p["center_id"], p["revision"], h)
+		}
+	case "MODULE_OPERATION":
+		var services []string
+		if err := json.Unmarshal([]byte(p["services"]), &services); err != nil {
+			fail(c, 400, err)
+			return
+		}
+		run = func(ctx context.Context, h *task.Handle) error {
+			return s.provisioning.ModuleAction(ctx, p["center_id"], p["module_id"], p["action"], services, p["revision"], h)
+		}
 	case "CENTER_OPERATION":
 		// Replay only the stored, previously authorized operation; no new action parameters are accepted.
 		run = func(ctx context.Context, h *task.Handle) error {

@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"center-cv-manager/internal/centerlock"
-	"center-cv-manager/internal/centerpath"
+	"center-cv-manager/internal/modular"
 	"center-cv-manager/internal/sshx"
 	"golang.org/x/crypto/ssh"
 )
@@ -247,7 +247,7 @@ func (s *Service) CheckRelease(ctx context.Context, centerID string, items []Rel
 		return plan
 	}
 	defer client.Close()
-	targetRoot := centerpath.ModelsRoot(stored.ComposeFile)
+	targetRoot := modular.ModelsRoot(stored)
 	items, err = resolveReleaseItems(ctx, client, accelerator, items)
 	if err != nil {
 		plan.Error = err.Error()
@@ -471,7 +471,7 @@ func (s *Service) CurrentVersions(ctx context.Context, centerID string) ([]Curre
 	}
 	defer client.Close()
 	_ = s.centers.RememberHostKey(stored, fingerprint)
-	return CurrentVersionsOnClient(ctx, client, centerpath.ModelsRoot(stored.ComposeFile))
+	return CurrentVersionsOnClient(ctx, client, modular.ModelsRoot(stored))
 }
 
 // CurrentVersionsOnClient reuses an existing center SSH connection, which is
@@ -627,7 +627,7 @@ func (s *Service) SetModelSetPinned(ctx context.Context, centerID string, pinned
 	}
 	defer client.Close()
 	_ = s.centers.RememberHostKey(stored, fingerprint)
-	targetRoot := centerpath.ModelsRoot(stored.ComposeFile)
+	targetRoot := modular.ModelsRoot(stored)
 	files, err := prepareRemoteFiles(ctx, client, cfg.Password, targetRoot, discardReporter{})
 	if err != nil {
 		return ModelSetPin{}, err
@@ -724,7 +724,7 @@ func (s *Service) ReleaseCenter(ctx context.Context, centerID string, items []Re
 			return err
 		}
 	}
-	targetRoot := centerpath.ModelsRoot(stored.ComposeFile)
+	targetRoot := modular.ModelsRoot(stored)
 	files, err := prepareRemoteFiles(ctx, client, cfg.Password, targetRoot, r)
 	if err != nil {
 		return err

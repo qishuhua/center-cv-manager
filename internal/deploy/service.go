@@ -1,7 +1,6 @@
 package deploy
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"sort"
@@ -11,6 +10,7 @@ import (
 	"center-cv-manager/internal/build"
 	"center-cv-manager/internal/centerlock"
 	"center-cv-manager/internal/domain"
+	"center-cv-manager/internal/modular"
 	"center-cv-manager/internal/sshx"
 	containertypes "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
@@ -40,6 +40,7 @@ type Item struct {
 }
 
 type CheckResult struct {
+	Modules         map[string]CheckResult     `json:"modules,omitempty"`
 	Ready           bool                       `json:"ready"`
 	Error           string                     `json:"error,omitempty"`
 	Images          map[string]string          `json:"images"`
@@ -65,6 +66,9 @@ func (s *Service) Check(ctx context.Context, centerID string, items []Item) Chec
 	if err != nil {
 		result.Error = err.Error()
 		return result
+	}
+	if center.Deployment != nil {
+		return s.checkModules(ctx, centerID, center, items)
 	}
 	if center.ComposeFile == "" {
 		result.Error = "中心尚未配置 Compose 文件路径"
@@ -93,12 +97,16 @@ func (s *Service) Check(ctx context.Context, centerID string, items []Item) Chec
 		result.Error = "Compose 文件不存在或不可读: " + center.ComposeFile
 		return result
 	}
-	composeConfig, err := runSSH(ctx, remote.SSH, "docker compose -f "+shellQuote(center.ComposeFile)+" config", "")
+	composeConfig, err := runSSH(ctx, remote.SSH, modular.CenterCommand(center)+" config", "")
 	if err != nil {
 		result.Error = "Compose 预检失败: " + err.Error()
 		return result
 	}
-	result.ComposeConfig = composeConfig
+	result.ComposeConfig, err = runSSH(ctx, remote.SSH, "cat "+shellQuote(center.ComposeFile), "")
+	if err != nil {
+		result.Error = err.Error()
+		return result
+	}
 	serviceImages, err := parseDeploymentServices(composeConfig)
 	if err != nil {
 		result.Error = "解析 Compose 配置失败: " + err.Error()
@@ -115,6 +123,9 @@ func (s *Service) Check(ctx context.Context, centerID string, items []Item) Chec
 	if containers, listErr := remote.Client.ContainerList(ctx, containertypes.ListOptions{All: true}); listErr == nil {
 		running := map[string]bool{}
 		for _, current := range containers {
+			if center.ComposeProject != "" && current.Labels["com.docker.compose.project"] != center.ComposeProject {
+				continue
+			}
 			serviceName := current.Labels["com.docker.compose.service"]
 			sourceID := current.Labels["com.center-manager.source.id"]
 			sourceRef := current.Labels["com.center-manager.source.ref"]
@@ -164,11 +175,16 @@ func (s *Service) Check(ctx context.Context, centerID string, items []Item) Chec
 }
 
 func (s *Service) Run(ctx context.Context, centerID string, items []Item, r Reporter) error {
-	release, cancelErr := centerlock.AcquireContext(ctx, centerID)
-	if cancelErr != nil {
-		return cancelErr
+	return centerlock.Within(ctx, centerID, func(ctx context.Context) error { return s.runLocked(ctx, centerID, items, r) })
+}
+func (s *Service) runLocked(ctx context.Context, centerID string, items []Item, r Reporter) error {
+	_, _, currentCenter, resolveErr := s.centers.Connection(centerID)
+	if resolveErr != nil {
+		return resolveErr
 	}
-	defer release()
+	if currentCenter.Deployment != nil {
+		return s.runModules(ctx, centerID, currentCenter, items, r)
+	}
 	r.Message("正在检查中心部署条件")
 	r.Progress(5)
 	check := s.Check(ctx, centerID, items)
@@ -187,7 +203,7 @@ func (s *Service) Run(ctx context.Context, centerID string, items []Item, r Repo
 	_ = s.centers.RememberHostKey(center, fingerprint)
 
 	temporaryCompose := fmt.Sprintf("%s.tmp.%d", center.ComposeFile, time.Now().UnixNano())
-	content, err := renderComposeRelease(check.ComposeConfig, check.CurrentServices, items, check.Images, check.ServiceMappings)
+	content, err := renderComposeRelease(check.ComposeConfig, nil, items, check.Images, check.ServiceMappings)
 	if err != nil {
 		return fmt.Errorf("生成 Compose 发布配置失败: %w", err)
 	}
@@ -200,12 +216,21 @@ func (s *Service) Run(ctx context.Context, centerID string, items []Item, r Repo
 	}
 	r.Progress(45)
 	r.Message("正在校验 Compose 配置")
-	temporaryComposeArgs := "docker compose -f " + shellQuote(temporaryCompose)
+	candidate := center
+	candidate.ComposeFile = temporaryCompose
+	temporaryComposeArgs := modular.CenterCommand(candidate)
 	if output, commandErr := runSSH(ctx, remote.SSH, temporaryComposeArgs+" config >/dev/null", ""); commandErr != nil {
 		_, _ = runSSH(context.Background(), remote.SSH, "rm -f "+shellQuote(temporaryCompose), "")
 		return fmt.Errorf("Compose 配置校验失败: %s %w", output, commandErr)
 	}
-	if output, commandErr := runSSH(ctx, remote.SSH, "mv -f "+shellQuote(temporaryCompose)+" "+shellQuote(center.ComposeFile), ""); commandErr != nil {
+	original, readErr := runSSH(ctx, remote.SSH, "cat "+shellQuote(center.ComposeFile), "")
+	if readErr != nil {
+		return readErr
+	}
+	if modular.Hash(original) != modular.Hash(check.ComposeConfig) {
+		return fmt.Errorf("远端 Compose 在发布期间已修改，未覆盖配置")
+	}
+	if output, commandErr := runSSH(ctx, remote.SSH, "cp -p "+shellQuote(center.ComposeFile)+" "+shellQuote(center.ComposeFile+".bak."+fmt.Sprint(time.Now().UnixNano()))+" && mv -f "+shellQuote(temporaryCompose)+" "+shellQuote(center.ComposeFile), ""); commandErr != nil {
 		return fmt.Errorf("启用 Compose 发布配置失败: %s %w", output, commandErr)
 	}
 	accelerator := center.DetectedAccelerator
@@ -216,9 +241,23 @@ func (s *Service) Run(ctx context.Context, centerID string, items []Item, r Repo
 		return fmt.Errorf("保存中心 Compose 状态失败: %w", err)
 	}
 	r.Progress(60)
-	r.Message("正在启动整套服务")
-	composeArgs := "docker compose -f " + shellQuote(center.ComposeFile)
-	output, commandErr := runSSH(ctx, remote.SSH, composeArgs+" up -d --remove-orphans", "")
+	r.Message("正在更新目标服务")
+	composeArgs := modular.CenterCommand(center) + " up -d"
+	if center.ComposeProject != "" {
+		composeArgs += " --no-deps"
+	}
+	targets := []string{}
+	for _, names := range check.ServiceMappings {
+		targets = append(targets, names...)
+	}
+	targets = uniqueSorted(targets)
+	if len(targets) == 0 {
+		return fmt.Errorf("未选择任何目标服务")
+	}
+	for _, name := range targets {
+		composeArgs += " " + shellQuote(name)
+	}
+	output, commandErr := runSSH(ctx, remote.SSH, composeArgs, "")
 	if strings.TrimSpace(output) != "" {
 		r.Log(strings.TrimSpace(output))
 	}
@@ -226,7 +265,7 @@ func (s *Service) Run(ctx context.Context, centerID string, items []Item, r Repo
 		return fmt.Errorf("启动 Compose 服务失败: %w", commandErr)
 	}
 	r.Progress(100)
-	r.Message("整套服务部署完成")
+	r.Message("目标服务部署完成")
 	return nil
 }
 
@@ -324,13 +363,43 @@ func renderComposeRelease(base string, current map[string]deployedService, items
 			return "", fmt.Errorf("Compose service %s 无效", serviceName)
 		}
 		yamlSetScalar(service, "image", update.Image)
-		labels := yamlMappingValue(service, "labels")
-		if labels == nil {
-			labels = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
-			service.Content = append(service.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "labels"}, labels)
+		// Decode the service to include labels inherited through YAML merge
+		// anchors. Materialize only this service's labels, never modify the anchor.
+		var effective struct {
+			Labels any `yaml:"labels"`
 		}
-		if labels.Kind != yaml.MappingNode {
-			return "", fmt.Errorf("Compose service %s 的 labels 必须是映射", serviceName)
+		if err := service.Decode(&effective); err != nil {
+			return "", err
+		}
+		values := map[string]string{}
+		switch raw := effective.Labels.(type) {
+		case map[string]any:
+			for k, v := range raw {
+				values[k] = fmt.Sprint(v)
+			}
+		case []any:
+			for _, v := range raw {
+				parts := strings.SplitN(fmt.Sprint(v), "=", 2)
+				value := ""
+				if len(parts) == 2 {
+					value = parts[1]
+				}
+				values[parts[0]] = value
+			}
+		case nil:
+		default:
+			return "", fmt.Errorf("Compose service %s 的 labels 无效", serviceName)
+		}
+		labels := &yaml.Node{}
+		if err := labels.Encode(values); err != nil {
+			return "", err
+		}
+		existing := yamlMappingValue(service, "labels")
+		if existing != nil {
+			*existing = *labels
+			labels = existing
+		} else {
+			service.Content = append(service.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "labels"}, labels)
 		}
 		for key, value := range update.Labels {
 			yamlSetScalar(labels, key, value)
@@ -428,33 +497,7 @@ func imageRepository(reference string) string {
 }
 
 func runSSH(ctx context.Context, client *ssh.Client, command, stdin string) (string, error) {
-	session, err := client.NewSession()
-	if err != nil {
-		return "", err
-	}
-	defer session.Close()
-	var stdout, stderr bytes.Buffer
-	session.Stdout, session.Stderr = &stdout, &stderr
-	if stdin != "" {
-		session.Stdin = strings.NewReader(stdin)
-	}
-	if err = session.Start(command); err != nil {
-		return combineSSHOutput(stdout.String(), stderr.String()), err
-	}
-	done := make(chan error, 1)
-	go func() { done <- session.Wait() }()
-	select {
-	case <-ctx.Done():
-		_ = session.Close()
-		<-done
-		return combineSSHOutput(stdout.String(), stderr.String()), ctx.Err()
-	case err = <-done:
-		output := combineSSHOutput(stdout.String(), stderr.String())
-		if err != nil {
-			return output, fmt.Errorf("%s: %w", strings.TrimSpace(output), err)
-		}
-		return output, nil
-	}
+	return modular.Run(ctx, client, command, stdin)
 }
 
 func combineSSHOutput(stdout, stderr string) string {

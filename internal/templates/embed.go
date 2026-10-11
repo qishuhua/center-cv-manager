@@ -1,10 +1,9 @@
-// Package templates 内置部署所需的 compose、nginx、监控等配置模板，
-// 通过 go:embed 打进二进制。Render 按部署模式把所需文件落地到 deployRoot，
+// Package templates 从文件系统读取 compose、nginx、监控等配置模板。
+// Render 按部署模式把所需文件落地到 deployRoot，
 // 保持 compose 内相对挂载路径（./monitoring/...、./nginx/...）的目录结构。
 package templates
 
 import (
-	"embed"
 	"fmt"
 	"io/fs"
 	"os"
@@ -14,15 +13,50 @@ import (
 	"strings"
 )
 
-//go:embed all:compose
-//go:embed all:nginx
-//go:embed all:monitoring
-//go:embed all:secrets
-var embedded embed.FS
+// templateFiles 默认定位源码目录，服务启动时通过 SetDirectory 指定容器资源目录。
+var templateFiles = sourceDirectory()
 
-// FileSpec 一个模板文件：embed FS 内路径 -> 落地目标相对路径。
+func sourceDirectory() fs.FS {
+	dir, err := os.Getwd()
+	if err != nil {
+		return os.DirFS(".")
+	}
+	for {
+		for _, candidate := range []string{filepath.Join(dir, "internal", "templates"), dir} {
+			if info, err := os.Stat(filepath.Join(candidate, "compose")); err == nil && info.IsDir() {
+				return os.DirFS(candidate)
+			}
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return os.DirFS("internal/templates")
+		}
+		dir = parent
+	}
+}
+
+// SetDirectory 在启动服务前配置模板目录，运行期间不应修改。
+func SetDirectory(dir string) error {
+	root, err := filepath.Abs(dir)
+	if err != nil {
+		return err
+	}
+	for _, name := range []string{"compose", "nginx", "monitoring", "secrets", "modules"} {
+		info, err := os.Stat(filepath.Join(root, name))
+		if err != nil {
+			return fmt.Errorf("读取模板目录 %s: %w", name, err)
+		}
+		if !info.IsDir() {
+			return fmt.Errorf("模板路径 %s 不是目录", name)
+		}
+	}
+	templateFiles = os.DirFS(root)
+	return nil
+}
+
+// FileSpec 一个模板文件：模板目录 内路径 -> 落地目标相对路径。
 type FileSpec struct {
-	EmbedPath  string // embed FS 内路径，如 "compose/docker-compose.denglin.yml"
+	EmbedPath  string // 模板目录 内路径，如 "compose/docker-compose.denglin.yml"
 	TargetPath string // 相对 deployRoot 的目标路径，如 "docker-compose.denglin.yml"
 }
 
@@ -200,9 +234,9 @@ func Render(mode, deployRoot string, opts RenderOptions, log func(string)) error
 	}
 
 	for _, spec := range specs {
-		content, err := embedded.ReadFile(filepath.ToSlash(spec.EmbedPath))
+		content, err := fs.ReadFile(templateFiles, filepath.ToSlash(spec.EmbedPath))
 		if err != nil {
-			return fmt.Errorf("读取内置模板 %s 失败: %w", spec.EmbedPath, err)
+			return fmt.Errorf("读取模板 %s 失败: %w", spec.EmbedPath, err)
 		}
 		if spec.EmbedPath == filepath.Join("compose", composeForMode(mode)) && mode != "business" {
 			content = renderWorkerEnvironment(content, opts.WorkerEnv)
@@ -504,6 +538,3 @@ func renderDynamicPrometheus(content []byte, mode string, workers int) ([]byte, 
 func ComposeFile(mode, deployRoot string) string {
 	return filepath.Join(deployRoot, composeForMode(mode))
 }
-
-// EnsureFS 用于编译期校验 embed.FS 实现 fs.FS（保留导入）。
-var _ fs.FS = embedded

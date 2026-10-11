@@ -1,5 +1,7 @@
 # 中心数字化管理平台
 
+模块化部署改造设计见 [中心模块化部署方案](docs/architecture/modular-center-deployment.md)；操作说明见下文“模块化中心部署”。
+
 运行在开发机上的中心服务器集中管理服务。它用于登记各中心的 SSH 信息、查看并选择软件 Git
 版本，在需要构建镜像时自动准备精确 commit 的源码，并把 Docker 构建上下文通过 SSH 隧道直接
 流式发送给中心服务器的 Docker Engine。中心服务器不需要安装 Agent，也不会保存一份额外源码。
@@ -17,9 +19,47 @@
 
 - 统一版本发布：直接选择远端分支/标签并锁定 commit，按中心检查精确镜像，缺失时自动准备源码、构建并部署
 - 下载/发布任务异步执行，SQLite 持久化任务与日志，SSE 推送实时状态
-- Vue 3 + Element Plus 管理界面；发布时嵌入 Go 单一二进制
+- Vue 3 + Element Plus 管理界面；前端静态文件独立放入 Docker 镜像，由 Go 服务读取
 
 新中心默认把部署文件和持久化数据放在 SSH 用户自己的 `~/.local/share/center-manager` 工作区，不需要向宿主机根目录写入。初始化会先创建并验证数据目录，再生成 Compose，避免 Docker 自动创建 root 所有目录。自定义目录不可写时，模型发布仍会自动验证 sudo 作为兼容回退。
+
+## 模块化中心部署
+
+新中心默认使用五个独立项目：`infra`、`logging`、`business`、`gateway`、`monitoring`。模板来自 `center-cv-docker` 分类目录，作为独立资源打包进 Docker 镜像，运行时从 `/app/templates` 读取。
+
+- 初始化先准备并校验配置，按需同步基础镜像，然后按 **中间件 → 日志 → 业务 → 网关 → 监控** 启动。初始化服务必须成功退出，常驻服务必须运行且健康；业务额外检查应用就绪接口，监控最后启动。
+- 缺少模型或业务镜像时，显示“等待业务发布”，保留已完成的基础模块。发布所需镜像和模型后自动继续，也可在运行详情中点击“初始化 / 继续失败步骤”。已成功且未变化的模块仅核对状态。
+- 运行详情的“部署模块”支持独立编辑 Compose、`module.env` 和模块内配置文件，管理依赖、模型使用方、就绪 URL 和超时；支持添加自定义模块。每次命令只有一个 `-f`，并使用独立项目名。
+- 保存 Compose 时先在目标机校验，再备份原文件并原子替换；文件 hash 防止并发覆盖，远端手工修改会提示。保存不会自动部署。可查看差异、载入 Compose 历史备份后重新保存和部署。
+- “部署 / 重启 / 停止”可以选择整个模块或指定服务，执行前展示服务范围并绑定配置版本。配置变化后原计划拒绝执行，需要重新生成。失败任务可在配置不变时重试。
+- 软件发布只修改原始 YAML 中匹配服务的镜像及版本标签，保留其他配置、变量和继承标签；模块中心使用服务级 `up -d --no-deps`。不使用 `--remove-orphans`，删除服务不会自动清理容器或卷。
+- 模型升级只重启登记的模型使用服务。联合发布先构建所需镜像，再切换模型并部署软件；本次已经重建的 Worker 不重复重启。
+- 基础镜像默认仅加载；选择立即应用时，只重建实际使用本次变化镜像的运行服务。
+- 模块禁用不会停止现有容器；启用关系必须满足依赖。自定义服务或关闭部分模块时，请同步编辑监控采集目标和网关配置，避免访问未运行的上游。
+- 未配置飞书时，新中心监控仍可启动，但默认不发送通知；之后需在监控模块更新 Alertmanager 配置和 Webhook 文件并部署。已有文件不会被初始化覆盖。
+
+中心配置中的 `compose_file` 对新中心作为部署目录锚点保留兼容；实际入口分别位于 `deploy/<模块>/compose.yml`。模型、日志和媒体目录独立保存，不再跟随业务 Compose 路径变化。
+
+### 旧中心迁移
+
+已有中心默认保留原 Compose；新登记时发现指定路径已有 Compose 也按兼容模式导入，不自动拆分。可在运行详情点击“迁移到模块部署”，预检会展示模块、受影响容器和复用卷；实际迁移需要维护窗口并先排空业务任务。
+
+迁移保留旧镜像版本、绝对挂载路径、未识别的自定义服务（归入 business），将旧命名卷设为 `external: true` 并复用实际卷名。只移除计划中旧项目的容器，不删除数据卷、不清理其他项目。跨模块依赖变为管理端启动依赖。计划与现场不一致或目标项目已被占用时停止执行。
+
+失败后可重试原迁移任务；“回退迁移”恢复原 Compose，保留数据和模型现状，不回滚数据库内容或队列消息。原 Compose 被修改、或迁移后新增其他模块时，会要求先处理这些差异。仅配置解析通过不代表生产运行已验证，首次迁移应在测试中心验证。
+
+### 模块 API
+
+- `GET/POST /api/v1/centers/:id/modules`：列表 / 添加模块。
+- `PUT/DELETE /api/v1/centers/:id/modules/:module`：修改设置 / 移除无容器且无依赖的登记（保留文件）。
+- `GET/PUT /api/v1/centers/:id/modules/:module/compose?file=compose.yml`：读取 / 校验保存文件；`file=module.env` 编辑模块变量；PUT 必须提交读取时的 `revision`。
+- `GET /api/v1/centers/:id/modules/:module/revisions`：Compose 历史备份文件名。
+- `POST /api/v1/centers/:id/modules/:module/plan`：按 action 和 services 生成操作范围及配置版本。
+- `POST /api/v1/centers/:id/modules/:module/actions`：提交 action、services、计划 revision 和管理员密码，异步执行。
+- `POST /api/v1/centers/:id/migration/plan`：只读旧部署迁移预检。
+- `POST /api/v1/centers/:id/migration`：提交计划 revision、管理员密码后迁移；`rollback: true` 回退迁移。
+
+模块状态及路径作为中心的 `deployment_json` 存入 SQLite，旧记录默认为 null，升级数据库不触碰远端容器。任务与步骤输出沿用持久化任务日志和 SSE。
 
 ## 架构
 
@@ -47,10 +87,6 @@ npm install
 npm run build
 cd ..
 
-# 将前端产物同步到 Go embed 目录
-Remove-Item -Recurse -Force cmd/server/web_dist
-Copy-Item -Recurse web/dist cmd/server/web_dist
-
 go run ./cmd/server --listen 127.0.0.1:8099 --data ./data
 ```
 
@@ -76,19 +112,17 @@ docker compose ps
 
 ## 生产构建
 
-Windows 可运行 `make build`，产物为 `build/center-cv-manager.exe`。Linux 构建：
+项目以 Docker Compose 作为默认构建和部署方式，不生成 EXE。后端编译为容器内的 Linux 程序，前端静态文件与部署模板分别位于 `/app/web`、`/app/templates`，不嵌入二进制。
 
 ```bash
-cd web && npm ci && npm run build && cd ..
-rm -rf cmd/server/web_dist && cp -r web/dist cmd/server/web_dist
-go build -o build/center-cv-manager ./cmd/server
+docker compose build
+docker compose up -d
+docker compose logs -f --tail=100
 ```
 
-默认直接运行二进制时只监听 `127.0.0.1`。如需监听局域网：
+修改代码、前端或模板后，执行 `docker compose up -d --build` 更新。也可使用 `make build` 构建镜像、`make up` 构建并启动、`make down` 停止服务；停止服务保留数据卷。
 
-```powershell
-./build/center-cv-manager.exe --listen 0.0.0.0:8099 --data D:\center-manager-data
-```
+本地开发从项目根目录启动，默认读取 `web/dist` 和 `internal/templates`，可通过 `--web`、`--templates` 指定资源目录。部署只需 Docker Engine 与 Compose，无需宿主机安装 Go 或 Node.js。
 
 登录密码使用 bcrypt 保存，浏览器使用 12 小时 Cookie Session。SSH 密码、私钥和私钥口令
 使用 `data/master.key` 做 AES-256-GCM 加密后才写入 SQLite。`master.key` 与数据库必须一起
@@ -125,11 +159,11 @@ go build -o build/center-cv-manager ./cmd/server
 - 只发布软件时会沿用中心当前受管模型，但发布预检要求中心至少存在一组完整、健康的模型；新中心没有模型时必须同时选择模型版本。
 - 默认宿主机模型目录为 `~/.local/share/center-manager/data/models`；容器内仍挂载为 `/data/models`，无需修改现有镜像。
 - 对外模型目录只保留推理服务使用的扁平文件入口：`onnx/<model>.onnx`、`denglin/<model>.engine` 或 `plan/<hardware_profile>/<model>.plan`。版本文件存放在隐藏的 `.center-manager/repositories/` 内，扁平入口以相对符号链接指向当前版本，因此上传文件名仍不受限制。
-- 发布、重新部署或重启整套 Compose 时会根据中心保存的全部模型发布状态校验并修复扁平文件入口；旧版遗留的 `denglin/<model>/<file>.engine` 等公开目录会迁移到隐藏版本库并从公开模型目录移除，不需要逐个重新上传模型。
+- 模型发布和模型使用模块维护时会根据中心保存的模型发布状态校验并修复扁平文件入口；旧版遗留的 `denglin/<model>/<file>.engine` 等公开目录会迁移到隐藏版本库并从公开模型目录移除，不需要逐个重新上传模型。
 
 ## 中心目录布局
 
-新中心默认填写 `~/.local/share/center-manager/deploy/docker-compose.yml`。首次初始化会通过 SSH 将 `~` 解析为该账号真实的家目录，并保存绝对路径；因此也兼容家目录不在 `/home/<用户名>` 下的账号。
+中心连接配置默认使用 `~/.local/share/center-manager/deploy/docker-compose.yml` 作为部署目录锚点；模块化中心在其同级模块目录中生成实际 Compose。首次初始化会通过 SSH 将 `~` 解析为该账号真实的家目录，并保存绝对路径；因此也兼容家目录不在 `/home/<用户名>` 下的账号。
 
 登临环境按“每张物理 GPU 对应 4 个 DL 逻辑设备”换算硬件数量。例如 `dlsmi` 返回逻辑设备 `0`–`31` 时，管理端会生成 8 个 Worker，分别绑定 `0,1,2,3` 到 `28,29,30,31`，不会把 32 个逻辑设备误建成 32 个 Worker。
 
@@ -146,11 +180,11 @@ CPU 数量使用在线逻辑 CPU 数展示，但 Worker 的 `cpuset` 不再按 `
 
 可以在中心配置中改为其他绝对路径。已有 `/opt/center/deploy/docker-compose.yml` 配置保持旧的 `/data` 布局，不会自动搬迁或覆盖；需要迁移时，先备份旧数据，再修改 Compose 路径并执行强制重新生成。
 
-初始化或“同步内置配置”发现已有 Compose 时，会保留 Compose 和中心现有的飞书密钥，同时更新受管的 Nginx、Prometheus、Grafana、告警及日志模板；“按硬件重新生成模板”才会备份并覆盖 Compose。配置文件同步后需重启 Compose 中的相关服务才能加载新配置。
+兼容模式的初始化或“同步内置配置”发现已有 Compose 时，会保留 Compose 和中心现有的飞书密钥，同时更新受管的 Nginx、Prometheus、Grafana、告警及日志模板；“按硬件重新生成模板”才会备份并覆盖 Compose。配置文件同步后需重启 Compose 中的相关服务才能加载新配置。
 
 登临和 NVIDIA 完整模板的 RabbitMQ 健康检查使用 15 秒超时、60 秒启动宽限期，检查间隔为 10 秒、失败重试次数为 12，避免 `rabbitmq-diagnostics -q ping` 启动较慢时误判不健康并阻塞业务启动。已有中心仅“同步内置配置”不会更新 Compose：请在“编辑 Compose”中修改 `rabbitmq.healthcheck.timeout` 为 `15s`、`start_period` 为 `60s`，保存后在维护窗口执行“重新部署 Compose”，使 RabbitMQ 按新参数重建并启动依赖服务。重建会短暂中断消息连接，持久化数据卷保留；仅重启容器不会加载新的健康检查参数。完成后确认 RabbitMQ 健康、初始化成功、业务就绪及告警恢复。
 
-中心始终只有配置中指定的一个 Compose 文件。软件发布直接更新该文件中的镜像和版本标签，不创建、读取或叠加额外 Compose 配置；更新前会先校验临时文件，启动失败时保留当前现场和错误供人工检查。部署固定使用 `--remove-orphans`，确保已经从模板移除的 Worker 不会残留或复活。
+旧中心在迁移前继续管理原单 Compose；模块化中心分别管理各模块入口。发布前校验临时文件，启动失败时保留现场和错误；不再通过 `--remove-orphans` 自动清理服务，移除配置后需单独处理旧容器。
 
 ## 下一阶段建议
 

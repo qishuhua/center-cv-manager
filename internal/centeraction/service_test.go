@@ -9,7 +9,7 @@ import (
 )
 
 func TestComposeCommand(t *testing.T) {
-	cases := map[string]string{RestartCompose: "restart", RedeployCompose: "up -d --remove-orphans", StopCompose: "stop"}
+	cases := map[string]string{RestartCompose: "restart", RedeployCompose: "up -d", StopCompose: "stop"}
 	for action, want := range cases {
 		got, _ := composeCommand(action)
 		if got != want {
@@ -23,7 +23,7 @@ func TestComposeCommand(t *testing.T) {
 
 func TestCommandPreviewUsesConfiguredComposeFile(t *testing.T) {
 	got := CommandPreview("/home/deploy user/compose.yml", RedeployCompose, "")
-	want := "docker compose -f '/home/deploy user/compose.yml' up -d --remove-orphans"
+	want := "docker compose -f '/home/deploy user/compose.yml' up -d"
 	if got != want {
 		t.Fatalf("CommandPreview() = %q, want %q", got, want)
 	}

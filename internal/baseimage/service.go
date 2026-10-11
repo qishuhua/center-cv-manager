@@ -16,9 +16,11 @@ import (
 	"center-cv-manager/internal/center"
 	"center-cv-manager/internal/centerlock"
 	"center-cv-manager/internal/domain"
+	"center-cv-manager/internal/modular"
 	"center-cv-manager/internal/secret"
 	"center-cv-manager/internal/sshx"
 	aliyunoss "github.com/aliyun/aliyun-oss-go-sdk/oss"
+	containertypes "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"golang.org/x/crypto/ssh"
 )
@@ -201,6 +203,7 @@ func (s *Service) UpgradeCenter(ctx context.Context, centerID string, restartSta
 	localImageIDs := collectImageIDs(dockerImages)
 	var completedBytes int64
 	loadedCount := 0
+	applicableRefs := map[string]bool{}
 	for index, archive := range selected {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -214,6 +217,9 @@ func (s *Service) UpgradeCenter(ctx context.Context, centerID string, restartSta
 		loadedETag := strings.TrimSpace(string(loadedETagOutput))
 		loadedRefsOutput, _ := runSSH(ctx, remote.SSH, "cat "+shellQuote(loadedRefsPath)+" 2>/dev/null || true", nil)
 		loadedRefs := splitLines(string(loadedRefsOutput))
+		for _, ref := range loadedRefs {
+			applicableRefs[ref] = true
+		}
 		loadedIDsOutput, _ := runSSH(ctx, remote.SSH, "cat "+shellQuote(loadedIDsPath)+" 2>/dev/null || true", nil)
 		loadedIDs := parseLoadedImageIDs(string(loadedIDsOutput))
 		stateConflict := loadedETag == archive.ETag && len(loadedIDs) > 0 && !allImageIDsMatch(loadedRefs, loadedIDs, localImageIDs)
@@ -235,6 +241,7 @@ func (s *Service) UpgradeCenter(ctx context.Context, centerID string, restartSta
 		}
 		if !stateConflict && (loadedETag == "" || loadedETag == archive.ETag) {
 			if matchedRef, matched := archiveMatchesLocalImage(archive.Name, localTags); matched {
+				applicableRefs[matchedRef] = true
 				if err = writeLoadedState(ctx, remote.SSH, loadedPath, loadedRefsPath, loadedIDsPath, archive.ETag, []string{matchedRef}, localImageIDs); err != nil {
 					return fmt.Errorf("记录已存在镜像状态失败: %w", err)
 				}
@@ -313,6 +320,9 @@ func (s *Service) UpgradeCenter(ctx context.Context, centerID string, restartSta
 				localTags[strings.ToLower(ref)] = ref
 			}
 		}
+		for _, ref := range loadedRefs {
+			applicableRefs[ref] = true
+		}
 		if err = writeLoadedState(ctx, remote.SSH, loadedPath, loadedRefsPath, loadedIDsPath, archive.ETag, loadedRefs, localImageIDs); err != nil {
 			return fmt.Errorf("记录 %s 已加载状态失败: %w", archive.Name, err)
 		}
@@ -322,14 +332,60 @@ func (s *Service) UpgradeCenter(ctx context.Context, centerID string, restartSta
 		}
 	}
 	if restartStack {
-		r.Message("正在使用新基础镜像重建整套服务")
-		r.Log("已明确选择重建：运行中的容器将依次重建")
-		output, restartErr := runSSH(ctx, remote.SSH, "docker compose -f "+shellQuote(stored.ComposeFile)+" up -d --force-recreate", nil)
-		if strings.TrimSpace(string(output)) != "" {
-			r.Log(strings.TrimSpace(string(output)))
+		r.Message("正在应用变化镜像的使用服务")
+		after, e := remote.Client.ImageList(ctx, image.ListOptions{})
+		if e != nil {
+			return e
 		}
-		if restartErr != nil {
-			return fmt.Errorf("基础镜像已加载，但 Compose 重建失败: %w", restartErr)
+		desiredIDs := collectImageIDs(after)
+		containers, e := remote.Client.ContainerList(ctx, containertypes.ListOptions{})
+		if e != nil {
+			return e
+		}
+		for _, m := range modular.Modules(stored) {
+			if !m.Enabled {
+				continue
+			}
+			raw, e := modular.Run(ctx, remote.SSH, modular.Command(m)+" config", "")
+			if e != nil {
+				return e
+			}
+			parsed, e := modular.Parse(raw)
+			if e != nil {
+				return e
+			}
+			project := m.Project
+			if project == "" {
+				project = parsed.Name
+			}
+			targets := []string{}
+			for name, spec := range parsed.Services {
+				if !applicableRefs[spec.Image] {
+					continue
+				}
+				for _, v := range containers {
+					if v.Labels["com.docker.compose.project"] == project && v.Labels["com.docker.compose.service"] == name && imageNeedsApply(spec.Image, v.ImageID, applicableRefs, desiredIDs) {
+						targets = append(targets, name)
+						break
+					}
+				}
+			}
+			if len(targets) == 0 {
+				continue
+			}
+			sort.Strings(targets)
+			command := modular.Command(m) + " up -d --no-deps --force-recreate"
+			for _, n := range targets {
+				command += " " + shellQuote(n)
+			}
+			r.Log("$ " + command)
+			if output, e := modular.Run(ctx, remote.SSH, command, ""); e != nil {
+				return fmt.Errorf("镜像已加载，模块 %s 应用失败: %s %w", m.ID, output, e)
+			}
+			m.Project = project
+			if e = modular.Wait(ctx, remote, m, targets, nil); e != nil {
+				return e
+			}
 		}
 	} else if loadedCount > 0 {
 		r.Logf("已加载 %d 个基础镜像归档；现有容器保持运行，尚未使用新镜像重建", loadedCount)
@@ -691,4 +747,8 @@ func humanSize(value int64) string {
 		unit++
 	}
 	return fmt.Sprintf("%.1f %s", size, units[unit])
+}
+
+func imageNeedsApply(ref, currentID string, applicable map[string]bool, desired map[string]string) bool {
+	return applicable[ref] && desired[strings.ToLower(ref)] != "" && desired[strings.ToLower(ref)] != currentID
 }

@@ -1,18 +1,27 @@
-.PHONY: web build dev test clean
+.DEFAULT_GOAL := build
+.PHONY: web build up down logs dev test clean
 
 web:
-	cd web && npm install && npm run build
-	powershell -NoProfile -Command "Remove-Item -Recurse -Force cmd/server/web_dist -ErrorAction SilentlyContinue; Copy-Item -Recurse web/dist cmd/server/web_dist"
+	cd web && npm ci && npm run build
 
-build: web
-	go build -o build/center-cv-manager.exe ./cmd/server
+build:
+	docker compose build
+
+up:
+	docker compose up -d --build
+
+down:
+	docker compose down
+
+logs:
+	docker compose logs -f --tail=100
 
 dev:
 	go run ./cmd/server --listen 127.0.0.1:8099 --data ./data
 
 test:
 	go test ./...
-	cd web && npm run build
+	cd web && npm ci && npm run build
 
 clean:
-	powershell -NoProfile -Command "Remove-Item -Recurse -Force build,web/dist -ErrorAction SilentlyContinue"
+	docker compose down --rmi local
