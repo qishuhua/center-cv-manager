@@ -1,0 +1,154 @@
+internal/centeraction/models.go
+  s_e3e82785cd4c14::t_5d0ff97e36b115 1-125
+internal/modular/remote_test.go
+  s_e3e82785cd4c14::t_1a3e918717b666 1-62
+internal/provision/modules.go
+  s_e3e82785cd4c14::t_ecffb89f89a5d2 447-449
+  s_e3e82785cd4c14::t_44b66088e878cc 1-446,450-601
+internal/provision/module_history.go
+  s_e3e82785cd4c14::t_a2e050b77804d3 1-85
+internal/modular/remote.go
+  s_e3e82785cd4c14::t_ecffb89f89a5d2 127
+  s_e3e82785cd4c14::t_681e7a69f69159 1-126,128-143
+internal/templates/modules/infra/compose.yml
+  s_e3e82785cd4c14::t_5f34c8796832f3 1-49
+internal/store/modules_test.go
+  s_e3e82785cd4c14::t_c2f602ddf7be13 1-11,40
+  s_e3e82785cd4c14::t_8ee9888ab3d505 12-39
+internal/modular/config_test.go
+  s_e3e82785cd4c14::t_5f34c8796832f3 76-77
+  s_e3e82785cd4c14::t_dae22879dbb75f 71-75
+  s_e3e82785cd4c14::t_681e7a69f69159 1-69,78-112
+  s_e3e82785cd4c14::t_a96a35241b8e6e 70
+internal/baseimage/modules_test.go
+  s_e3e82785cd4c14::t_c2f602ddf7be13 1-4,17
+  s_e3e82785cd4c14::t_8ee9888ab3d505 10-16
+  s_e3e82785cd4c14::t_026215a8bffdf7 5-9
+internal/api/modules.go
+  s_e3e82785cd4c14::t_69019ab9da02d6 1-184
+internal/modular/config.go
+  s_e3e82785cd4c14::t_681e7a69f69159 95
+  s_e3e82785cd4c14::t_ecffb89f89a5d2 42
+  s_e3e82785cd4c14::t_44b66088e878cc 1-41,43-89,96-274
+  s_e3e82785cd4c14::t_dae22879dbb75f 90,93
+  s_e3e82785cd4c14::t_5f34c8796832f3 91-92,94
+internal/templates/modules_test.go
+  s_e3e82785cd4c14::t_1fb499a046186d 1-64
+internal/deploy/modules.go
+  s_e3e82785cd4c14::t_5d0ff97e36b115 1-179
+internal/provision/migration.go
+  s_e3e82785cd4c14::t_ec761544314c0c 1-395
+docs/architecture/modular-center-deployment.md
+  s_b284d554d34a75::t_bf55b88e277460 204
+  s_e3e82785cd4c14::t_8f22a2f0c3e791 1-203,205-223
+internal/templates/modules.go
+  s_b284d554d34a75::t_c3717cb532a6f0 23,38,93
+  s_e3e82785cd4c14::t_b55191bc37fa96 1-22,24-37,39-92,94-102
+internal/centerlock/operation_test.go
+  s_e3e82785cd4c14::t_8ee9888ab3d505 9-26
+  s_e3e82785cd4c14::t_c2f602ddf7be13 1-8,27
+web/src/ModuleManager.vue
+  s_e3e82785cd4c14::t_5d0ff97e36b115 1-11,13-23,34-80,82-104
+  s_e3e82785cd4c14::t_69019ab9da02d6 12,24-33,81
+internal/provision/module_plan.go
+  s_e3e82785cd4c14::t_44b66088e878cc 52
+  s_e3e82785cd4c14::t_ecffb89f89a5d2 38-40
+  s_e3e82785cd4c14::t_5d0ff97e36b115 1-37,41-51,53
+internal/templates/directory_test.go
+  s_b284d554d34a75::t_50063002688d38 1-35
+internal/provision/migration_test.go
+  s_e3e82785cd4c14::t_c2f602ddf7be13 1-10,13-41,66-67,73-74,85
+  s_e3e82785cd4c14::t_8ee9888ab3d505 11-12,42-65,68-72,75-84
+internal/templates/modules/business/compose.denglin.yml
+  s_e3e82785cd4c14::t_eac49e20371cdc 1-184
+internal/templates/modules/business/compose.nvidia.yml
+  s_e3e82785cd4c14::t_11d9b888c67fe4 1-184
+internal/templates/modules/gateway/compose.yml
+  s_e3e82785cd4c14::t_1a9307d2de3cd9 1-11
+internal/templates/modules/gateway/nginx/nginx.conf
+  s_e3e82785cd4c14::t_7a7728ab81485f 1-188
+internal/templates/modules/infra/rabbitmq/enabled_plugins
+  s_e3e82785cd4c14::t_e7c8ad7208e64d 1
+internal/templates/modules/infra/rabbitmq/init.sh
+  s_e3e82785cd4c14::t_af736d9009e802 1-88
+internal/templates/modules/infra/rabbitmq/rabbitmq.conf
+  s_e3e82785cd4c14::t_baaac3a39ab132 1-10
+internal/templates/modules/logging/compose.yml
+  s_e3e82785cd4c14::t_569c2f49b36446 1-116
+internal/templates/modules/logging/elasticsearch/center-cv-logs-ilm-policy.json
+  s_e3e82785cd4c14::t_8d468dfb1cc18f 1-19
+internal/templates/modules/logging/filebeat/filebeat.yml
+  s_e3e82785cd4c14::t_4c0264ff30ff35 1-70
+internal/templates/modules/logging/kibana/init.sh
+  s_e3e82785cd4c14::t_0ad1822af4b55b 1-28
+internal/templates/modules/monitoring/alerting/alertmanager.yml
+  s_e3e82785cd4c14::t_41b764014c9e43 1-45
+internal/templates/modules/monitoring/alerting/feishu-webhook-url.example
+  s_e3e82785cd4c14::t_9486b55ae94399 1
+internal/templates/modules/monitoring/alerting/rules/exporters.yml
+  s_e3e82785cd4c14::t_c795744f29656e 1-22
+internal/templates/modules/monitoring/alerting/rules/gpu.yml
+  s_e3e82785cd4c14::t_0bf18f83613707 1-85
+internal/templates/modules/monitoring/alerting/rules/host.yml
+  s_e3e82785cd4c14::t_be832604e9fd2f 1-55
+internal/templates/modules/monitoring/alerting/rules/logs.yml
+  s_e3e82785cd4c14::t_8f81e04f7673db 1-10
+internal/templates/modules/monitoring/alerting/rules/rabbitmq.yml
+  s_e3e82785cd4c14::t_2c71f9c39a19fa 1-12
+internal/templates/modules/monitoring/alerting/rules/services.yml
+  s_e3e82785cd4c14::t_62a8acd49bf3b9 1-71
+internal/templates/modules/monitoring/alerting/templates/feishu.tmpl
+  s_e3e82785cd4c14::t_130ab024c91f41 1-53
+internal/templates/modules/monitoring/blackbox/blackbox.yml
+  s_e3e82785cd4c14::t_32a63b5a9b1183 1-11
+internal/templates/modules/monitoring/compose.denglin.yml
+  s_e3e82785cd4c14::t_5e22f4a7919511 1-172
+internal/templates/modules/monitoring/compose.nvidia.yml
+  s_e3e82785cd4c14::t_1850695ef962e2 1-158
+internal/templates/modules/monitoring/denglin-gpu-exporter/denglin-gpu-exporter.json
+  s_e3e82785cd4c14::t_369f7bc568363f 1-13
+internal/templates/modules/monitoring/grafana/dashboards/center-cv-overview.denglin.json
+  s_e3e82785cd4c14::t_4b8f22ab1580bd 1-2300
+internal/templates/modules/monitoring/grafana/dashboards/center-cv-overview.nvidia.json
+  s_e3e82785cd4c14::t_0c68a18ce672db 1-2361
+internal/templates/modules/monitoring/grafana/provisioning/dashboards-denglin/dashboards.yml
+  s_e3e82785cd4c14::t_b67fe06b520d11 1-13
+internal/templates/modules/monitoring/grafana/provisioning/dashboards/dashboards.yml
+  s_e3e82785cd4c14::t_3e41ca8f93c046 1-11
+internal/templates/modules/monitoring/grafana/provisioning/datasources-host/elasticsearch.yml
+  s_e3e82785cd4c14::t_e9b803bfa368ef 1-16
+internal/templates/modules/monitoring/grafana/provisioning/datasources-host/prometheus.yml
+  s_e3e82785cd4c14::t_8c3309aecb190d 1-12
+internal/templates/modules/monitoring/grafana/provisioning/datasources/prometheus.yml
+  s_e3e82785cd4c14::t_a5340aad4dbb57 1-10
+internal/templates/modules/monitoring/mtail/log_errors.mtail
+  s_e3e82785cd4c14::t_c7ce7d7750b66b 1-11
+internal/templates/modules/monitoring/prometheus/prometheus.denglin.yml
+  s_e3e82785cd4c14::t_446ed38378e76c 1-163
+internal/templates/modules/monitoring/prometheus/prometheus.nvidia.yml
+  s_e3e82785cd4c14::t_022d23ca2c0f32 1-164
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7450a6796bc9faab20bea63d3aa349c6c727b29a",
+  "prompts": {},
+  "sessions": {
+    "s_b284d554d34a75": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a126d3-4664-7781-8585-a18b6b9a2e48",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "henry.qi <henry.qi@jtexpress.com>"
+    },
+    "s_e3e82785cd4c14": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a126a6-d7b7-7bd3-bdb2-d0e244688e86",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "henry.qi <henry.qi@jtexpress.com>"
+    }
+  }
+}
