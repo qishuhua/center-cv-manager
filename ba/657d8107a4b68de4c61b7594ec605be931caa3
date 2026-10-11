@@ -1,0 +1,96 @@
+internal/templates/embed.go
+  s_b284d554d34a75::t_c3717cb532a6f0 1-2,16-17,19-57,59,237,239
+internal/modelasset/service.go
+  s_e3e82785cd4c14::t_8ee9888ab3d505 20,121
+internal/baseimage/service.go
+  s_e3e82785cd4c14::t_78d023a81b795f 19,23,325,335-339,341-362,364-366,368-388,751,754
+  s_e3e82785cd4c14::t_008bf55f4d2b30 206,220-222,244,323-324,340,363,367,752-753
+Makefile
+  s_b284d554d34a75::t_c3717cb532a6f0 1-2,5,7-17,24,27
+internal/deploy/service_test.go
+  s_e3e82785cd4c14::t_681e7a69f69159 185,198-207
+  s_e3e82785cd4c14::t_f955aa33ca0f11 184,186-197
+cmd/server/main.go
+  s_b284d554d34a75::t_300ef1f7352abe 24,30-31,33-35,69
+internal/api/task_actions.go
+  s_e3e82785cd4c14::t_4a4bf438e88c5e 133,138-145,147
+  s_e3e82785cd4c14::t_78d023a81b795f 146
+  s_e3e82785cd4c14::t_9a6bb283760fe6 132,134-137
+internal/center/service.go
+  s_e3e82785cd4c14::t_8f22a2f0c3e791 253,256
+  s_e3e82785cd4c14::t_5d0ff97e36b115 8,11,68-71,94-97,126,159-161,203-205,246-252,254-255,257-261
+internal/api/server.go
+  s_e3e82785cd4c14::t_69019ab9da02d6 100-102
+  s_b284d554d34a75::t_300ef1f7352abe 156,158
+  s_e3e82785cd4c14::t_5d0ff97e36b115 24,28,95-99,103-105,210-226,489,895-897,905-909,1205,1449-1451,1467-1473,1479-1482,1485,1489-1497,1538,1756-1765
+  s_e3e82785cd4c14::t_42d2e0c3ce76d0 209
+  s_e3e82785cd4c14::t_e430bb1d690e59 1755
+  s_b284d554d34a75::t_0e89f0b764d6b1 1184
+internal/centerlock/registry.go
+  s_e3e82785cd4c14::t_a1a496a06d40a5 10-22,31-33
+web/src/App.vue
+  s_e3e82785cd4c14::t_f299b61635528c 219,260-267,283,319,406,419,427
+  s_e3e82785cd4c14::t_5d0ff97e36b115 16,456
+  s_e3e82785cd4c14::t_26aadc2abd28a6 9,430,525-531,534-535,539-543
+internal/provision/service.go
+  s_e3e82785cd4c14::t_44b66088e878cc 22,151-157,208-213,552,1023
+  s_e3e82785cd4c14::t_6cb2d50713c112 526-528,550-551
+internal/centeraction/service_test.go
+  s_e3e82785cd4c14::t_78d023a81b795f 12,26
+Dockerfile
+  s_b284d554d34a75::t_300ef1f7352abe 23-28,33
+README.md
+  s_e3e82785cd4c14::t_8f22a2f0c3e791 3,26-27,29-63,162,166,183,187
+  s_b284d554d34a75::t_c3717cb532a6f0 115,118-120,123,125
+  s_b284d554d34a75::t_bf55b88e277460 22,28
+  s_e3e82785cd4c14::t_47cc8ad3d0e39b 4
+internal/store/sqlite.go
+  s_e3e82785cd4c14::t_fd11cdfefdd00c 118,194,204-208,224-225,230-232,242-246
+  s_e3e82785cd4c14::t_5d0ff97e36b115 556,558-559
+  s_e3e82785cd4c14::t_25ac4d95844250 555,557
+internal/deploy/service.go
+  s_e3e82785cd4c14::t_8e9bfae631318c 500
+  s_e3e82785cd4c14::t_2b79db21437dc1 13,43,70-72,100,105-109,126-128,178-186,206,219-221,226-233,244,248-260,268
+  s_e3e82785cd4c14::t_98e32c7cc565de 366-395,397-402
+  s_e3e82785cd4c14::t_dfe22d0178573b 245-247
+internal/templates/embed_test.go
+  s_b284d554d34a75::t_c3717cb532a6f0 4,51,77,129,149,164,180,192,203,308,331,352
+internal/domain/models.go
+  s_e3e82785cd4c14::t_6abe7888900bda 53
+  s_e3e82785cd4c14::t_496f044a23657b 23-34,36-42,52,55-69
+  s_e3e82785cd4c14::t_58fd87bed0d82b 45-46
+  s_e3e82785cd4c14::t_33844e694a35d9 35,44,47-51,54
+  s_e3e82785cd4c14::t_6cbdeaaf31af5f 6-22,43
+.dockerignore
+  s_b284d554d34a75::t_c3717cb532a6f0 9
+internal/modelasset/release.go
+  s_e3e82785cd4c14::t_fd11cdfefdd00c 18,250,474,630,727
+internal/centeraction/service.go
+  s_e3e82785cd4c14::t_e14d67e1f59b14 77-79,407
+web/src/types.ts
+  s_e3e82785cd4c14::t_a18f36eedb9576 1,25-26
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ba657d8107a4b68de4c61b7594ec605be931caa3",
+  "prompts": {},
+  "sessions": {
+    "s_b284d554d34a75": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a126d3-4664-7781-8585-a18b6b9a2e48",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "henry.qi <henry.qi@jtexpress.com>"
+    },
+    "s_e3e82785cd4c14": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a126a6-d7b7-7bd3-bdb2-d0e244688e86",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "henry.qi <henry.qi@jtexpress.com>"
+    }
+  }
+}
