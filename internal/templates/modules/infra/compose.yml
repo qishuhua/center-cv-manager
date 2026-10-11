@@ -1,0 +1,49 @@
+name: center-cv-infra
+
+services:
+  rabbitmq:
+    image: rabbitmq:4.3.5-management
+    pull_policy: missing
+    container_name: rabbitmq
+    hostname: rabbitmq
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      RABBITMQ_NODENAME: rabbit@localhost
+      RABBITMQ_DEFAULT_VHOST: /
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 15s
+      retries: 12
+      start_period: 60s
+
+  rabbitmq-init:
+    image: rabbitmq:4.3.5-management
+    pull_policy: missing
+    container_name: rabbitmq-init
+    restart: "no"
+    network_mode: host
+    environment:
+      RABBITMQADMIN_TARGET_HOST: 127.0.0.1
+      RABBITMQADMIN_TARGET_PORT: 15672
+      RABBITMQADMIN_USERNAME: guest
+      RABBITMQADMIN_PASSWORD: guest
+      RABBITMQ_DEFAULT_VHOST: /
+      RABBITMQ_DEFAULT_USER: guest
+    entrypoint: ["/bin/sh", "/opt/rabbitmq/init.sh"]
+    volumes:
+      - ./rabbitmq/init.sh:/opt/rabbitmq/init.sh:ro
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+volumes:
+  rabbitmq-data:
+    name: ${CENTER_CV_DATA_PREFIX:-center-cv-infra}_rabbitmq-data

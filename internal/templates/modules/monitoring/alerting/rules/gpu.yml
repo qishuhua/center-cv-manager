@@ -1,0 +1,85 @@
+# The inactive vendor has no matching series and does not trigger alerts.
+# VRAM capacity is not DCGM_FI_DEV_MEM_COPY_UTIL or denglin_mem_util.
+groups:
+  - name: gpu-resources
+    rules:
+      - alert: NvidiaGpuUtilHigh
+        expr: (DCGM_FI_DEV_GPU_UTIL{job="nvidia-dcgm"} > 99) and (DCGM_FI_DEV_GPU_UTIL{job="nvidia-dcgm"} <= 100)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: NVIDIA GPU SM 利用率持续偏高
+          description: 'GPU {{ $labels.gpu }} SM 利用率 {{ printf "%.1f" $value }}%，超过 99% 持续 30 分钟。'
+
+      - alert: NvidiaGpuDecoderUtilHigh
+        expr: (DCGM_FI_DEV_DEC_UTIL{job="nvidia-dcgm"} > 99) and (DCGM_FI_DEV_DEC_UTIL{job="nvidia-dcgm"} <= 100)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: NVIDIA GPU 解码利用率持续偏高
+          description: 'GPU {{ $labels.gpu }} 解码利用率 {{ printf "%.1f" $value }}%，超过 99% 持续 30 分钟。'
+
+      - alert: NvidiaGpuMemoryHigh
+        expr: |
+          (100 * DCGM_FI_DEV_FB_USED{job="nvidia-dcgm"}
+          / (DCGM_FI_DEV_FB_USED{job="nvidia-dcgm"} + DCGM_FI_DEV_FB_FREE{job="nvidia-dcgm"}) > 90)
+          and (DCGM_FI_DEV_FB_USED{job="nvidia-dcgm"} >= 0)
+          and (DCGM_FI_DEV_FB_USED{job="nvidia-dcgm"} < 1e12)
+          and (DCGM_FI_DEV_FB_FREE{job="nvidia-dcgm"} >= 0)
+          and (DCGM_FI_DEV_FB_FREE{job="nvidia-dcgm"} < 1e12)
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: NVIDIA 显存占用偏高
+          description: 'GPU {{ $labels.gpu }} 显存容量占用 {{ printf "%.1f" $value }}%，超过 90% 持续 5 分钟。'
+
+      - alert: NvidiaGpuTemperatureHigh
+        expr: DCGM_FI_DEV_GPU_TEMP{job="nvidia-dcgm"} > 70
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: NVIDIA GPU 温度持续偏高
+          description: 'GPU {{ $labels.gpu }} 温度 {{ printf "%.1f" $value }}°C，超过 70°C 持续 5 分钟。'
+
+      - alert: DenglinGpuUtilHigh
+        expr: (denglin_gpu_util{job="denglin-gpu"} > 99) and (denglin_gpu_util{job="denglin-gpu"} <= 100)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: 登临 GPU SM 利用率持续偏高
+          description: 'GPU {{ $labels.gpu_index }} SM 利用率 {{ printf "%.1f" $value }}%，超过 99% 持续 30 分钟。'
+
+      - alert: DenglinGpuDecoderUtilHigh
+        expr: (denglin_dec_util{job="denglin-gpu"} > 99) and (denglin_dec_util{job="denglin-gpu"} <= 100)
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: 登临 GPU 解码利用率持续偏高
+          description: 'GPU {{ $labels.gpu_index }} 解码利用率 {{ printf "%.1f" $value }}%，超过 99% 持续 30 分钟。'
+
+      - alert: DenglinGpuMemoryHigh
+        expr: |
+          (100 * denglin_gpu_used_mem{job="denglin-gpu"} / denglin_gpu_total_mem{job="denglin-gpu"} > 90)
+          and (denglin_gpu_total_mem{job="denglin-gpu"} > 0)
+          and (denglin_gpu_used_mem{job="denglin-gpu"} <= denglin_gpu_total_mem{job="denglin-gpu"})
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 登临显存占用偏高
+          description: 'GPU {{ $labels.gpu_index }} 显存容量占用 {{ printf "%.1f" $value }}%，超过 90% 持续 5 分钟。'
+
+      - alert: DenglinGpuTemperatureHigh
+        expr: denglin_gpu_temp{job="denglin-gpu"} > 70
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 登临 GPU 温度持续偏高
+          description: 'GPU {{ $labels.gpu_index }} 温度 {{ printf "%.1f" $value }}°C，超过 70°C 持续 5 分钟。'

@@ -1,0 +1,19 @@
+{
+  "policy": {
+    "_meta": {
+      "description": "Delete Center CV business log indices after 30 days"
+    },
+    "phases": {
+      "hot": {
+        "min_age": "0ms",
+        "actions": {}
+      },
+      "delete": {
+        "min_age": "30d",
+        "actions": {
+          "delete": {}
+        }
+      }
+    }
+  }
+}

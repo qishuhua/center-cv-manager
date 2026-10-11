@@ -1,0 +1,13 @@
+apiVersion: 1
+
+providers:
+  - name: Center CV
+    orgId: 1
+    folder: Center CV
+    type: file
+    # Remove retired file-provisioned dashboards, including the former vendor page.
+    # Keep the provider name stable so Grafana can reconcile existing records.
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards

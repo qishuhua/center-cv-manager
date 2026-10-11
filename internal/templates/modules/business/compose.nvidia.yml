@@ -1,0 +1,184 @@
+name: center-cv-business
+
+# Start infra and complete rabbitmq-init before starting business services.
+x-worker-environment: &worker-environment
+  # Denglin image does not define TZ; keep one explicit cross-platform value.
+  TZ: Asia/Shanghai
+  # Keep task ingress and alarm publishers on the same priority mapping.
+  RABBITMQ_REALTIME_PRIORITY: ${RABBITMQ_REALTIME_PRIORITY:-5}
+  RABBITMQ_PLAYBACK_PRIORITY: ${RABBITMQ_PLAYBACK_PRIORITY:-1}
+
+x-worker-common: &worker-common
+  image: center-cv-service:nvidia
+  pull_policy: never
+  restart: unless-stopped
+  runtime: nvidia
+  network_mode: host
+  ulimits:
+    nofile:
+      soft: 65535
+      hard: 65535
+  volumes:
+    - /data/models:/data/models:ro
+    - /data/logs:/data/logs
+    - /data/media-resources:/data/media-resources
+  healthcheck:
+    test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/127.0.0.1/$${CV_LISTEN_PORT}'"]
+    interval: 10s
+    timeout: 3s
+    retries: 12
+    start_period: 300s
+
+services:
+  # CPU/GPU topology assumption: physical GPU 0-3 are local to NUMA 0 and
+  # physical GPU 4-7 are local to NUMA 1. Verify this against the PCI topology
+  # before production deployment. Each worker exposes one NVIDIA GPU.
+  center-cv-service-0:
+    <<: *worker-common
+    container_name: center-cv-service-0
+    cpuset: "0-6,52-58"
+    environment:
+      <<: *worker-environment
+      APPNAME: center-cv-service-0
+      CV_LISTEN_PORT: 8181
+      NVIDIA_VISIBLE_DEVICES: "0"
+
+  center-cv-service-1:
+    <<: *worker-common
+    container_name: center-cv-service-1
+    cpuset: "7-13,59-65"
+    environment:
+      <<: *worker-environment
+      APPNAME: center-cv-service-1
+      CV_LISTEN_PORT: 8182
+      NVIDIA_VISIBLE_DEVICES: "1"
+
+  center-cv-service-2:
+    <<: *worker-common
+    container_name: center-cv-service-2
+    cpuset: "14-19,66-71"
+    environment:
+      <<: *worker-environment
+      APPNAME: center-cv-service-2
+      CV_LISTEN_PORT: 8183
+      NVIDIA_VISIBLE_DEVICES: "2"
+
+  center-cv-service-3:
+    <<: *worker-common
+    container_name: center-cv-service-3
+    cpuset: "20-25,72-77"
+    environment:
+      <<: *worker-environment
+      APPNAME: center-cv-service-3
+      CV_LISTEN_PORT: 8184
+      NVIDIA_VISIBLE_DEVICES: "3"
+
+  center-cv-service-4:
+    <<: *worker-common
+    container_name: center-cv-service-4
+    cpuset: "26-32,78-84"
+    environment:
+      <<: *worker-environment
+      APPNAME: center-cv-service-4
+      CV_LISTEN_PORT: 8185
+      NVIDIA_VISIBLE_DEVICES: "4"
+
+  center-cv-service-5:
+    <<: *worker-common
+    container_name: center-cv-service-5
+    cpuset: "33-39,85-91"
+    environment:
+      <<: *worker-environment
+      APPNAME: center-cv-service-5
+      CV_LISTEN_PORT: 8186
+      NVIDIA_VISIBLE_DEVICES: "5"
+
+  center-cv-service-6:
+    <<: *worker-common
+    container_name: center-cv-service-6
+    cpuset: "40-45,92-97"
+    environment:
+      <<: *worker-environment
+      APPNAME: center-cv-service-6
+      CV_LISTEN_PORT: 8187
+      NVIDIA_VISIBLE_DEVICES: "6"
+
+  center-cv-service-7:
+    <<: *worker-common
+    container_name: center-cv-service-7
+    cpuset: "46-51,98-103"
+    environment:
+      <<: *worker-environment
+      APPNAME: center-cv-service-7
+      CV_LISTEN_PORT: 8188
+      NVIDIA_VISIBLE_DEVICES: "7"
+
+  center-cv-ingress:
+    image: center-cv-ingress:latest
+    pull_policy: never
+    container_name: center-cv-ingress
+    restart: unless-stopped
+    network_mode: host
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    environment:
+      # Priority mapping is shared with worker alarm publishers.
+      RABBITMQ_REALTIME_PRIORITY: ${RABBITMQ_REALTIME_PRIORITY:-5}
+      RABBITMQ_PLAYBACK_PRIORITY: ${RABBITMQ_PLAYBACK_PRIORITY:-1}
+      RABBITMQ_DEFAULT_VHOST: /
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - /data/logs:/data/logs
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/127.0.0.1/8090' || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  chute-verification-service:
+    image: chute-verification-service:latest
+    pull_policy: never
+    container_name: chute-verification-service
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      # Keep the internal API loopback-only; the source default is 0.0.0.0.
+      CV_LISTEN_HOST: 127.0.0.1
+      CV_ORGAN_CODE: "637101"
+      # Required fixed detection-result receiver confirmed for production.
+      CV_DETECT_RESULT_HOST: 10.21.61.48
+      CV_DETECT_RESULT_PORT: "31995"
+    volumes:
+      - /data/logs:/data/logs
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/127.0.0.1/8091' || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  video-transcode-service:
+    image: video-transcode-service:latest
+    pull_policy: never
+    container_name: video-transcode-service
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      # Keep the management API loopback-only and away from Nginx port 8080.
+      HTTP_HOST: 127.0.0.1
+      HTTP_PORT: "8092"
+      # Select the service's built-in production callback/upload endpoints.
+      CV_ENV_IS_PRO: "1"
+    volumes:
+      - /data/logs:/data/logs
+      - /data/media-resources:/data/media-resources
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/127.0.0.1/8092' || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s

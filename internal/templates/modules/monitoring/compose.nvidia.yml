@@ -1,0 +1,158 @@
+name: center-cv-monitoring
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.13.1
+    pull_policy: missing
+    container_name: prometheus
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --web.listen-address=0.0.0.0:9090
+      - --web.external-url=/prometheus/
+      - --web.route-prefix=/prometheus
+    volumes:
+      - ./prometheus/prometheus.nvidia.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alerting/rules:/etc/prometheus/alert-rules:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      - node-exporter
+      - cadvisor
+      - blackbox-exporter
+      - mtail
+      - dcgm-exporter
+
+  alertmanager:
+    # This configuration uses v0.34.0 custom payload and route labels.
+    image: prom/alertmanager:v0.34.0
+    pull_policy: missing
+    container_name: alertmanager
+    restart: unless-stopped
+    network_mode: host
+    user: "65534:65534"
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --web.listen-address=127.0.0.1:9093
+      - --cluster.listen-address=
+    volumes:
+      - ./alerting/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./alerting/templates:/etc/alertmanager/templates:ro
+      - type: bind
+        source: ./alerting/feishu-webhook-url
+        target: /run/secrets/feishu-webhook-url
+        read_only: true
+        bind:
+          create_host_path: false
+      - alertmanager-data:/alertmanager
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  grafana:
+    image: grafana/grafana:13.1.1
+    pull_policy: missing
+    container_name: grafana
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # Nginx replaces this placeholder in Grafana's boot HTML with the
+      # browser-facing scheme and Host, so deployments do not need a site IP.
+      GF_SERVER_ROOT_URL: "http://grafana.internal/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning/datasources-host:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/dashboards/center-cv-overview.nvidia.json:/var/lib/grafana/dashboards/center-cv-overview.json:ro
+    depends_on:
+      - prometheus
+
+  node-exporter:
+    image: prom/node-exporter:v1.12.1
+    pull_policy: missing
+    container_name: node-exporter
+    restart: unless-stopped
+    network_mode: host
+    pid: host
+    command:
+      - --path.rootfs=/host
+      - --web.listen-address=0.0.0.0:9100
+    volumes:
+      - /:/host:ro
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.55.1
+    pull_policy: missing
+    container_name: cadvisor
+    restart: unless-stopped
+    network_mode: host
+    privileged: true
+    command:
+      - --port=8084
+      - --listen_ip=0.0.0.0
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.28.0
+    pull_policy: missing
+    container_name: blackbox-exporter
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - --config.file=/etc/blackbox_exporter/config.yml
+      - --web.listen-address=0.0.0.0:9115
+    volumes:
+      - ./blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+
+  mtail:
+    image: ghcr.io/google/mtail:3.0.8
+    pull_policy: missing
+    container_name: mtail
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - --address=127.0.0.1
+      - --port=3903
+      - --progs=/etc/mtail
+      - --logs=/data/logs/*.log
+      - --logs=/data/logs/video-transcode-service
+      - --ignore_filename_regex_pattern=\.[^.]+\.log$
+      - --logtostderr
+    volumes:
+      - ./mtail:/etc/mtail:ro
+      - /data/logs:/data/logs:ro
+
+  dcgm-exporter:
+    image: nvcr.io/nvidia/k8s/dcgm-exporter:4.8.3
+    pull_policy: missing
+    container_name: dcgm-exporter
+    restart: unless-stopped
+    network_mode: host
+    runtime: nvidia
+    gpus: all
+    cap_add:
+      - SYS_ADMIN
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+
+volumes:
+  prometheus-data:
+    name: ${CENTER_CV_DATA_PREFIX:-center-cv-monitoring}_prometheus-data
+  alertmanager-data:
+    name: ${CENTER_CV_DATA_PREFIX:-center-cv-monitoring}_alertmanager-data
+  grafana-data:
+    name: ${CENTER_CV_DATA_PREFIX:-center-cv-monitoring}_grafana-data

@@ -1,0 +1,116 @@
+name: center-cv-logging
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.19.0
+    pull_policy: missing
+    container_name: elasticsearch
+    hostname: elasticsearch
+    extra_hosts:
+      - elasticsearch:127.0.0.1
+    restart: unless-stopped
+
+    network_mode: host
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  elasticsearch-init:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.19.0
+    pull_policy: missing
+    container_name: elasticsearch-init
+    restart: "no"
+
+    network_mode: host
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        curl -fsS -X PUT
+        http://127.0.0.1:9200/_ilm/policy/center-cv-logs-retention
+        -H 'Content-Type: application/json'
+        --data-binary @/config/center-cv-logs-ilm-policy.json
+        &&
+        curl -fsS -X PUT
+        'http://127.0.0.1:9200/center-cv-logs-*/_settings?allow_no_indices=true&ignore_unavailable=true'
+        -H 'Content-Type: application/json'
+        -d '{"index.lifecycle.name":"center-cv-logs-retention"}'
+    volumes:
+      - ./elasticsearch/center-cv-logs-ilm-policy.json:/config/center-cv-logs-ilm-policy.json:ro
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.19.0
+    pull_policy: missing
+    container_name: kibana
+    restart: unless-stopped
+
+    network_mode: host
+    environment:
+      ELASTICSEARCH_HOSTS: '["http://127.0.0.1:9200"]'
+      SERVER_HOST: 0.0.0.0
+      SERVER_NAME: kibana
+      SERVER_BASEPATH: /kibana
+      SERVER_REWRITEBASEPATH: "true"
+      XPACK_SECURITY_ENABLED: "false"
+      TELEMETRY_ENABLED: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:5601/kibana/api/status >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  kibana-init:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.19.0
+    pull_policy: missing
+    container_name: kibana-init
+    restart: "no"
+    network_mode: host
+    entrypoint: ["/bin/sh", "/config/init.sh"]
+    volumes:
+      - ./kibana/init.sh:/config/init.sh:ro
+    depends_on:
+      kibana:
+        condition: service_healthy
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.19.0
+    pull_policy: missing
+    container_name: filebeat
+    restart: unless-stopped
+
+    network_mode: host
+    user: root
+    command: ["filebeat", "-e", "--strict.perms=false"]
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    volumes:
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /data/logs:/data/logs:ro
+      - filebeat-data:/usr/share/filebeat/data
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      elasticsearch-init:
+        condition: service_completed_successfully
+
+volumes:
+  elasticsearch-data:
+    name: ${CENTER_CV_DATA_PREFIX:-center-cv-logging}_elasticsearch-data
+  filebeat-data:
+    name: ${CENTER_CV_DATA_PREFIX:-center-cv-logging}_filebeat-data

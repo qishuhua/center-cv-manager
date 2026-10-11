@@ -1,0 +1,12 @@
+groups:
+  - name: rabbitmq-queues
+    rules:
+      # Ready means waiting to be delivered, excluding messages already unacked.
+      # Keep each instance/vhost/queue series separate; never sum different queues.
+      - alert: RabbitMQQueueBacklogHigh
+        expr: rabbitmq_queue_messages_ready{job="rabbitmq-per-object",queue!=""} > 1000
+        labels:
+          severity: warning
+        annotations:
+          summary: RabbitMQ 消费队列积压超过 1000
+          description: 'VHost={{ $labels.vhost }}，队列={{ $labels.queue }}，待消费消息 {{ printf "%.0f" $value }} 条，超过 1000 条（不含已投递未确认消息）。'
