@@ -1,6 +1,6 @@
 export type UserRole='admin'|'viewer'
 export interface UserAccount {username:string;role:UserRole;must_change_password:boolean;created_at:string}
-export interface Center {deployment?:{reselection_required?:boolean;migration?:{completed:boolean};root:string;status:string;modules:ComposeModule[]};id?:string;name:string;host:string;port:number;username:string;auth_type:'password'|'private_key';password?:string;private_key?:string;passphrase?:string;host_key?:string;docker_socket:string;accelerator:'auto'|'nvidia'|'denglin'|'cpu';detected_accelerator?:string;cpu_count:number;gpu_count:number;compose_file:string;initialized_at?:string;description:string;updated_at?:string}
+export interface Center {deployment?:{reselection_required?:boolean;migration?:{completed:boolean};root:string;status:string;modules:ComposeModule[]};id?:string;name:string;host:string;port:number;console_port:number;username:string;auth_type:'password'|'private_key';password?:string;private_key?:string;passphrase?:string;host_key?:string;docker_socket:string;accelerator:'auto'|'nvidia'|'denglin'|'cpu';detected_accelerator?:string;cpu_count:number;gpu_count:number;compose_file:string;initialized_at?:string;description:string;updated_at?:string}
 export interface Source {id?:string;name:string;repository:string;description:string;updated_at?:string}
 export interface GitCredential {base_url:string;username:string;token?:string;configured:boolean;updated_at?:string}
 export interface Version {ref:string;commit:string;kind:'branch'|'tag'}

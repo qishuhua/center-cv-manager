@@ -5,7 +5,7 @@ import { Key, Plus, Refresh, User } from '@element-plus/icons-vue'
 import http from './api'
 import type { UserAccount, UserRole } from './types'
 
-defineProps<{ currentUsername: string }>()
+defineProps<{ currentUsername: string; superAdmin?: boolean }>()
 const emit = defineEmits<{ roleChanged: [] }>()
 const users = ref<UserAccount[]>([])
 const loading = ref(false)
@@ -71,13 +71,14 @@ onMounted(load)
     <div class="panel-title">
       <div>
         <h2>用户与权限</h2>
-        <p>管理员可发布软件和模型、重启服务等；普通用户只能查看各中心状态。admin 为超级管理员，不允许删除或降级。</p>
+        <p>管理员可发布软件和模型、重启服务等；普通用户只能查看各中心状态。admin 为超级管理员：用户增删、角色调整、重置密码与任务记录删除仅限该账号。</p>
       </div>
       <div>
         <el-button :icon="Refresh" @click="load">刷新</el-button>
-        <el-button type="primary" :icon="Plus" @click="openCreate">新建用户</el-button>
+        <el-button v-if="superAdmin" type="primary" :icon="Plus" @click="openCreate">新建用户</el-button>
       </div>
     </div>
+    <el-alert v-if="!superAdmin" title="用户增删、角色调整与重置密码仅限内建 admin 账号操作，当前为只读视图。" type="info" :closable="false" show-icon style="margin-bottom:14px"/>
     <el-table :data="users" empty-text="暂无用户">
       <el-table-column label="用户名" min-width="180">
         <template #default="{row}"><span class="username"><el-icon><User/></el-icon><strong>{{row.username}}</strong><el-tag v-if="row.username===currentUsername" size="small" type="info">当前登录</el-tag></span></template>
@@ -93,9 +94,12 @@ onMounted(load)
       </el-table-column>
       <el-table-column label="操作" min-width="280" fixed="right">
         <template #default="{row}">
-          <el-button v-if="row.username!=='admin'" :type="row.role==='admin'?'warning':'primary'" link @click="toggleRole(row)">{{row.role==='admin'?'设为普通用户':'设为管理员'}}</el-button>
-          <el-button :icon="Key" link @click="resetPassword(row)">重置密码</el-button>
-          <el-button v-if="row.username!=='admin'&&row.username!==currentUsername" type="danger" link @click="removeUser(row)">删除</el-button>
+          <template v-if="superAdmin">
+            <el-button v-if="row.username!=='admin'" :type="row.role==='admin'?'warning':'primary'" link @click="toggleRole(row)">{{row.role==='admin'?'设为普通用户':'设为管理员'}}</el-button>
+            <el-button :icon="Key" link @click="resetPassword(row)">重置密码</el-button>
+            <el-button v-if="row.username!=='admin'&&row.username!==currentUsername" type="danger" link @click="removeUser(row)">删除</el-button>
+          </template>
+          <span v-else class="muted">仅内建 admin 可管理</span>
         </template>
       </el-table-column>
     </el-table>

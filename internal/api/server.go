@@ -115,6 +115,8 @@ func (s *Server) Router() *gin.Engine {
 	admin.POST("/centers/:id/test", s.testCenter)
 	admin.POST("/centers/:id/initialize", s.initializeCenter)
 	admin.POST("/centers/:id/reset", s.resetCenterDeployment)
+	admin.POST("/centers/:id/pause", s.pauseCenter)
+	admin.POST("/centers/:id/resume", s.resumeCenter)
 	admin.POST("/centers/:id/actions", s.runCenterAction)
 	admin.POST("/centers/:id/modules/:module/publish-plan", s.planComposePublish)
 	admin.POST("/centers/:id/modules/:module/publish", s.publishCompose)
@@ -156,12 +158,15 @@ func (s *Server) Router() *gin.Engine {
 	admin.POST("/tasks/:id/cancel", s.cancelTask)
 	admin.POST("/tasks/cancel-all", s.cancelAllTasks)
 	admin.POST("/tasks/:id/retry", s.retryTask)
-	admin.DELETE("/tasks/:id", s.deleteTask)
 	admin.GET("/users", s.listUsers)
-	admin.POST("/users", s.createUser)
-	admin.PUT("/users/:username/role", s.setUserRole)
-	admin.POST("/users/:username/reset-password", s.resetUserPassword)
-	admin.DELETE("/users/:username", s.deleteUser)
+	// 账号体系与审计记录类操作仅限内建 admin 账号，不随管理权限下放。
+	superAdmin := admin.Group("")
+	superAdmin.Use(s.requireSuperAdmin())
+	superAdmin.DELETE("/tasks/:id", s.deleteTask)
+	superAdmin.POST("/users", s.createUser)
+	superAdmin.PUT("/users/:username/role", s.setUserRole)
+	superAdmin.POST("/users/:username/reset-password", s.resetUserPassword)
+	superAdmin.DELETE("/users/:username", s.deleteUser)
 	if s.static != nil {
 		r.NoRoute(func(c *gin.Context) {
 			path := c.Request.URL.Path
@@ -216,7 +221,7 @@ func (s *Server) saveCenter(c *gin.Context) {
 	ok(c, out)
 }
 
-func (s *Server) submitCenterInitialization(v domain.Center, items []deploy.Item, models []modelasset.ReleaseItem) (*domain.Task, error) {
+func (s *Server) submitCenterInitialization(v domain.Center, items []deploy.Item, models []modelasset.ReleaseItem, operator string) (*domain.Task, error) {
 	s.initializationMu.Lock()
 	defer s.initializationMu.Unlock()
 	current, err := s.centers.GetPublic(v.ID)
@@ -232,8 +237,10 @@ func (s *Server) submitCenterInitialization(v domain.Center, items []deploy.Item
 	softwareJSON, _ := json.Marshal(items)
 	modelsJSON, _ := json.Marshal(models)
 	params := map[string]string{"center_id": v.ID, "center_name": v.Name, "items": string(softwareJSON), "models": string(modelsJSON)}
+	finish := notifyCenterOperation(s.alerts, "🛠️", "初始化中心", operator, v.Name, "将上传模块配置、按依赖顺序启动全部服务，并发布所选业务代码与模型版本；初始化期间服务分批上线。")
 	return s.tasks.Submit("INITIALIZE_CENTER", params, func(ctx context.Context, h *task.Handle) error {
-		return centerlock.Within(ctx, v.ID, func(ctx context.Context) error {
+		var successDetail string
+		err := centerlock.Within(ctx, v.ID, func(ctx context.Context) error {
 			current, err := s.centers.GetPublic(v.ID)
 			if err != nil {
 				return err
@@ -280,9 +287,26 @@ func (s *Server) submitCenterInitialization(v domain.Center, items []deploy.Item
 			if finished.Deployment != nil && finished.Deployment.Status != "ready" {
 				return fmt.Errorf("初始化未完成，当前状态: %s", finished.Deployment.Status)
 			}
+			// 汇总本次实际发布的业务代码与模型版本，随完成通知发送到飞书。
+			lines := make([]string, 0, len(items)+len(plan.ModelPlan.Targets)+2)
+			lines = append(lines, "业务代码：")
+			for _, item := range items {
+				lines = append(lines, fmt.Sprintf("- %s:%s@%s", item.SourceName, item.Ref, shortCommit(item.Commit)))
+			}
+			lines = append(lines, "模型：")
+			for _, item := range plan.ModelPlan.Targets {
+				variant := item.Platform
+				if item.HardwareProfile != "" {
+					variant += "-" + item.HardwareProfile
+				}
+				lines = append(lines, fmt.Sprintf("- %s:%s[%s]@%s", item.Model, item.Version, variant, item.ManifestDigest[:12]))
+			}
+			successDetail = strings.Join(lines, "\n")
 			h.Message("初始化部署完成，所选业务代码与模型已发布，全部模块已就绪")
 			return nil
 		})
+		finish(err, successDetail)
+		return err
 	}), nil
 }
 
@@ -336,7 +360,7 @@ func (s *Server) initializeCenter(c *gin.Context) {
 		fail(c, 400, err)
 		return
 	}
-	result, err := s.submitCenterInitialization(v, items, models)
+	result, err := s.submitCenterInitialization(v, items, models, releaseOperator(c))
 	if err != nil {
 		fail(c, 409, err)
 		return

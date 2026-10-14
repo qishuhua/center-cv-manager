@@ -7,6 +7,7 @@ type Center struct {
 	Name                string      `json:"name"`
 	Host                string      `json:"host"`
 	Port                int         `json:"port"`
+	ConsolePort         int         `json:"console_port"`
 	Username            string      `json:"username"`
 	AuthType            string      `json:"auth_type"`
 	Password            string      `json:"password,omitempty"`

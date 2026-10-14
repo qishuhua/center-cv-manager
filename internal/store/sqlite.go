@@ -84,7 +84,7 @@ func Open(path string) (*Store, error) {
 	// 最后几条已提交日志，对本地管理工具可接受。
 	for _, q := range []string{
 		`PRAGMA journal_mode=WAL`, `PRAGMA synchronous=NORMAL`, `PRAGMA foreign_keys=ON`,
-		`CREATE TABLE IF NOT EXISTS centers (id TEXT PRIMARY KEY,name TEXT NOT NULL,host TEXT NOT NULL,port INTEGER NOT NULL,username TEXT NOT NULL,auth_type TEXT NOT NULL,password TEXT NOT NULL DEFAULT '',private_key TEXT NOT NULL DEFAULT '',passphrase TEXT NOT NULL DEFAULT '',host_key TEXT NOT NULL DEFAULT '',docker_socket TEXT NOT NULL,accelerator TEXT NOT NULL DEFAULT 'auto',detected_accelerator TEXT NOT NULL DEFAULT '',cpu_count INTEGER NOT NULL DEFAULT 0,gpu_count INTEGER NOT NULL DEFAULT 0,compose_file TEXT NOT NULL DEFAULT '~/.local/share/center-manager/deploy/docker-compose.yml',compose_content TEXT NOT NULL DEFAULT '',initialized_at TEXT,description TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)`,
+		`CREATE TABLE IF NOT EXISTS centers (id TEXT PRIMARY KEY,name TEXT NOT NULL,host TEXT NOT NULL,port INTEGER NOT NULL,console_port INTEGER NOT NULL DEFAULT 8080,username TEXT NOT NULL,auth_type TEXT NOT NULL,password TEXT NOT NULL DEFAULT '',private_key TEXT NOT NULL DEFAULT '',passphrase TEXT NOT NULL DEFAULT '',host_key TEXT NOT NULL DEFAULT '',docker_socket TEXT NOT NULL,accelerator TEXT NOT NULL DEFAULT 'auto',detected_accelerator TEXT NOT NULL DEFAULT '',cpu_count INTEGER NOT NULL DEFAULT 0,gpu_count INTEGER NOT NULL DEFAULT 0,compose_file TEXT NOT NULL DEFAULT '~/.local/share/center-manager/deploy/docker-compose.yml',compose_content TEXT NOT NULL DEFAULT '',initialized_at TEXT,description TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS sources (id TEXT PRIMARY KEY,name TEXT NOT NULL,repository TEXT NOT NULL,description TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS git_credentials (id INTEGER PRIMARY KEY CHECK(id=1),base_url TEXT NOT NULL,username TEXT NOT NULL,token TEXT NOT NULL,updated_at TEXT NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS oss_credentials (id INTEGER PRIMARY KEY CHECK(id=1),endpoint TEXT NOT NULL,bucket TEXT NOT NULL,access_key_id TEXT NOT NULL,access_key_secret TEXT NOT NULL,images_prefix TEXT NOT NULL DEFAULT 'center-images/',models_prefix TEXT NOT NULL DEFAULT 'center-models/',updated_at TEXT NOT NULL)`,
@@ -110,6 +110,7 @@ func Open(path string) (*Store, error) {
 		return nil, fmt.Errorf("升级数据库: %w", err)
 	}
 	for _, migration := range []struct{ column, definition string }{
+		{"console_port", `INTEGER NOT NULL DEFAULT 8080`},
 		{"detected_accelerator", `TEXT NOT NULL DEFAULT ''`},
 		{"cpu_count", `INTEGER NOT NULL DEFAULT 0`},
 		{"gpu_count", `INTEGER NOT NULL DEFAULT 0`},
@@ -191,7 +192,7 @@ func ensureColumn(db *sql.DB, table, column, definition string) error {
 func (s *Store) Close() error { return s.db.Close() }
 
 func (s *Store) ListCenters() ([]domain.Center, error) {
-	rows, err := s.db.Query(`SELECT id,name,host,port,username,auth_type,password,private_key,passphrase,host_key,docker_socket,accelerator,detected_accelerator,cpu_count,gpu_count,compose_file,compose_content,initialized_at,description,created_at,updated_at,deployment_json FROM centers ORDER BY name`)
+	rows, err := s.db.Query(`SELECT id,name,host,port,console_port,username,auth_type,password,private_key,passphrase,host_key,docker_socket,accelerator,detected_accelerator,cpu_count,gpu_count,compose_file,compose_content,initialized_at,description,created_at,updated_at,deployment_json FROM centers ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +203,7 @@ func (s *Store) ListCenters() ([]domain.Center, error) {
 		var createdAt, updatedAt sqliteTime
 		var initializedAt nullableSQLiteTime
 		var deploymentJSON string
-		if err = rows.Scan(&v.ID, &v.Name, &v.Host, &v.Port, &v.Username, &v.AuthType, &v.Password, &v.PrivateKey, &v.Passphrase, &v.HostKey, &v.DockerSocket, &v.Accelerator, &v.DetectedAccelerator, &v.CPUCount, &v.GPUCount, &v.ComposeFile, &v.ComposeContent, &initializedAt, &v.Description, &createdAt, &updatedAt, &deploymentJSON); err != nil {
+		if err = rows.Scan(&v.ID, &v.Name, &v.Host, &v.Port, &v.ConsolePort, &v.Username, &v.AuthType, &v.Password, &v.PrivateKey, &v.Passphrase, &v.HostKey, &v.DockerSocket, &v.Accelerator, &v.DetectedAccelerator, &v.CPUCount, &v.GPUCount, &v.ComposeFile, &v.ComposeContent, &initializedAt, &v.Description, &createdAt, &updatedAt, &deploymentJSON); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal([]byte(deploymentJSON), &v.Deployment); err != nil {
@@ -222,7 +223,7 @@ func (s *Store) GetCenter(id string) (domain.Center, error) {
 	var createdAt, updatedAt sqliteTime
 	var initializedAt nullableSQLiteTime
 	var deploymentJSON string
-	err := s.db.QueryRow(`SELECT id,name,host,port,username,auth_type,password,private_key,passphrase,host_key,docker_socket,accelerator,detected_accelerator,cpu_count,gpu_count,compose_file,compose_content,initialized_at,description,created_at,updated_at,deployment_json FROM centers WHERE id=?`, id).Scan(&v.ID, &v.Name, &v.Host, &v.Port, &v.Username, &v.AuthType, &v.Password, &v.PrivateKey, &v.Passphrase, &v.HostKey, &v.DockerSocket, &v.Accelerator, &v.DetectedAccelerator, &v.CPUCount, &v.GPUCount, &v.ComposeFile, &v.ComposeContent, &initializedAt, &v.Description, &createdAt, &updatedAt, &deploymentJSON)
+	err := s.db.QueryRow(`SELECT id,name,host,port,console_port,username,auth_type,password,private_key,passphrase,host_key,docker_socket,accelerator,detected_accelerator,cpu_count,gpu_count,compose_file,compose_content,initialized_at,description,created_at,updated_at,deployment_json FROM centers WHERE id=?`, id).Scan(&v.ID, &v.Name, &v.Host, &v.Port, &v.ConsolePort, &v.Username, &v.AuthType, &v.Password, &v.PrivateKey, &v.Passphrase, &v.HostKey, &v.DockerSocket, &v.Accelerator, &v.DetectedAccelerator, &v.CPUCount, &v.GPUCount, &v.ComposeFile, &v.ComposeContent, &initializedAt, &v.Description, &createdAt, &updatedAt, &deploymentJSON)
 	if errors.Is(err, sql.ErrNoRows) {
 		err = ErrNotFound
 	}
@@ -243,7 +244,7 @@ func (s *Store) SaveCenter(v domain.Center) error {
 	if marshalErr != nil {
 		return marshalErr
 	}
-	_, err := s.db.Exec(`INSERT INTO centers(id,name,host,port,username,auth_type,password,private_key,passphrase,host_key,docker_socket,accelerator,detected_accelerator,cpu_count,gpu_count,compose_file,compose_content,initialized_at,description,created_at,updated_at,deployment_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,host=excluded.host,port=excluded.port,username=excluded.username,auth_type=excluded.auth_type,password=excluded.password,private_key=excluded.private_key,passphrase=excluded.passphrase,host_key=excluded.host_key,docker_socket=excluded.docker_socket,accelerator=excluded.accelerator,detected_accelerator=excluded.detected_accelerator,cpu_count=excluded.cpu_count,gpu_count=excluded.gpu_count,compose_file=excluded.compose_file,compose_content=excluded.compose_content,initialized_at=excluded.initialized_at,description=excluded.description,updated_at=excluded.updated_at,deployment_json=excluded.deployment_json`, v.ID, v.Name, v.Host, v.Port, v.Username, v.AuthType, v.Password, v.PrivateKey, v.Passphrase, v.HostKey, v.DockerSocket, v.Accelerator, v.DetectedAccelerator, v.CPUCount, v.GPUCount, v.ComposeFile, v.ComposeContent, v.InitializedAt, v.Description, v.CreatedAt, v.UpdatedAt, string(deploymentJSON))
+	_, err := s.db.Exec(`INSERT INTO centers(id,name,host,port,console_port,username,auth_type,password,private_key,passphrase,host_key,docker_socket,accelerator,detected_accelerator,cpu_count,gpu_count,compose_file,compose_content,initialized_at,description,created_at,updated_at,deployment_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,host=excluded.host,port=excluded.port,console_port=excluded.console_port,username=excluded.username,auth_type=excluded.auth_type,password=excluded.password,private_key=excluded.private_key,passphrase=excluded.passphrase,host_key=excluded.host_key,docker_socket=excluded.docker_socket,accelerator=excluded.accelerator,detected_accelerator=excluded.detected_accelerator,cpu_count=excluded.cpu_count,gpu_count=excluded.gpu_count,compose_file=excluded.compose_file,compose_content=excluded.compose_content,initialized_at=excluded.initialized_at,description=excluded.description,updated_at=excluded.updated_at,deployment_json=excluded.deployment_json`, v.ID, v.Name, v.Host, v.Port, v.ConsolePort, v.Username, v.AuthType, v.Password, v.PrivateKey, v.Passphrase, v.HostKey, v.DockerSocket, v.Accelerator, v.DetectedAccelerator, v.CPUCount, v.GPUCount, v.ComposeFile, v.ComposeContent, v.InitializedAt, v.Description, v.CreatedAt, v.UpdatedAt, string(deploymentJSON))
 	return err
 }
 

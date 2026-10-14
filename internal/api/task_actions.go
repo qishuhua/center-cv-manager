@@ -61,7 +61,7 @@ func (s *Server) retryTask(c *gin.Context) {
 			fail(c, 400, fmt.Errorf("旧初始化任务未保存版本选择，请重新打开初始化部署选择版本"))
 			return
 		}
-		result, err := s.submitCenterInitialization(center, items, models)
+		result, err := s.submitCenterInitialization(center, items, models, releaseOperator(c))
 		if err != nil {
 			fail(c, 409, err)
 			return
@@ -148,6 +148,22 @@ func (s *Server) retryTask(c *gin.Context) {
 		}
 		run = func(ctx context.Context, h *task.Handle) error {
 			return s.runCenterReset(ctx, p["center_id"], h)
+		}
+	case "PAUSE_CENTER":
+		if p["confirm"] != "true" {
+			fail(c, 400, fmt.Errorf("暂停任务缺少确认记录，请重新点击暂停并确认"))
+			return
+		}
+		run = func(ctx context.Context, h *task.Handle) error {
+			return s.provisioning.PauseCenter(ctx, p["center_id"], h)
+		}
+	case "RESUME_CENTER":
+		if p["confirm"] != "true" {
+			fail(c, 400, fmt.Errorf("恢复任务缺少确认记录，请重新点击恢复并确认"))
+			return
+		}
+		run = func(ctx context.Context, h *task.Handle) error {
+			return s.provisioning.ResumeCenter(ctx, p["center_id"], h)
 		}
 	case "MODULE_MIGRATION":
 		run = func(ctx context.Context, h *task.Handle) error {

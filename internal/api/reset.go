@@ -21,7 +21,12 @@ func (s *Server) resetCenterDeployment(c *gin.Context) {
 		s.storeError(c, err)
 		return
 	}
-	ok(c, s.tasks.Submit("RESET_CENTER", map[string]string{"center_id": center.ID, "center_name": center.Name, "confirm_reset": "true"}, func(ctx context.Context, h *task.Handle) error { return s.runCenterReset(ctx, center.ID, h) }))
+	finish := notifyCenterOperation(s.alerts, "⚙️", "重置中心", releaseOperator(c), center.Name, "将删除受管 Compose 容器与部署配置，服务立即下线；镜像、数据卷与模型文件保留。")
+	ok(c, s.tasks.Submit("RESET_CENTER", map[string]string{"center_id": center.ID, "center_name": center.Name, "confirm_reset": "true"}, func(ctx context.Context, h *task.Handle) error {
+		err := s.runCenterReset(ctx, center.ID, h)
+		finish(err, "")
+		return err
+	}))
 }
 
 func (s *Server) runCenterReset(ctx context.Context, id string, h *task.Handle) error {

@@ -127,6 +127,19 @@ func TestRBACRouteMatrix(t *testing.T) {
 	if response := admin(http.MethodPut, "/api/v1/users/viewer1/role", map[string]string{"role": "admin"}); response.Code != 200 {
 		t.Fatalf("promote viewer = %d %s", response.Code, response.Body.String())
 	}
+	// 用户管理与任务记录删除仅限内建 admin：被提权的管理员不能增删用户或删除任务记录。
+	if response := viewer(http.MethodPost, "/api/v1/users", map[string]string{"username": "viewer2", "password": "viewer-pass", "role": "viewer"}); response.Code != 403 {
+		t.Fatalf("promoted admin create user = %d %s", response.Code, response.Body.String())
+	}
+	if response := viewer(http.MethodPut, "/api/v1/users/viewer1/role", map[string]string{"role": "viewer"}); response.Code != 403 {
+		t.Fatalf("promoted admin change role = %d %s", response.Code, response.Body.String())
+	}
+	if response := viewer(http.MethodDelete, "/api/v1/tasks/task-missing", nil); response.Code != 403 {
+		t.Fatalf("promoted admin delete task = %d %s", response.Code, response.Body.String())
+	}
+	if response := viewer(http.MethodGet, "/api/v1/users", nil); response.Code != 200 {
+		t.Fatalf("promoted admin list users = %d", response.Code)
+	}
 	if response := admin(http.MethodPut, "/api/v1/users/admin/role", map[string]string{"role": "viewer"}); response.Code != 409 {
 		t.Fatalf("super admin must stay immutable even with other admins: %d %s", response.Code, response.Body.String())
 	}

@@ -36,6 +36,9 @@ func validate(v domain.Center) error {
 	if v.Port < 1 || v.Port > 65535 {
 		return fmt.Errorf("SSH 端口无效")
 	}
+	if v.ConsolePort < 1 || v.ConsolePort > 65535 {
+		return fmt.Errorf("对外访问端口无效")
+	}
 	if v.AuthType != "password" && v.AuthType != "private_key" {
 		return fmt.Errorf("认证方式必须是 password 或 private_key")
 	}
@@ -71,6 +74,9 @@ func (s *Service) Save(input domain.Center) (domain.Center, error) {
 	}
 	if input.Port == 0 {
 		input.Port = 22
+	}
+	if input.ConsolePort == 0 {
+		input.ConsolePort = 8080
 	}
 	if input.DockerSocket == "" {
 		input.DockerSocket = "/var/run/docker.sock"

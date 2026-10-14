@@ -99,6 +99,19 @@ func (s *Server) requireAdmin() gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// requireSuperAdmin 只允许内建 admin 账号通过：用户增删改与任务记录删除等
+// 账号体系、审计记录类操作不随管理权限下放，避免管理员互相提权。
+func (s *Server) requireSuperAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if username, _ := c.Get("auth_username"); username != auth.DefaultUsername {
+			fail(c, http.StatusForbidden, errors.New("该操作仅限内建 admin 账号执行"))
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
 func setSessionCookie(c *gin.Context, value string, maxAge int) {
 	c.SetSameSite(http.SameSiteStrictMode)
 	c.SetCookie(authCookieName, value, maxAge, "/", "", false, true)

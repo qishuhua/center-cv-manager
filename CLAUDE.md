@@ -48,7 +48,7 @@ main.go 是唯一装配点：打开 SQLite（`data/manager.db`）→ 加载/创�
 
 ### 分层结构
 
-- `internal/api` — Gin 路由与 handler，统一 envelope 响应（`{code, message, data}`）。除 `/health`、`/auth/*` 外全部走 `requireAuth()` Cookie Session 中间件；所有变更类路由（发布、初始化、迁移、模块操作、凭据、用户管理 `/users`、任务停止/重试/删除、SSH 终端 WebSocket）再套 `requireAdmin()`，查看用户（viewer）只能访问数据 GET、`detect` 与 `/settings/status`。路由注册集中在 `server.go` 的 `Router()`；`terminal.go` 提供 WebSocket SSH 终端（`GET /centers/:id/terminal`）。统一发布（`/releases`）的编排逻辑也在这一层。
+- `internal/api` — Gin 路由与 handler，统一 envelope 响应（`{code, message, data}`）。除 `/health`、`/auth/*` 外全部走 `requireAuth()` Cookie Session 中间件；所有变更类路由（发布、初始化、迁移、模块操作、凭据、用户管理 `/users`、任务停止/重试/删除、SSH 终端 WebSocket）再套 `requireAdmin()`，查看用户（viewer）只能访问数据 GET、`detect` 与 `/settings/status`。其中用户管理写操作（新建/删除/改角色/重置密码）与任务记录删除（`DELETE /tasks/:id`）再套 `requireSuperAdmin()`，仅内建 `admin` 账号可执行，不随管理权限下放。路由注册集中在 `server.go` 的 `Router()`；`terminal.go` 提供 WebSocket SSH 终端（`GET /centers/:id/terminal`）。统一发布（`/releases`）的编排逻辑也在这一层。
 - `internal/auth` — 多用户登录与 Session 管理：`data/auth.json` 存用户数组（bcrypt 哈希、role=admin/viewer、每人独立首登改密标记，旧单用户格式自动迁移），12 小时 Cookie、连续失败按 IP 锁定 5 分钟。Session 绑定用户名且每次请求重新解析用户：删号立即踢下线、角色变更即时生效；改密/重置只吊销该用户的其他会话。用户 CRUD 保护：内建 `admin` 是超级管理员（加载时强制 role=admin，任何人不允许删除或降级）、不能删除当前登录账号自己。
 - `internal/centerlock` — 进程内按中心 ID 的互斥锁（`Acquire`/`AcquireContext`/`Within`），串行化对同一中心的状态变更操作，不同中心互不阻塞。deploy、centeraction、baseimage、provision、modelasset 均使用。
 - `internal/alerting` — 全局飞书机器人 Webhook 凭据（加密存储），provision 等流程渲染通知时经它取凭据并自动带入中心名称；`SendText` 供管理端直发文本消息（统一发布在 `api/release_notify.go` 的开始/结束通知中使用，尽力而为、失败不影响发布）。
