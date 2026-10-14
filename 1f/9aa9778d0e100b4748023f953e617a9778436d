@@ -1,0 +1,95 @@
+internal/api/task_actions.go
+  s_782d10ea6f6d7a::t_f7f3fb0de9c91e 64
+  s_782d10ea6f6d7a::t_aa1c132e27b177 151-166
+internal/api/pause_test.go
+  s_782d10ea6f6d7a::t_8d571a968ac73f 1-30
+internal/api/server.go
+  s_782d10ea6f6d7a::t_796bb52d3a90a4 118-119
+  s_782d10ea6f6d7a::t_17206a04469195 162-169
+  s_782d10ea6f6d7a::t_e12422bf24464e 290-304,308
+  s_782d10ea6f6d7a::t_10dbd6acfe2b22 242
+  s_782d10ea6f6d7a::t_b62059b40e0b9d 224,240,243
+  s_782d10ea6f6d7a::t_7f8d45e252fcce 309
+  s_782d10ea6f6d7a::t_0ae219251ec3e1 363
+internal/domain/models.go
+  s_782d10ea6f6d7a::t_1f9befdefdba2c 10
+internal/api/reset.go
+  s_782d10ea6f6d7a::t_eaecf97eedd144 27
+  s_782d10ea6f6d7a::t_39ccf03171a983 24-26,28-29
+internal/api/center_notify_test.go
+  s_782d10ea6f6d7a::t_13cb8a293374f8 15,19-22,24-27,29
+  s_782d10ea6f6d7a::t_38e6150ecc9966 1-14,16-18,23,28,30
+web/src/UserManagement.vue
+  s_782d10ea6f6d7a::t_7f30091cc79b8f 8
+  s_782d10ea6f6d7a::t_efff96e1264a2f 97-102
+  s_782d10ea6f6d7a::t_a0b39e59e14308 78,81
+  s_782d10ea6f6d7a::t_e42e491e651b0c 74
+CLAUDE.md
+  s_782d10ea6f6d7a::t_e109ae647a409e 51
+internal/center/service_test.go
+  s_782d10ea6f6d7a::t_7c884537e89bf8 1-35
+internal/store/sqlite.go
+  s_782d10ea6f6d7a::t_344a757fee8abd 113
+  s_782d10ea6f6d7a::t_8bb515173cdd90 87
+  s_782d10ea6f6d7a::t_1357d7204ca1b9 206,226
+  s_782d10ea6f6d7a::t_33d27fb47c339b 195
+  s_782d10ea6f6d7a::t_15d9b6ee280c3c 247
+web/src/App.vue
+  s_782d10ea6f6d7a::t_012391bacda8e1 529
+  s_782d10ea6f6d7a::t_490b5cba48dff0 286-288,294-306
+  s_782d10ea6f6d7a::t_fb06ce662596a3 40,307-309
+  s_782d10ea6f6d7a::t_cb12beefde4ef2 199-201
+  s_782d10ea6f6d7a::t_c7daf46b545c70 394
+  s_782d10ea6f6d7a::t_e6416d832b8802 572
+  s_782d10ea6f6d7a::t_3cfed9783591f9 576
+  s_782d10ea6f6d7a::t_e02eff24e6ec95 513
+  s_782d10ea6f6d7a::t_c092b501257337 464
+  s_782d10ea6f6d7a::t_46c5431f2a83ee 137
+  s_782d10ea6f6d7a::t_bb458133d6043a 29-30
+  s_782d10ea6f6d7a::t_6e5b6bf3863582 509
+  s_782d10ea6f6d7a::t_87d2c264374c3f 136
+  s_782d10ea6f6d7a::t_c46a2a3bc25fa6 277
+internal/provision/pause.go
+  s_782d10ea6f6d7a::t_3bcfafc7f364a2 44
+  s_782d10ea6f6d7a::t_7adc5b16cd7ab7 1-5,7-43,45-115
+  s_782d10ea6f6d7a::t_dce2d20e9edca0 6
+internal/center/service.go
+  s_782d10ea6f6d7a::t_dec1c5fdd783ab 39-41
+  s_782d10ea6f6d7a::t_ced93f00f6d822 78-80
+internal/api/pause.go
+  s_782d10ea6f6d7a::t_b292efe3084da0 45,47,49
+  s_782d10ea6f6d7a::t_4c3bde1b97f6de 1-23,25,29-44,46,50-51
+  s_782d10ea6f6d7a::t_b30b6826129707 27
+  s_782d10ea6f6d7a::t_9a4547e653192b 24,26,28
+  s_782d10ea6f6d7a::t_81b8e1a40602f0 48
+internal/api/users_test.go
+  s_782d10ea6f6d7a::t_b4c19902e9c01c 130-142
+internal/api/center_notify.go
+  s_782d10ea6f6d7a::t_ffc8e3bba78e9e 8-10,12,26,31-35
+  s_782d10ea6f6d7a::t_14316491a19b40 1-7,11,13-25,27-30,36-37
+web/src/types.ts
+  s_782d10ea6f6d7a::t_3a6de4ef3a4632 3
+internal/api/auth.go
+  s_782d10ea6f6d7a::t_49908f11cd8d03 102-114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "1f9aa9778d0e100b4748023f953e617a9778436d",
+  "prompts": {},
+  "humans": {
+    "h_4ba6e213f37271": {
+      "author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  },
+  "sessions": {
+    "s_782d10ea6f6d7a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1d32c12f-3b1b-47e0-8df7-98cfa4551af3",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
