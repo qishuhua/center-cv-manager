@@ -1,0 +1,587 @@
+internal/api/users_test.go
+  s_6f4dce646f419b::t_ecdce1abbaa041 1-119,121,123-124,126-129,136,138-190
+  s_6f4dce646f419b::t_552cfe5784e0f7 120,122,125,130-135,137
+internal/templates/compose/docker-compose.denglin.yml
+  s_be2c5172d1728a::t_32f9e4ca0a1867 376-377
+internal/api/release_notify.go
+  s_6f4dce646f419b::t_8ce99410742b23 1-17,19-27,30-34,44-50,53-63,66-72,82,84-129
+  s_6f4dce646f419b::t_d18f0f7174eb0f 18,28-29,35-43,51-52,64-65,73-81,83
+internal/centeraction/service.go
+  s_be2c5172d1728a::t_5ae0e67dae5096 407-409
+internal/templates/monitoring/filebeat/filebeat.yml
+  s_ce001e2e355df7::t_ffdee4f457b316 29-40
+  s_be2c5172d1728a::t_f0ff407addbd24 28
+internal/templates/monitoring/grafana/dashboards/center-cv-overview.denglin.json
+  s_be2c5172d1728a::t_9a65ae5b17298b 1247,1283-1284,1291-1292,1294,1296,1299-1300,1310-1311,1315,1325-1326,1333-1336,1338,1340-1348,1352-1353,1357-1358,1365,1368-1370,1377-1378,1380,1382,1385-1386,1396-1397,1401,1411-1412,1419-1422,1424,1426-1438,1442-1445,1449-1450,1532,1534,1546,1560-1561,1565,1575,1577,1589,1603-1604,1606-1615,1618
+  s_ce001e2e355df7::t_ffdee4f457b316 2-5,7-1246,1248-1282,1285-1290,1293,1295,1297-1298,1301-1309,1312-1314,1316-1324,1327-1332,1337,1339,1349-1351,1354-1356,1359-1364,1366-1367,1371-1376,1379,1381,1383-1384,1387-1395,1398-1400,1402-1410,1413-1418,1423,1425,1439-1441,1446-1448,1451-1531,1533,1535-1545,1547-1559,1562-1564,1566-1574,1576,1578-1588,1590-1602,1605,1616-1617,1619-2300
+internal/api/users.go
+  s_6f4dce646f419b::t_6225f1802f196f 24-25
+  s_6f4dce646f419b::t_bec5356ddcd011 43-44,48,58-59,63,73-74,78
+  s_6f4dce646f419b::t_eab3d9bb0c1bcc 1-23,26-42,45-47,49-57,60-62,64-72,75-77,79-88
+web/index.html
+  s_be2c5172d1728a::t_11c41e164de6e7 1
+internal/auth/manager.go
+  s_6f4dce646f419b::t_f7395cc8a1f324 264-265,274-276
+  s_6f4dce646f419b::t_dc88d5af43267c 38
+  s_6f4dce646f419b::t_c1b41ff180f26f 109,117,123,125
+  s_6f4dce646f419b::t_82147bd01df8af 278,280,283,289,293,298,333,335,344,347,351,353,355,357,361,367,372,375
+  s_6f4dce646f419b::t_b9e356dbf1fa7d 157-168
+  s_6f4dce646f419b::t_7b67bae8659de2 307-309
+  s_6f4dce646f419b::t_94ad2dba4492ed 11-12,24-25,29-37,41-66,71-75,83,87-92,105-106,110-116,119,121-122,126-127,136,139-156,177-178,193-194,204-206,208,210,221-225,228,235-236,240-247,253-254,257,260-263,266-273,277,279,281-282,284-288,290-292,294-297,299-300,303-306,310-332,334,336,340-343,345-346,348-350,352,354,356,358-360,362-366,368-371,373-374,376-410,416
+  s_6f4dce646f419b::t_443afc506981f4 337-339
+  s_6f4dce646f419b::t_ae2687b062c1f5 120,124
+  s_6f4dce646f419b::t_8a1ff35d070bed 301-302
+internal/templates/monitoring/prometheus/prometheus.denglin.yml
+  s_be2c5172d1728a::t_9a65ae5b17298b 105-106,138-139
+  s_ce001e2e355df7::t_ffdee4f457b316 87,89,91,93,95,97,99,101,120,122,124,126,128,130,132,134
+internal/api/task_actions.go
+  s_6780e1cba2b60e::t_d4fa2d6b3327fb 117-118
+  s_6780e1cba2b60e::t_4ef04d10ef65e9 58-69,144-151
+web/src/style.css
+  s_782d10ea6f6d7a::t_c5653b16a3067a 12-13
+  s_6780e1cba2b60e::t_dae37a0ee1aa03 26
+  s_f3db1b49df0f30::t_7ba601954d318e 10-11,14-15
+  s_6780e1cba2b60e::t_df884d29aa3e6e 17
+  s_782d10ea6f6d7a::t_ce50a5f7dd4ed6 4-8
+  s_be2c5172d1728a::t_eb022790f74228 1-3,9,16,18,20-21,25,27,29,31-33
+  s_6780e1cba2b60e::t_75f02b69f7a4f4 24
+  s_6780e1cba2b60e::t_7ac529e358070c 28
+  s_782d10ea6f6d7a::t_a6b40d1ff38274 19
+  s_6780e1cba2b60e::t_9962d438718ee7 23
+internal/api/server.go
+  s_6f4dce646f419b::t_f272eaab2aa723 994,997,1113,1150,1155,1169,1349-1356,1358,1368-1375,1377-1379,1381,1383,1385-1387,1393-1400,1445,1448,1518,1521,1729
+  s_6f4dce646f419b::t_ed6cc1fbdf956b 693-707,1401,1731
+  s_6780e1cba2b60e::t_921f7dde3263dc 1679
+  s_6f4dce646f419b::t_0327b355294249 395-396,399
+  s_6780e1cba2b60e::t_5f435b2c0c3b0e 1010
+  s_6780e1cba2b60e::t_44070bf3893e4f 992,1146,1443,1476-1477,1483-1498,1505-1506,1509,1516
+  s_6f4dce646f419b::t_b944ab4c535d42 85,101-102,107-164
+  s_6780e1cba2b60e::t_8c047eaf99444c 991
+  s_6f4dce646f419b::t_120bcab0aa3ce2 995-996
+  s_6f4dce646f419b::t_ac71267c6d9072 998
+  s_6f4dce646f419b::t_75400fc37a867a 1112
+  s_6f4dce646f419b::t_81dd340bebf81b 1114-1116
+  s_6780e1cba2b60e::t_ce5fca9cc04a9a 1145
+  s_6f4dce646f419b::t_b1b41c881d4708 1151-1154
+  s_6f4dce646f419b::t_a15bebe46d5027 1166-1168
+  s_6f4dce646f419b::t_af4adfd2ee031e 1402
+  s_6780e1cba2b60e::t_e27f96d6304a05 1442
+  s_6f4dce646f419b::t_91b0ae95e79e89 1446-1447
+  s_6780e1cba2b60e::t_944abc4c351a8d 1515
+  s_6f4dce646f419b::t_e73e7aab404a0b 1519-1520
+  s_6f4dce646f419b::t_d71da0ed620eea 1522
+  s_6780e1cba2b60e::t_c34ba020e90a88 1680-1682
+  s_6f4dce646f419b::t_f28863431580f7 1726-1728
+  s_6f4dce646f419b::t_7fbd798b078e80 1730
+  s_78f3b5fd6e0e37::t_387939525e9b9a 40-54,179-182,219-234,237-248,251-253,256-263,266-284,286-296,318-332,334-335,339-344,350,360-361,369,993,1089,1092,1117-1118,1147-1149,1257,1313,1444,1517,1683-1684,1688,1693-1725
+internal/templates/monitoring/mtail/log_errors.mtail
+  s_be2c5172d1728a::t_9a65ae5b17298b 6-7
+internal/templates/embed_test.go
+  s_ce001e2e355df7::t_7250ff7230be93 287,293,301,313,317-318
+  s_ce001e2e355df7::t_240fc6d1c45ede 302
+  s_ce001e2e355df7::t_2762e2c5dfa2fc 314
+  s_be2c5172d1728a::t_b36d2eb7530403 306
+CLAUDE.md
+  s_be2c5172d1728a::t_027f26c282123f 85
+  s_be2c5172d1728a::t_07d12efc3d5232 71
+  s_6f4dce646f419b::t_788f1c7db22b9d 52
+  s_be2c5172d1728a::t_63c5f024f40933 63
+  s_6f4dce646f419b::t_b81b2b1654bd74 54
+  s_be2c5172d1728a::t_529686281343d2 76
+  s_6780e1cba2b60e::t_49812d9df69728 62
+  s_be2c5172d1728a::t_49a35529878301 80
+  s_6f4dce646f419b::t_98b74c96c6ad66 51
+  s_be2c5172d1728a::t_0f4fc1faec7e53 77
+  s_6f4dce646f419b::t_cc87f7c036057c 7-9,14-17,19,22-24,27,30,33-35,37-38,41,47,53,55-57,66,68,73-75,78-79,91-93
+  s_be2c5172d1728a::t_5f4553b1bd9d51 81
+  s_6780e1cba2b60e::t_bf167980d4d6b8 72,96-98
+internal/centeraction/service_test.go
+  s_be2c5172d1728a::t_2828a10be91609 26
+  s_be2c5172d1728a::t_b01255b1323615 12
+internal/templates/modules_test.go
+  s_be2c5172d1728a::t_8093ecaed18b80 51-52
+  s_63aa2da86b0924::t_c7f50322a2e32a 26-32
+web/src/InitializeCenterDialog.vue
+  s_f3db1b49df0f30::t_84098142759a91 14-33
+  s_f3db1b49df0f30::t_e4a565578b0a82 11-13
+  s_f3db1b49df0f30::t_751d4ced60bc49 34-36
+  s_f3db1b49df0f30::t_65b1a4e765c10b 1-10,37-72
+internal/deploy/service_test.go
+  s_6780e1cba2b60e::t_46387f79999f17 4
+  s_6780e1cba2b60e::t_175ff149752ba6 108-119
+internal/api/modules.go
+  s_6f4dce646f419b::t_2f6bda18d5d244 130-131
+  s_6f4dce646f419b::t_496555e1d555ea 78-80
+  s_be2c5172d1728a::t_d23ad59af6fb29 200-202,212,226-227
+  s_be2c5172d1728a::t_999aa8f1216bb8 197-199
+  s_be2c5172d1728a::t_b6f42fb49a1ff7 203-205,209-211
+  s_be2c5172d1728a::t_f74be65e896160 213-215,223-225
+  s_6780e1cba2b60e::t_5f0f1a9ceea7d7 9,12,23-30,86-87,90-91,186-196,206-208,216-222
+internal/provision/compose_publish_test.go
+  s_6780e1cba2b60e::t_e36b8b23856625 12-13,18,22,26-27,29,32,37,40-41,43-57,62,65,68,71,75-76
+  s_6780e1cba2b60e::t_da2f38b668b219 9-11
+  s_6780e1cba2b60e::t_be8beda1a9a130 14-17
+  s_6780e1cba2b60e::t_4be750838b7fd3 19-21
+  s_6780e1cba2b60e::t_3a54d4b86d2dd7 23-25
+  s_6780e1cba2b60e::t_6e5234d6639064 28
+  s_6780e1cba2b60e::t_d2639a44948512 30-31
+  s_6780e1cba2b60e::t_0d515c55c68e86 33-36
+  s_6780e1cba2b60e::t_44cc28d7bc9cc5 38-39
+  s_6780e1cba2b60e::t_773f9bd1cbc78d 42
+  s_6780e1cba2b60e::t_f598961d16ff59 58-61
+  s_6780e1cba2b60e::t_67b2647ab8d270 63-64
+  s_6780e1cba2b60e::t_fda93ac43d1d97 66-67
+  s_6780e1cba2b60e::t_fde7c5d46e7fa3 69-70
+  s_6780e1cba2b60e::t_b3b8b58cf794b8 72-74
+  s_6780e1cba2b60e::t_6a648465ea302f 1-8
+README.md
+  s_6f4dce646f419b::t_89e738146f5ffe 14
+  s_6f4dce646f419b::t_0d8e65773a6ea8 61
+  s_6f4dce646f419b::t_72000f0f1e6216 59
+  s_6f4dce646f419b::t_21cc98754abf83 134-135
+  s_6f4dce646f419b::t_2330f8d924863e 157
+  s_ce001e2e355df7::t_73f3ba37fd9414 119,191
+  s_6780e1cba2b60e::t_15ecb70a5407d7 190
+  s_6f4dce646f419b::t_a8b40400957817 11-12
+  s_6f4dce646f419b::t_d3c4d86dc3380c 156
+  s_6780e1cba2b60e::t_3ebb0ccad7a1b6 36
+  s_ce001e2e355df7::t_f793306c3484b6 116-118
+  s_ce001e2e355df7::t_d12d17e414de79 192
+  s_5b1b60623cbb3b::t_e0ceb5cd9b9c76 17-18,32,106,115,170,194,196,204-205
+web/src/main.ts
+  s_be2c5172d1728a::t_b78586dfeaa674 4
+web/src/ModelCatalog.vue
+  s_be2c5172d1728a::t_41a45649265ef3 152-154
+  s_be2c5172d1728a::t_3e360c05d09be4 144,146-147
+  s_782d10ea6f6d7a::t_f8799c1c2a0719 62
+  s_be2c5172d1728a::t_e95cf98fc63195 138-140
+  s_be2c5172d1728a::t_f76a8e8049bd6a 129,131-132
+internal/templates/monitoring/alerting/rules/services.yml
+  s_be2c5172d1728a::t_9a65ae5b17298b 38,66
+web/src/ModuleManager.vue
+  s_6f4dce646f419b::t_f4fd258e251859 46
+  s_6f4dce646f419b::t_3f388038697101 53-58
+  s_6f4dce646f419b::t_164efb27b06829 92-93
+  s_6f4dce646f419b::t_f6f97f9b34e59d 88
+  s_6f4dce646f419b::t_297ed9da2bab20 9-14
+  s_6f4dce646f419b::t_049d03d778b83c 40
+  s_6f4dce646f419b::t_17a847a34d2d7e 7-8
+  s_6f4dce646f419b::t_c8cfdb58e787cd 15
+  s_6f4dce646f419b::t_b964ef8bc7f209 47
+  s_6f4dce646f419b::t_dcddd28b3e1c20 52
+  s_6f4dce646f419b::t_83afb087ec6d99 59-60
+  s_6f4dce646f419b::t_c2251a2b53a071 87
+  s_6f4dce646f419b::t_377974e08c8ba9 90-91
+  s_f79320746f44d8::t_e642539ccc3429 2,17-19,24-25,29,35,43,49,62-69,71-73,78,81-83
+internal/templates/nginx/nginx.full.conf
+  s_be2c5172d1728a::t_70553f8cf8c580 58-60
+  s_be2c5172d1728a::t_daeffa73ce9f31 98-118
+internal/deploy/modules.go
+  s_6780e1cba2b60e::t_03a9715430ca50 86,89,93,97,101,105,120,124,128,131,134-139,141,144,148,153,156
+  s_6780e1cba2b60e::t_1fe4bc1317084f 173-176
+internal/alerting/service.go
+  s_6f4dce646f419b::t_39a1bfb224b3f6 4,6,8-9
+  s_6f4dce646f419b::t_cedc8d744558eb 92-129
+  s_6f4dce646f419b::t_3e4694413242ac 5
+internal/api/auth.go
+  s_6f4dce646f419b::t_670ddcf715be2e 86-98
+web/src/YamlEditor.vue
+  s_be2c5172d1728a::t_024336b55c3bc5 44-45,48
+web/src/App.vue
+  s_6f4dce646f419b::t_6b25e555fbc8a4 275,292,295,297,299,314
+  s_6f4dce646f419b::t_2a94a8f2b0f0c1 273
+  s_6f4dce646f419b::t_36f164a494c68c 29-34
+  s_6f4dce646f419b::t_8469d4631de634 375
+  s_6f4dce646f419b::t_0873a5bfa4b5ab 421
+  s_6780e1cba2b60e::t_4aecc9cc536206 230,233,235,237-239
+  s_be2c5172d1728a::t_933ab714a8e508 197-198
+  s_6f4dce646f419b::t_d74418eb944088 452,467,492
+  s_be2c5172d1728a::t_bc0459807add19 514
+  s_be2c5172d1728a::t_197634cd4cb400 549-550
+  s_6f4dce646f419b::t_2ecc55fd9d6166 416,418
+  s_6f4dce646f419b::t_f4632105655fef 250
+  s_6f4dce646f419b::t_e081f96cd0df2b 14
+  s_6780e1cba2b60e::t_1b1b53035d78e7 579
+  s_782d10ea6f6d7a::t_38d22de183017e 477
+  s_6f4dce646f419b::t_3d949c145f479c 614
+  s_6780e1cba2b60e::t_c361488fc556ee 15
+  s_6f4dce646f419b::t_397bb5dfe8c64d 27-28
+  s_6f4dce646f419b::t_ea341f25492b1b 487-490
+  s_6f4dce646f419b::t_481164c5d2d693 81,96,109,277,290,293-294,304,306,332,356,370,372
+  s_6f4dce646f419b::t_a3e4cc776fe11b 460
+  s_f3db1b49df0f30::t_2c8e98c3add761 362-363
+  s_f3db1b49df0f30::t_e80411b6034192 364
+  s_be2c5172d1728a::t_cd5066852ade49 286
+  s_6f4dce646f419b::t_9d6df8bd0cbb89 243-249
+  s_6f4dce646f419b::t_72585a8c41f1a3 11-13
+  s_6f4dce646f419b::t_a78785937e3a1f 276
+  s_be2c5172d1728a::t_55344b1b2bb0de 283-285
+  s_be2c5172d1728a::t_7d3363d7fb169c 287
+  s_6f4dce646f419b::t_a061a30126d74f 289
+  s_6f4dce646f419b::t_14d3bec4160ce7 373
+  s_be2c5172d1728a::t_d0f7dc9f6140c3 547-548
+  s_be2c5172d1728a::t_19c1a0fc3611ca 551
+  s_782d10ea6f6d7a::t_f90b7df658b428 10,134-135,155,279-281,336,443,544,555-556,558,564,612
+web/src/types.ts
+  s_6f4dce646f419b::t_876cc8f01b9c30 1-2
+  s_6f4dce646f419b::t_9cb070036c6bcc 3
+internal/api/release_notify_test.go
+  s_6f4dce646f419b::t_f9ef8903aec9a3 1-86
+internal/provision/service.go
+  s_6780e1cba2b60e::t_a3327098d2280f 140-141,143-144,146-147
+  s_ce001e2e355df7::t_4a1ea8d49d5104 478-481,506-521,529-530,539-541
+  s_6780e1cba2b60e::t_911968b22518d9 101
+  s_be2c5172d1728a::t_68b89e76fea991 134-139
+  s_6780e1cba2b60e::t_c6b995e09cfdc0 148
+  s_ce001e2e355df7::t_dbd4c9a8bb19f8 477
+  s_ce001e2e355df7::t_a539e134ca767f 505
+  s_ce001e2e355df7::t_8908cadda45964 538
+  s_6780e1cba2b60e::t_88dcc799d99a31 46,157-167,171,208-210,278,468,485,488,543
+internal/templates/monitoring/grafana/dashboards/center-cv-overview.nvidia.json
+  s_ce001e2e355df7::t_ffdee4f457b316 2-5,7-1307,1309-1343,1346-1351,1354,1356,1358-1359,1362-1370,1373-1375,1377-1385,1388-1393,1398,1400,1410-1412,1415-1417,1420-1425,1427-1428,1432-1437,1440,1442,1444-1445,1448-1456,1459-1461,1463-1471,1474-1479,1484,1486,1500-1502,1507-1509,1512-1592,1594,1596-1606,1608-1620,1623-1625,1627-1635,1637,1639-1649,1651-1663,1666,1677-1678,1680-2361
+  s_be2c5172d1728a::t_9a65ae5b17298b 1308,1344-1345,1352-1353,1355,1357,1360-1361,1371-1372,1376,1386-1387,1394-1397,1399,1401-1409,1413-1414,1418-1419,1426,1429-1431,1438-1439,1441,1443,1446-1447,1457-1458,1462,1472-1473,1480-1483,1485,1487-1499,1503-1506,1510-1511,1593,1595,1607,1621-1622,1626,1636,1638,1650,1664-1665,1667-1676,1679
+web/src/TerminalPage.vue
+  s_be2c5172d1728a::t_23618b95c90b54 160-161
+internal/provision/compose_publish.go
+  s_be2c5172d1728a::t_b1fbb3d866c6e8 119,145,282-289,306,309,314,318,324,328,335,338,341,347,350,353
+  s_be2c5172d1728a::t_26a94e9cfa2cf4 48,56-57,62,73-106,177,182,186,190,216,220,240,250,255-256,261,383,387,396
+  s_6780e1cba2b60e::t_4d56422a689675 33,39,43,50,53,58,63,66,70,72,120-121,124,127,130,132,135-136,139,146,149-150,152,160,163,169,173,175,179,184,188,192,197,202,206,209,212,218,222,230,233,237,242,245,253,257,260,262,270,275,278,281,293,299,302,354,360,363,366,371,376-377,379,385,389,397,405-406,408,411-472,476
+  s_be2c5172d1728a::t_3378de6a92e613 8-18
+  s_be2c5172d1728a::t_48389a1044e450 5-7
+  s_6780e1cba2b60e::t_955a54954ec04f 34-38
+  s_6780e1cba2b60e::t_b50b2653ee9a1a 40-42
+  s_6780e1cba2b60e::t_d869f7085775eb 51-52
+  s_6780e1cba2b60e::t_4cf2ac9b0295b7 64-65
+  s_6780e1cba2b60e::t_dd045899dc81bd 67-69
+  s_6780e1cba2b60e::t_0245c9c90ff8d0 71
+  s_be2c5172d1728a::t_e050762dc2fb56 107-109,116-118
+  s_6780e1cba2b60e::t_9d81d6896908bf 122-123
+  s_6780e1cba2b60e::t_31d15c3f63d4cf 125-126
+  s_6780e1cba2b60e::t_69054f414fa6ed 128-129
+  s_6780e1cba2b60e::t_532749e5c83a07 131
+  s_6780e1cba2b60e::t_af58a26e9f10b0 133-134
+  s_6780e1cba2b60e::t_e0031d86eda56a 137-138
+  s_6780e1cba2b60e::t_5d9fdc037cb55f 147-148
+  s_6780e1cba2b60e::t_977de7fc9a7d5a 151
+  s_6780e1cba2b60e::t_b746c009058568 153-155,157-159
+  s_6780e1cba2b60e::t_6e6ed0bfcd5f83 161-162
+  s_6780e1cba2b60e::t_15b07388994916 164-168
+  s_6780e1cba2b60e::t_5cd245ade4535a 170-172
+  s_6780e1cba2b60e::t_e3b782021b5537 174
+  s_6780e1cba2b60e::t_06c9caabb8a959 193-196
+  s_6780e1cba2b60e::t_9855bbcd74f76b 198-201
+  s_6780e1cba2b60e::t_99b55f5246af37 203-205
+  s_6780e1cba2b60e::t_bcb56644ca3eaf 207-208
+  s_6780e1cba2b60e::t_9ba7607f114fb8 210-211
+  s_6780e1cba2b60e::t_696192e3fd0fc1 223-225,227-229
+  s_6780e1cba2b60e::t_0759693a3a6136 231-232
+  s_6780e1cba2b60e::t_e4a8347d051a01 234-236
+  s_6780e1cba2b60e::t_2dc9927384ac93 243-244
+  s_6780e1cba2b60e::t_58c2557f8ee7eb 258-259
+  s_6780e1cba2b60e::t_b54ebd3500d01d 263-265,267-269
+  s_6780e1cba2b60e::t_3957e7bcc3fb74 271-274
+  s_6780e1cba2b60e::t_2baf900c09b787 276-277
+  s_6780e1cba2b60e::t_597e9e7e1129c9 279-280
+  s_6780e1cba2b60e::t_2b3f817b0b4217 294-298
+  s_6780e1cba2b60e::t_4573126425b29c 300-301
+  s_be2c5172d1728a::t_001221a78545f5 307-308
+  s_be2c5172d1728a::t_e06ae8a4950ea9 310-313
+  s_be2c5172d1728a::t_72c0ac06be6f79 315-317
+  s_be2c5172d1728a::t_c8534082c5e776 319-323
+  s_be2c5172d1728a::t_a2ea25047bb92a 325-327
+  s_be2c5172d1728a::t_cf201158f59598 329-334
+  s_be2c5172d1728a::t_e8d976988f3382 336-337
+  s_be2c5172d1728a::t_42df9b581f9887 339-340
+  s_be2c5172d1728a::t_d292bd7a6037dc 342-346
+  s_be2c5172d1728a::t_10fa1e00e0e116 348-349
+  s_be2c5172d1728a::t_013b5188b7e5a9 351-352
+  s_6780e1cba2b60e::t_f4e6115b9cd116 355-359
+  s_6780e1cba2b60e::t_87c6020209e9ea 361-362
+  s_6780e1cba2b60e::t_355ac5fc90266f 364-365
+  s_6780e1cba2b60e::t_f3b58d90966e12 367-370
+  s_6780e1cba2b60e::t_e63b1e3a438721 372-375
+  s_6780e1cba2b60e::t_269bbdda9574fb 378
+  s_6780e1cba2b60e::t_edd38ca9ae048e 398-400,402-404
+  s_6780e1cba2b60e::t_0f1c7a8771f596 407
+  s_6780e1cba2b60e::t_580346adc01875 409-410
+  s_6780e1cba2b60e::t_d01eff30a0aec1 473-475
+  s_6780e1cba2b60e::t_c2a63a51e59ee8 1-4,19-32,44-47,49,54-55,59-61,110-115,140-144,156,176,178,180-181,183,185,187,189,191,213-215,217,219,221,226,238-239,241,246-249,251-252,254,266,290-292,303-305,380-382,384,386,388,390-395,401
+internal/templates/compose/docker-compose.nvidia.yml
+  s_be2c5172d1728a::t_6a3884e3ed430e 363-364
+  s_be2c5172d1728a::t_b4df9d5798633d 388-390
+  s_be2c5172d1728a::t_76ed6ef522ce91 476-477
+internal/deploy/service.go
+  s_6780e1cba2b60e::t_6e867b8a44c562 259-260
+  s_6780e1cba2b60e::t_8ca908edd361cf 177-190,192,195,204,208,212,220,227,236,240,243,246,253,257,263,265-267,276,280-289
+web/src/UserManagement.vue
+  s_6f4dce646f419b::t_d1caec82b361ac 74
+  s_6f4dce646f419b::t_e1f7980051af0b 1-7,9-73,75-85,87-95,97,99-126
+  s_6f4dce646f419b::t_9527759cbbf660 96,98
+  s_6780e1cba2b60e::t_dd9bed14331157 8
+  s_6f4dce646f419b::t_a8bccd32d8bb8b 86
+internal/templates/embed.go
+  s_ce001e2e355df7::t_7250ff7230be93 517,535
+  s_d2ba1ee1b29b96::t_23c34b2aecca30 241,251-253
+internal/auth/manager_test.go
+  s_6f4dce646f419b::t_9f064d90248663 3-7,21-23,70-93,99-100,102-103,105-106,108-109,111-113,117-118,120,123-132,136,139-142,144-145,152,160-164,167-174,176-181,183-210,212-226,228
+  s_6f4dce646f419b::t_074e89aa3b3cb8 98,101,104,107,110,143,153,175,182,211
+  s_6f4dce646f419b::t_3232b982f5e50d 227,229-250
+  s_6f4dce646f419b::t_ec08b54de36944 133-135,137-138,146-151,154-159,165-166
+internal/alerting/service_test.go
+  s_6f4dce646f419b::t_c10e24be94722d 54-94
+  s_6f4dce646f419b::t_3efd52a4f8ea7d 4-8
+web/package.json
+  s_6780e1cba2b60e::t_beaf292e441e0d 8
+internal/provision/module_setup.go
+  s_6780e1cba2b60e::t_603f73ab655bf0 73
+  s_6780e1cba2b60e::t_cb62cea72c89f3 70-72
+  s_6780e1cba2b60e::t_64504fef356eb5 74
+  s_6780e1cba2b60e::t_fab4f475ff69e1 1-69
+internal/templates/monitoring/prometheus/prometheus.nvidia.yml
+  s_ce001e2e355df7::t_ffdee4f457b316 82,84,86,88,90,92,94,96,116,118,120,122,124,126,128,130
+  s_be2c5172d1728a::t_9a65ae5b17298b 100-101,134-135
+internal/domain/models.go
+  s_6780e1cba2b60e::t_c471a590436a8e 35-41
+  s_25d6be1c9d1612::t_7ebf5aa03d4cb1 34
+internal/api/reset.go
+  s_25d6be1c9d1612::t_7edca413758f0d 1-37
+internal/modular/config.go
+  s_25d6be1c9d1612::t_49525cf38d1ae0 38
+internal/provision/reset.go
+  s_25d6be1c9d1612::t_1dc492fcf4b3bb 1-218
+.gitattributes
+  s_d2ba1ee1b29b96::t_760a2d41752966 1
+cmd/center-diagnostic-tmp/main.go
+  s_ff41c827bda7b3::t_ef2f143d5ba869 1-385
+compose.yaml
+  s_a73a24bdac3c9d::t_6d985ce1a7b4bc 13,25
+docs/architecture/modular-center-deployment.md
+  s_47b77c32f0a442::t_9ce2476bce6d12 218
+internal/api/initialization_test.go
+  s_78f3b5fd6e0e37::t_6c58feca568122 1-29
+internal/api/reselection_test.go
+  s_47b77c32f0a442::t_80308d8e1efa49 1-43
+internal/api/reset_test.go
+  s_4f5518cc83141f::t_c211e119c0a0d5 1-21
+internal/center/reset_test.go
+  s_4f5518cc83141f::t_e5a54b22eacfb2 1-44
+internal/center/service.go
+  s_47b77c32f0a442::t_f7cf202efa4570 248-263
+internal/modelasset/release.go
+  s_ff41c827bda7b3::t_f681b635a4007e 565,603-604
+internal/modelasset/release_test.go
+  s_ff41c827bda7b3::t_32f99c87e9b4ee 56-59
+internal/modelasset/remote_test.go
+  s_ff41c827bda7b3::t_17d3e600f8ff36 9,69-78
+internal/modelasset/repository.go
+  s_ff41c827bda7b3::t_c07f4afe070b02 184-186,191-195,306-339,513
+internal/modelasset/repository_test.go
+  s_ff41c827bda7b3::t_9a55f1bed26a53 4-5,7,147-154,177-239
+internal/modular/remote.go
+  s_63aa2da86b0924::t_3e16282e635de4 6,71-79,111-113,129-147,157-160
+internal/modular/remote_test.go
+  s_63aa2da86b0924::t_87443dd0d65f81 6,11,62-70,74-97
+internal/provision/compose_files.go
+  s_7f5af6e9697fee::t_863d26100fa3da 1-81
+internal/provision/compose_files_test.go
+  s_efebc4a4ed34b7::t_30e2e90e699367 1-23
+internal/provision/compose_live_test.go
+  s_2c6d9cfd92f932::t_17d884add89b39 1-75
+internal/provision/config_revision.go
+  s_d2ba1ee1b29b96::t_9b01025c85bfe9 1-139
+internal/provision/config_revision_test.go
+  s_63aa2da86b0924::t_36a63a7a21e497 1-111
+internal/provision/module_setup_test.go
+  s_efebc4a4ed34b7::t_5ef4973ab0efbf 1-20
+internal/provision/modules.go
+  s_be2c5172d1728a::t_9fb9d1a2caa3bf 21-27,31-35,91,201-205,339-346,525-539,624-637
+internal/provision/reset_test.go
+  s_4f5518cc83141f::t_7c254849599156 1-50
+internal/source/selection_test.go
+  s_f79320746f44d8::t_26fa8d08c84d36 1-18
+internal/source/service.go
+  s_f79320746f44d8::t_b81f8d971c5269 226-250
+internal/source/service_test.go
+  s_47b77c32f0a442::t_5d0f9165ea910d 97-99,118-123
+internal/task/initialization_test.go
+  s_78f3b5fd6e0e37::t_67fb83db962fa9 1-32
+internal/task/manager.go
+  s_f79320746f44d8::t_fb7349daf1b862 292-303
+internal/templates/line_endings_test.go
+  s_d2ba1ee1b29b96::t_da613fed025dbd 1-54
+internal/templates/modules.go
+  s_d2ba1ee1b29b96::t_8a4ff651231e17 42,54-56,64
+internal/templates/modules/monitoring/compose.denglin.yml
+  s_d2ba1ee1b29b96::t_f5305cf075a175 104-105
+internal/templates/modules/monitoring/compose.nvidia.yml
+  s_63aa2da86b0924::t_0ac85d1e9d87b9 94-95
+internal/templates/validate.go
+  s_7f5af6e9697fee::t_c33ae8f7274a1c 1-80
+internal/templates/validate_test.go
+  s_7f5af6e9697fee::t_c65fdb29699fe6 1-58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "6bb48b8c48e2d6c0d67f5d894826b7064d4e685e",
+  "prompts": {},
+  "humans": {
+    "h_4ba6e213f37271": {
+      "author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  },
+  "sessions": {
+    "s_25d6be1c9d1612": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "76a9e7d6-4dbe-4d30-ae84-ab68b2137c33",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_2c6d9cfd92f932": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a13002-2d48-7d10-ac00-24b5dc34db8f",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_47b77c32f0a442": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1359a-c69e-7c91-8c68-a160a8259d44",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_4f5518cc83141f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a13563-2aec-7f12-ae24-fbff968b636e",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_5b1b60623cbb3b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a13943-9ea7-70d2-b1f2-f50a89f593bb",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_63aa2da86b0924": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a135d3-660d-76d0-941e-17549ef7ea5d",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_6780e1cba2b60e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e61828c8-b79b-40f3-91e9-99f2286fe0d2",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_6f4dce646f419b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d4998ff7-c0a6-48ae-8e66-fd45d006723f",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_782d10ea6f6d7a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1d32c12f-3b1b-47e0-8df7-98cfa4551af3",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_78f3b5fd6e0e37": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a135ba-3ed4-7450-ac0e-31e7986bc79b",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_7f5af6e9697fee": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a12f37-7061-72e3-83b3-d0d9d9a217c5",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_a73a24bdac3c9d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a137fa-9c04-7813-86fa-a9be4baa5b0e",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_be2c5172d1728a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dad5dafc-4a55-45ef-8126-7f061abda848",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_ce001e2e355df7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d419-74d2-76d0-9982-42dfb40222d0",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_d2ba1ee1b29b96": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a135ce-ff94-7730-a7a7-dcc3b11320d0",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_efebc4a4ed34b7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a12f38-082f-7a80-9417-9e9ed2ecf950",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_f3db1b49df0f30": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e2a952e0-8614-4180-80da-d88f19bf960a",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_f79320746f44d8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1358d-3157-75c1-8374-5d9df223698e",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_ff41c827bda7b3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a13905-1fd7-7690-a569-21b3ede8d3dc",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
