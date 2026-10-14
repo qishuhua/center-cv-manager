@@ -1,7 +1,10 @@
 package modelasset
 
 import (
+	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -141,8 +144,14 @@ func TestRuntimeAliasUsesCanonicalInferencePath(t *testing.T) {
 		{
 			name:       "nvidia",
 			item:       ReleaseItem{Model: "crossover", Platform: "nvidia", HardwareProfile: "3050", RepositoryPath: "plan/3050/crossover", Artifacts: []ManifestArtifact{{TargetPath: "plan/3050/crossover/model.plan"}}},
-			wantAlias:  "plan/3050/crossover.plan",
-			wantTarget: "crossover/model.plan",
+			wantAlias:  "plan/crossover.plan",
+			wantTarget: "3050/crossover/model.plan",
+		},
+		{
+			name:       "nvidia V100",
+			item:       ReleaseItem{Model: "violence", Platform: "nvidia", HardwareProfile: "V100", RepositoryPath: "plan/V100/violence", Artifacts: []ManifestArtifact{{TargetPath: "plan/V100/violence/violence.plan"}}},
+			wantAlias:  "plan/violence.plan",
+			wantTarget: "V100/violence/violence.plan",
 		},
 	}
 	for _, tt := range tests {
@@ -162,6 +171,69 @@ func TestRuntimeAliasRejectsAmbiguousArtifacts(t *testing.T) {
 	item := ReleaseItem{Model: "fire", Platform: "denglin", Artifacts: []ManifestArtifact{{TargetPath: "denglin/fire/a.engine"}, {TargetPath: "denglin/fire/b.engine"}}}
 	if _, _, _, err := runtimeAlias(item); err == nil {
 		t.Fatal("runtime alias accepted multiple model files")
+	}
+}
+
+func TestNVIDIARuntimeAliasRejectsWrongHardwareArtifact(t *testing.T) {
+	item := ReleaseItem{Model: "fire", Platform: "nvidia", HardwareProfile: "V100", Artifacts: []ManifestArtifact{{TargetPath: "plan/3050/fire/model.plan"}}}
+	if _, _, _, err := runtimeAlias(item); err == nil {
+		t.Fatal("flattening the inference path must not bypass hardware profile validation")
+	}
+}
+
+func TestRepairProfileQualifiedNVIDIACurrentVersion(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires Linux shell and symlinks")
+	}
+	root := t.TempDir()
+	content := []byte("existing V100 engine")
+	storage := ".center-manager/repositories/fire/v1/artifact/fire.plan"
+	stored := filepath.Join(root, storage)
+	if err := os.MkdirAll(filepath.Dir(stored), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(stored, content, 0644); err != nil {
+		t.Fatal(err)
+	}
+	item := ReleaseItem{Model: "fire", Version: "v1", Platform: "nvidia", HardwareProfile: "V100", RepositoryPath: "plan/V100/fire", Artifacts: []ManifestArtifact{{TargetPath: "plan/V100/fire/fire.plan", Size: int64(len(content)), SHA256: fmt.Sprintf("%x", sha256.Sum256(content))}}}
+	current := CurrentVersion{Model: item.Model, Version: item.Version, Platform: item.Platform, HardwareProfile: item.HardwareProfile, RepositoryPath: item.RepositoryPath, Artifacts: item.Artifacts, TargetPath: "plan/V100/fire.plan", StoragePath: storage, ActivatedAt: "2026-10-14T00:00:00Z"}
+	oldAlias := filepath.Join(root, current.TargetPath)
+	if err := os.MkdirAll(filepath.Dir(oldAlias), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(relativeSymlinkTarget(filepath.Dir(oldAlias), stored), oldAlias); err != nil {
+		t.Fatal(err)
+	}
+	state := releaseStatePath(root, item.Model)
+	if err := os.MkdirAll(filepath.Dir(state), 0755); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := json.Marshal(current)
+	if err := os.WriteFile(state, data, 0644); err != nil {
+		t.Fatal(err)
+	}
+	files := remoteFiles{root: root, client: permissionSSH(t, "filesystem")}
+	for i := 0; i < 2; i++ {
+		updated, err := repairStoredCurrentVersion(context.Background(), files, current, item, quietReporter{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if updated.TargetPath != "plan/fire.plan" || updated.StoragePath != storage || updated.Version != current.Version || updated.ActivatedAt != current.ActivatedAt {
+			t.Fatalf("unexpected migration: %+v", updated)
+		}
+		actual, err := os.ReadFile(filepath.Join(root, "plan/fire.plan"))
+		if err != nil || string(actual) != string(content) {
+			t.Fatalf("inference cannot read engine: %q %v", actual, err)
+		}
+		data, err = os.ReadFile(state)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var saved CurrentVersion
+		if err = json.Unmarshal(data, &saved); err != nil || saved.TargetPath != updated.TargetPath {
+			t.Fatalf("state was not migrated: %s %v", data, err)
+		}
+		current = updated
 	}
 }
 

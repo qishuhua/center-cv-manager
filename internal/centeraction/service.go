@@ -404,7 +404,9 @@ func composeCommand(action string) (string, string) {
 	case RestartCompose:
 		return "restart", "正在重启整套 Compose"
 	case RedeployCompose:
-		return "up -d", "正在重新部署整套 Compose"
+		// --force-recreate：Compose 文件未变时也要重建容器，
+		// 让同步后的 bind-mount 配置（Nginx/Prometheus/告警等）真正加载。
+		return "up -d --force-recreate", "正在重新部署整套 Compose"
 	case StopCompose:
 		return "stop", "正在停止整套 Compose"
 	default:

@@ -6,7 +6,6 @@ raw.interceptors.response.use(r=>r.data.data,e=>{
 })
 const http={
   get:<T=any>(url:string):Promise<T>=>raw.get(url) as any,
-  getFresh:<T=any>(url:string):Promise<T>=>raw.get(url,{params:{_fresh:Date.now()},headers:{'Cache-Control':'no-cache'}}) as any,
   post:<T=any>(url:string,data?:any):Promise<T>=>raw.post(url,data) as any,
   postLong:<T=any>(url:string,data?:any):Promise<T>=>raw.post(url,data,{timeout:0}) as any,
   put:<T=any>(url:string,data?:any):Promise<T>=>raw.put(url,data) as any,

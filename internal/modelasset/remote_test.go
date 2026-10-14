@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"io"
 	"net"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -65,6 +66,16 @@ func permissionSSH(t *testing.T, mode string) *ssh.Client {
 					var payload struct{ Command string }
 					ssh.Unmarshal(req.Payload, &payload)
 					req.Reply(true, nil)
+					if mode == "filesystem" {
+						output, err := exec.Command("sh", "-c", payload.Command).CombinedOutput()
+						_, _ = stream.Write(output)
+						status := uint32(0)
+						if err != nil {
+							status = 1
+						}
+						_, _ = stream.SendRequest("exit-status", false, ssh.Marshal(struct{ Status uint32 }{status}))
+						return
+					}
 					allowed := mode == "direct" && !strings.HasPrefix(payload.Command, "sudo ") || mode == "nopass" && strings.HasPrefix(payload.Command, "sudo -n ")
 					if strings.HasPrefix(payload.Command, "sudo -k -S ") {
 						input, _ := io.ReadAll(stream)

@@ -18,10 +18,21 @@ import (
 
 func (s *Service) prepareModules(ctx context.Context, remote *sshx.DockerClient, c domain.Center, composeFile, accelerator string, cpus, gpus int, opts templates.RenderOptions, r Reporter) error {
 	d := c.Deployment
+	if d.Status == "reset" {
+		fresh := modular.NewDeployment(composeFile, opts.Workers)
+		fresh.ModelsRoot, fresh.LogsRoot, fresh.MediaRoot = d.ModelsRoot, d.LogsRoot, d.MediaRoot
+		fresh.Status = "configured"
+		fresh.ReselectionRequired = d.ReselectionRequired
+		d = fresh
+	}
 	if d.Status == "preparing" && allPending(d.Modules) {
 		d = modular.NewDeployment(composeFile, opts.Workers)
 	}
-	files, err := templates.RenderModules(accelerator, opts)
+	files := map[string]string{}
+	var err error
+	if d.Status == "preparing" || d.Status == "configured" {
+		files, err = templates.RenderModules(accelerator, opts)
+	}
 	if err != nil {
 		return err
 	}
@@ -77,7 +88,7 @@ func (s *Service) prepareModules(ctx context.Context, remote *sshx.DockerClient,
 	if err = s.centers.UpdateRuntime(c.ID, accelerator, cpus, gpus, composeFile, ""); err != nil {
 		return err
 	}
-	if d.Status == "preparing" {
+	if d.Status == "preparing" || d.Status == "configured" {
 		d.Status = "prepared"
 	}
 	if err = s.centers.UpdateDeployment(c.ID, d); err != nil {
@@ -184,6 +195,11 @@ func (s *Service) SaveModule(ctx context.Context, centerID, moduleID, file, cont
 	isCompose := target == m.ComposeFile
 	if isCompose {
 		if err = modular.ValidateConfig(m, content); err != nil {
+			return ModuleDocument{}, err
+		}
+	}
+	if readErr == nil && isCompose {
+		if err = s.captureComposeBaseline(ctx, remote, c, moduleID); err != nil {
 			return ModuleDocument{}, err
 		}
 	}
@@ -320,6 +336,14 @@ func (s *Service) ResumeModules(ctx context.Context, centerID string, r Reporter
 		return err
 	}
 	for i, m := range order {
+		if m.ID == "business" && d.ReselectionRequired {
+			d.Status = "waiting_business"
+			if err = s.centers.UpdateDeployment(centerID, d); err != nil {
+				return err
+			}
+			r.Message("基础模块已就绪，准备发布本次选择的软件与模型版本")
+			return nil
+		}
 		if m.ID == "business" {
 			models, e := modelasset.CurrentVersionsOnClient(ctx, remote.SSH, d.ModelsRoot)
 			if e != nil {
@@ -498,6 +522,21 @@ func (s *Service) applyModule(ctx context.Context, remote *sshx.DockerClient, c 
 		return err
 	}
 	m.Revision = modular.Hash(content)
+	resolved, err := runSSH(ctx, remote.SSH, modular.Command(m)+" config", "")
+	if err != nil {
+		return err
+	}
+	filesRevision, err := configurationRevision(ctx, remote, *c, m.ComposeFile, resolved)
+	if err != nil {
+		return err
+	}
+	published, err := readPublishedState(ctx, remote, m.ComposeFile)
+	if err != nil {
+		return err
+	}
+	if published.Files == "" || published.Files != filesRevision {
+		m.ConfigChanged = true
+	}
 	if action == "deploy" && all && m.AppliedRevision == m.Revision && m.Status == "healthy" && !m.ConfigChanged {
 		if err = modular.Inspect(ctx, remote, m, services); err == nil {
 			r.Logf("模块 %s 已部署，核对就绪状态", m.Name)
@@ -582,6 +621,20 @@ func (s *Service) applyModule(ctx context.Context, remote *sshx.DockerClient, c 
 		}
 	}
 	if all && action == "deploy" {
+		latest, err := runSSH(ctx, remote.SSH, modular.Command(m)+" config", "")
+		if err != nil {
+			return err
+		}
+		latestFiles, err := configurationRevision(ctx, remote, *c, m.ComposeFile, latest)
+		if err != nil {
+			return err
+		}
+		if latest != resolved || latestFiles != filesRevision {
+			return fmt.Errorf("部署期间配置发生变化，请刷新后重新发布")
+		}
+		if err = writePublishedState(ctx, remote, m.ComposeFile, composePublishedState{Content: m.Revision, Resolved: modular.Hash(resolved), Files: filesRevision}); err != nil {
+			return err
+		}
 		m.AppliedRevision = m.Revision
 		m.ConfigChanged = false
 	}

@@ -238,6 +238,7 @@ func Render(mode, deployRoot string, opts RenderOptions, log func(string)) error
 		if err != nil {
 			return fmt.Errorf("读取模板 %s 失败: %w", spec.EmbedPath, err)
 		}
+		content = []byte(strings.ReplaceAll(string(content), "\r\n", "\n"))
 		if spec.EmbedPath == filepath.Join("compose", composeForMode(mode)) && mode != "business" {
 			content = renderWorkerEnvironment(content, opts.WorkerEnv)
 			content, err = renderDynamicWorkers(content, mode, opts.Workers, opts.CPUSets)
@@ -247,6 +248,9 @@ func Render(mode, deployRoot string, opts RenderOptions, log func(string)) error
 		}
 		if spec.EmbedPath == filepath.Join("compose", composeForMode(mode)) {
 			content = renderHostMounts(content, mode, opts.ModelsRoot, opts.LogsRoot, opts.MediaResourcesRoot)
+			if err := validateGeneratedCompose(content); err != nil {
+				return fmt.Errorf("模板 %s: %w", spec.EmbedPath, err)
+			}
 		}
 		if spec.TargetPath == filepath.Join("monitoring", "prometheus", prometheusForMode(mode)) && mode != "business" {
 			content, err = renderDynamicPrometheus(content, mode, opts.Workers)
@@ -510,7 +514,7 @@ func renderDynamicPrometheus(content []byte, mode string, workers int) ([]byte, 
 	ingressTarget += healthStart
 	var healthTargets strings.Builder
 	for i := 0; i < workers; i++ {
-		fmt.Fprintf(&healthTargets, "      - targets: [\"http://127.0.0.1:%d/healthz\"]\n", 8181+i)
+		fmt.Fprintf(&healthTargets, "      - targets: [\"http://127.0.0.1:%d/api/healthz\"]\n", 8181+i)
 		fmt.Fprintf(&healthTargets, "        labels: {worker: \"center-cv-service-%d\", physical_gpu: \"%d\"}\n", i, i)
 	}
 	text = text[:healthStatic] + healthTargets.String() + text[ingressTarget:]
@@ -528,7 +532,7 @@ func renderDynamicPrometheus(content []byte, mode string, workers int) ([]byte, 
 	readinessIngress += readinessStart
 	var readinessTargets strings.Builder
 	for i := 0; i < workers; i++ {
-		fmt.Fprintf(&readinessTargets, "      - targets: [\"http://127.0.0.1:%d/readyz\"]\n", 8181+i)
+		fmt.Fprintf(&readinessTargets, "      - targets: [\"http://127.0.0.1:%d/api/readyz\"]\n", 8181+i)
 		fmt.Fprintf(&readinessTargets, "        labels: {name: \"center-cv-service-%d\"}\n", i)
 	}
 	return []byte(text[:readinessStatic] + readinessTargets.String() + text[readinessIngress:]), nil

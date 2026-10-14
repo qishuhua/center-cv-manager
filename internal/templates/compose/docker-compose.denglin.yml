@@ -373,6 +373,8 @@ services:
       - --port=3903
       - --progs=/etc/mtail
       - --logs=/data/logs/*.log
+      - --logs=/data/logs/video-transcode-service
+      - --ignore_filename_regex_pattern=\.[^.]+\.log$
       - --logtostderr
     volumes:
       - ./monitoring/mtail:/etc/mtail:ro

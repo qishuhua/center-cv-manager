@@ -139,28 +139,6 @@ services:
       retries: 12
       start_period: 10s
 
-  chute-verification-service:
-    image: chute-verification-service:latest
-    pull_policy: never
-    container_name: chute-verification-service
-    restart: unless-stopped
-    network_mode: host
-    environment:
-      # Keep the internal API loopback-only; the source default is 0.0.0.0.
-      CV_LISTEN_HOST: 127.0.0.1
-      CV_ORGAN_CODE: "637101"
-      # Required fixed detection-result receiver confirmed for production.
-      CV_DETECT_RESULT_HOST: 10.21.61.48
-      CV_DETECT_RESULT_PORT: "31995"
-    volumes:
-      - /data/logs:/data/logs
-    healthcheck:
-      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/127.0.0.1/8091' || exit 1"]
-      interval: 10s
-      timeout: 3s
-      retries: 12
-      start_period: 10s
-
   video-transcode-service:
     image: video-transcode-service:latest
     pull_policy: never

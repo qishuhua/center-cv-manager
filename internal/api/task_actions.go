@@ -55,7 +55,18 @@ func (s *Server) retryTask(c *gin.Context) {
 			s.storeError(c, err)
 			return
 		}
-		ok(c, s.submitCenterInitialization(center, p["force_template"] == "true", p["download_images"] != "false"))
+		var items []deploy.Item
+		var models []modelasset.ReleaseItem
+		if json.Unmarshal([]byte(p["items"]), &items) != nil || json.Unmarshal([]byte(p["models"]), &models) != nil {
+			fail(c, 400, fmt.Errorf("旧初始化任务未保存版本选择，请重新打开初始化部署选择版本"))
+			return
+		}
+		result, err := s.submitCenterInitialization(center, items, models)
+		if err != nil {
+			fail(c, 409, err)
+			return
+		}
+		ok(c, result)
 		return
 	case "BASE_IMAGE_UPDATE":
 		run = func(ctx context.Context, h *task.Handle) error {
@@ -103,7 +114,8 @@ func (s *Server) retryTask(c *gin.Context) {
 			return
 		}
 		run = func(ctx context.Context, h *task.Handle) error {
-			return s.deployments.Run(ctx, p["center_id"], items, h)
+			_, err := s.deployments.Run(ctx, p["center_id"], items, h)
+			return err
 		}
 	case "RELEASE_VERSION":
 		var items []deploy.Item
@@ -128,6 +140,14 @@ func (s *Server) retryTask(c *gin.Context) {
 		}
 		run = func(ctx context.Context, h *task.Handle) error {
 			return s.runRelease(ctx, p["center_id"], items, modelItems, h)
+		}
+	case "RESET_CENTER":
+		if p["confirm_reset"] != "true" {
+			fail(c, 400, fmt.Errorf("重置任务缺少确认记录，请重新点击重置并确认"))
+			return
+		}
+		run = func(ctx context.Context, h *task.Handle) error {
+			return s.runCenterReset(ctx, p["center_id"], h)
 		}
 	case "MODULE_MIGRATION":
 		run = func(ctx context.Context, h *task.Handle) error {

@@ -39,6 +39,7 @@ func RenderModules(platform string, opts RenderOptions) (map[string]string, erro
 		if err != nil {
 			return err
 		}
+		content = []byte(strings.ReplaceAll(string(content), "\r\n", "\n"))
 		if strings.HasPrefix(rel, "business/compose.") {
 			content, err = renderDynamicWorkers(content, mode, opts.Workers, opts.CPUSets)
 			if err != nil {
@@ -50,6 +51,9 @@ func RenderModules(platform string, opts RenderOptions) (map[string]string, erro
 		}
 		if strings.Contains(rel, "/compose.") {
 			content = renderHostMounts(content, mode, opts.ModelsRoot, opts.LogsRoot, opts.MediaResourcesRoot)
+			if err := validateGeneratedCompose(content); err != nil {
+				return fmt.Errorf("模板 %s: %w", rel, err)
+			}
 			rel = path.Join(path.Dir(rel), "compose.yml")
 		}
 		if strings.HasPrefix(rel, "monitoring/prometheus/prometheus.") {
@@ -57,11 +61,7 @@ func RenderModules(platform string, opts RenderOptions) (map[string]string, erro
 			if err != nil {
 				return err
 			}
-			// The current business API uses /api on Worker health endpoints.
-			content = []byte(strings.NewReplacer("/healthz\"", "/api/healthz\"", "/readyz\"", "/api/readyz\"").Replace(string(content)))
-			for _, port := range []string{"8090", "8091", "8092"} {
-				content = []byte(strings.ReplaceAll(string(content), ":"+port+"/api/readyz", ":"+port+"/readyz"))
-			}
+
 		}
 		if rel == "monitoring/alerting/alertmanager.yml" {
 			content, err = renderAlertServerName(content, opts.ServerName)

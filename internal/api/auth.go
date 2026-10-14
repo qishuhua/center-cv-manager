@@ -83,6 +83,19 @@ func (s *Server) requireAuth() gin.HandlerFunc {
 			return
 		}
 		c.Set("auth_username", status.Username)
+		c.Set("auth_role", status.Role)
+		c.Next()
+	}
+}
+
+// requireAdmin 只允许管理员角色通过；角色取自 requireAuth 刚解析的会话状态。
+func (s *Server) requireAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if role, _ := c.Get("auth_role"); role != auth.RoleAdmin {
+			fail(c, http.StatusForbidden, errors.New("需要管理员权限"))
+			c.Abort()
+			return
+		}
 		c.Next()
 	}
 }

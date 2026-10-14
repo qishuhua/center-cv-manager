@@ -245,6 +245,22 @@ func (s *Service) mask(v *domain.Center) {
 }
 
 // UpdateDeployment is called under the center operation lock.
+// ResetRuntime clears publication state after remote reset, keeping connection
+// settings and data paths for an explicit subsequent initialization.
+func (s *Service) ResetRuntime(id string, deployment *domain.Deployment) error {
+	v, err := s.repo.GetCenter(id)
+	if err != nil {
+		return err
+	}
+	deployment.ReselectionRequired = true
+	v.Deployment = deployment
+	v.InitializedAt = nil
+	v.ComposeContent = ""
+	v.ComposeProject = ""
+	v.UpdatedAt = time.Now()
+	return s.repo.SaveCenter(v)
+}
+
 func (s *Service) UpdateDeployment(id string, deployment *domain.Deployment) error {
 	v, err := s.repo.GetCenter(id)
 	if err != nil {

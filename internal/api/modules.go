@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"time"
 
+	"center-cv-manager/internal/centerlock"
 	"center-cv-manager/internal/domain"
 	"center-cv-manager/internal/modular"
+	"center-cv-manager/internal/provision"
 	"center-cv-manager/internal/task"
 	"github.com/gin-gonic/gin"
 )
@@ -18,7 +20,14 @@ func (s *Server) listModules(c *gin.Context) {
 		s.storeError(c, err)
 		return
 	}
-	ok(c, modular.Modules(v))
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+	files, err := s.provisioning.ListComposePublications(ctx, v.ID)
+	if err != nil {
+		fail(c, 400, err)
+		return
+	}
+	ok(c, files)
 }
 func (s *Server) saveModuleMetadata(c *gin.Context) {
 	var m domain.ComposeModule
@@ -66,22 +75,20 @@ func (s *Server) saveModule(c *gin.Context) {
 }
 func (s *Server) moduleAction(c *gin.Context) {
 	var in struct {
-		Action        string   `json:"action"`
-		Services      []string `json:"services"`
-		Revision      string   `json:"revision"`
-		AdminPassword string   `json:"admin_password"`
+		Action   string   `json:"action"`
+		Services []string `json:"services"`
+		Revision string   `json:"revision"`
 	}
 	if err := c.ShouldBindJSON(&in); err != nil {
 		fail(c, 400, err)
 		return
 	}
-	if in.Action != "deploy" && in.Action != "restart" && in.Action != "stop" {
-		fail(c, 400, fmt.Errorf("无效的模块操作"))
+	if len(in.Services) > 0 {
+		fail(c, 400, fmt.Errorf("Compose 必须整体发布，不支持单独操作服务"))
 		return
 	}
-	token, _ := c.Cookie(authCookieName)
-	if err := s.auth.VerifyPassword(token, in.AdminPassword); err != nil {
-		fail(c, 403, err)
+	if in.Action != "deploy" && in.Action != "restart" && in.Action != "stop" {
+		fail(c, 400, fmt.Errorf("无效的模块操作"))
 		return
 	}
 	id, moduleID := c.Param("id"), c.Param("module")
@@ -120,17 +127,11 @@ func (s *Server) migrationPlan(c *gin.Context) {
 
 func (s *Server) migrateCenter(c *gin.Context) {
 	var in struct {
-		Revision      string `json:"revision"`
-		AdminPassword string `json:"admin_password"`
-		Rollback      bool   `json:"rollback"`
+		Revision string `json:"revision"`
+		Rollback bool   `json:"rollback"`
 	}
 	if err := c.ShouldBindJSON(&in); err != nil {
 		fail(c, 400, err)
-		return
-	}
-	token, _ := c.Cookie(authCookieName)
-	if err := s.auth.VerifyPassword(token, in.AdminPassword); err != nil {
-		fail(c, 403, err)
 		return
 	}
 	id := c.Param("id")
@@ -181,4 +182,46 @@ func (s *Server) deleteModule(c *gin.Context) {
 		return
 	}
 	ok(c, true)
+}
+
+func (s *Server) prepareModuleFiles(c *gin.Context) {
+	var in provision.ModuleSetup
+	if err := c.ShouldBindJSON(&in); err != nil {
+		fail(c, 400, err)
+		return
+	}
+	if err := in.Validate(); err != nil {
+		fail(c, 400, err)
+		return
+	}
+	id := c.Param("id")
+	ok(c, s.tasks.Submit("PREPARE_MODULES", map[string]string{"center_id": id}, func(ctx context.Context, h *task.Handle) error {
+		return centerlock.Within(ctx, id, func(ctx context.Context) error { return s.provisioning.PrepareModuleFiles(ctx, id, in, h) })
+	}))
+}
+
+func (s *Server) planComposePublish(c *gin.Context) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 45*time.Second)
+	defer cancel()
+	plan, err := s.provisioning.PlanComposePublish(ctx, c.Param("id"), c.Param("module"))
+	if err != nil {
+		fail(c, 400, err)
+		return
+	}
+	ok(c, plan)
+}
+func (s *Server) publishCompose(c *gin.Context) {
+	var in struct {
+		Revision         string `json:"revision"`
+		ConfirmUnchanged bool   `json:"confirm_unchanged"`
+	}
+	if err := c.ShouldBindJSON(&in); err != nil {
+		fail(c, 400, err)
+		return
+	}
+	id, file := c.Param("id"), c.Param("module")
+	params := map[string]string{"center_id": id, "module_id": file, "action": "publish"}
+	ok(c, s.tasks.Submit("COMPOSE_PUBLISH", params, func(ctx context.Context, h *task.Handle) error {
+		return s.provisioning.PublishCompose(ctx, id, file, in.Revision, in.ConfirmUnchanged, h)
+	}))
 }

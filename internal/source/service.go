@@ -223,6 +223,31 @@ func (s *Service) Download(ctx context.Context, src domain.Source, ref string, r
 	return s.download(ctx, src, ref, "", r)
 }
 
+// VerifySelection checks the live remote before accepting a new release. Once
+// accepted, the task keeps its immutable commit even when the branch moves.
+func (s *Service) VerifySelection(ctx context.Context, src domain.Source, ref, kind, commit string) error {
+	versions, err := s.Versions(ctx, src)
+	if err != nil {
+		return err
+	}
+	return VerifyRemoteVersion(versions, ref, kind, commit)
+}
+
+func VerifyRemoteVersion(versions []Version, ref, kind, commit string) error {
+	if kind != "branch" && kind != "tag" {
+		return fmt.Errorf("请选择明确的远端分支或标签并刷新版本")
+	}
+	for _, version := range versions {
+		if version.Ref == ref && version.Kind == kind {
+			if !strings.EqualFold(version.Commit, commit) {
+				return fmt.Errorf("远端 %s 已更新（选择 %s，当前 %s），请刷新并重新确认版本", ref, commit, version.Commit)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("远端 %s 已不存在，请刷新版本列表", ref)
+}
+
 // EnsureCheckout returns an exact, immutable source snapshot for a release.
 // The expected commit comes from ls-remote and prevents a moving branch from
 // silently changing between version selection and the actual build.

@@ -22,7 +22,6 @@ type Center struct {
 	ComposeContent      string      `json:"-"`
 	Deployment          *Deployment `json:"deployment,omitempty"`
 	ComposeProject      string      `json:"-"`
-	ComposeEnvFile      string      `json:"-"`
 	InitializedAt       *time.Time  `json:"initialized_at,omitempty"`
 	Description         string      `json:"description"`
 	CreatedAt           time.Time   `json:"created_at"`
@@ -32,13 +31,14 @@ type Center struct {
 // Deployment keeps center paths independent of any individual Compose entry.
 // A nil Deployment is a legacy center and is never implicitly migrated.
 type Deployment struct {
-	Migration  *ModuleMigration `json:"migration,omitempty"`
-	Root       string           `json:"root"`
-	ModelsRoot string           `json:"models_root"`
-	LogsRoot   string           `json:"logs_root"`
-	MediaRoot  string           `json:"media_root"`
-	Status     string           `json:"status"`
-	Modules    []ComposeModule  `json:"modules"`
+	ReselectionRequired bool             `json:"reselection_required,omitempty"`
+	Migration           *ModuleMigration `json:"migration,omitempty"`
+	Root                string           `json:"root"`
+	ModelsRoot          string           `json:"models_root"`
+	LogsRoot            string           `json:"logs_root"`
+	MediaRoot           string           `json:"media_root"`
+	Status              string           `json:"status"`
+	Modules             []ComposeModule  `json:"modules"`
 }
 
 type ModuleMigration struct {

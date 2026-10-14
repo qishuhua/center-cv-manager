@@ -59,7 +59,7 @@ function sizeLabel(value: number) {
   <div class="panel model-catalog" v-loading="loading">
     <div class="panel-title">
       <div><h2>模型文件夹</h2><p>每个文件夹是一个独立模型，展开后选择或上传其中的版本。</p></div>
-      <el-button :icon="Refresh" :disabled="loading" @click="emit('refresh')">刷新清单</el-button>
+      <el-button :icon="Refresh" :disabled="loading" @click="emit('refresh')">刷新</el-button>
     </div>
     <div v-if="selectable" class="model-select-all">
       <div class="model-selection-summary">
@@ -126,32 +126,32 @@ function sizeLabel(value: number) {
 </template>
 
 <style scoped>
-.model-select-all{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 18px;margin-bottom:18px;border:1px solid #c6dcfa;border-radius:10px;background:#f0f6ff;flex-wrap:wrap}
+.model-select-all{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 18px;margin-bottom:18px;border:1px solid #2c3235;border-radius:10px;background:#1f2125;flex-wrap:wrap}
 .model-selection-summary{display:flex;flex-direction:column;gap:6px}
-.model-selection-summary strong{color:#26364a;font-size:15px}
-.model-selection-summary span{color:#52657f;font-size:13px}
+.model-selection-summary strong{color:#fff;font-size:15px}
+.model-selection-summary span{color:#8e9297;font-size:13px}
 .model-selection-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .model-selection-actions>.el-button{margin-left:0}
 .model-selection-actions>.el-button--primary{font-weight:600}
 @media(max-width:600px){.model-selection-actions{width:100%}.model-selection-actions>.el-button--primary{width:100%}}
 .model-folders{border-top:0}
-.model-folders :deep(.el-collapse-item){border:1px solid #e3e9f1;border-radius:12px;margin-bottom:12px;overflow:hidden}
-.model-folders :deep(.el-collapse-item__header){height:72px;padding:0 18px;border-bottom:0;background:#fbfcfe}
-.model-folders :deep(.el-collapse-item__header.is-active){border-bottom:1px solid #e8edf3}
+.model-folders :deep(.el-collapse-item){border:1px solid #22252b;border-radius:12px;margin-bottom:12px;overflow:hidden}
+.model-folders :deep(.el-collapse-item__header){height:72px;padding:0 18px;border-bottom:0;background:#1f2125;color:#d8d9da}
+.model-folders :deep(.el-collapse-item__header.is-active){border-bottom:1px solid #22252b}
 .model-folders :deep(.el-collapse-item__wrap){border-bottom:0}
 .model-folders :deep(.el-collapse-item__content){padding:0 18px 18px}
 .model-folder-title{display:flex;align-items:center;gap:13px;width:100%;min-width:0;padding-right:12px}
-.folder-icon{width:34px;height:34px;border-radius:9px;background:#eaf2ff;color:#3378dc;font-size:19px;flex:0 0 auto}
+.folder-icon{width:34px;height:34px;border-radius:9px;background:rgba(51,162,229,.15);color:#33a2e5;font-size:19px;flex:0 0 auto}
 .folder-name{display:flex;flex-direction:column;align-items:flex-start;line-height:1.45;min-width:160px;margin-right:auto}
-.folder-name strong{font-size:16px;color:#26364a}
-.folder-name span,.version-list-head span,.format-title span{font-size:12px;color:#7b8797}
+.folder-name strong{font-size:16px;color:#e0e1e2}
+.folder-name span,.version-list-head span,.format-title span{font-size:12px;color:#8e9297}
 .folder-upload{margin-left:6px}
 .version-list-head{display:flex;align-items:center;justify-content:space-between;padding:15px 2px 10px}
 .version-list-head>div{display:flex;align-items:center;gap:12px}
 .version-formats{padding:2px 20px 18px}
-.version-formats>p{color:#748093;margin:6px 0 12px}
-.format-group{border:1px solid #e6ebf2;border-radius:9px;overflow:hidden;margin-top:10px;background:#fff}
-.format-title{display:flex;align-items:center;gap:12px;padding:10px 12px;background:#f8fafc}
+.version-formats>p{color:#8e9297;margin:6px 0 12px}
+.format-group{border:1px solid #22252b;border-radius:9px;overflow:hidden;margin-top:10px;background:#181b1f}
+.format-title{display:flex;align-items:center;gap:12px;padding:10px 12px;background:#1f2125}
 .version-table :deep(.el-radio__label){display:none}
 @media(max-width:800px){.model-folder-title>.el-tag{display:none}.folder-upload{margin-left:auto}.version-list-head span{display:none}}
 </style>

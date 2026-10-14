@@ -3,10 +3,12 @@ package modular
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"center-cv-manager/internal/domain"
 	"center-cv-manager/internal/sshx"
@@ -57,6 +59,39 @@ func TestInspectRequiresEveryServiceAndSuccessfulInit(t *testing.T) {
 			if (err == nil) != (scenario == "healthy") {
 				t.Fatalf("scenario %s: %v", scenario, err)
 			}
+			if scenario == "failed-init" {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+				defer cancel()
+				err = Wait(ctx, &sshx.DockerClient{Client: cli}, domain.ComposeModule{ID: "infra", Project: "center-cv-infra", InitServices: []string{"rabbitmq-init"}}, []string{"rabbitmq", "rabbitmq-init"}, nil)
+				var failed *initFailure
+				if !errors.As(err, &failed) || failed.code != 1 {
+					t.Fatalf("expected immediate init failure, got %v", err)
+				}
+			}
 		})
+	}
+}
+
+func TestWaitSkipsAbsentOptionalChuteProbe(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[]`))
+	}))
+	defer server.Close()
+	cli, err := client.NewClientWithOpts(client.WithHost(server.URL), client.WithVersion("1.47"), client.WithHTTPClient(server.Client()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cli.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	m := domain.ComposeModule{ID: "business", Project: "center-cv-business"}
+	if err := Wait(ctx, &sshx.DockerClient{Client: cli}, m, nil, []string{"http://127.0.0.1:8091/readyz"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, u := range NewDeployment("/tmp/deploy/compose.yml", 1).Modules[2].ReadyURLs {
+		if strings.Contains(u, ":8091/") {
+			t.Fatal("default deployment probes optional chute service")
+		}
 	}
 }

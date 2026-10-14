@@ -26,6 +26,19 @@ filebeat.inputs:
     fields_under_root: true
 
   - type: filestream
+    id: chute-verification-service-business-logs-v1
+    enabled: true
+    paths:
+      - /data/logs/chute-verification-service.log
+      - /data/logs/chute-verification-service.*.log
+      - /data/logs/chute-verification-service-*.log
+      - /data/logs/chute-verification-service-*.*.log
+    fields:
+      service.name: chute-verification-service
+      event.dataset: chute-verification-service
+    fields_under_root: true
+
+  - type: filestream
     id: video-transcode-service-business-logs-v1
     enabled: true
     paths:

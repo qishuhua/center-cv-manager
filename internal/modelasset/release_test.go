@@ -54,6 +54,10 @@ func TestValidateCurrentVersionSupportsLegacyAndFlatState(t *testing.T) {
 	current.TargetPath = "plan/3050/fire-detector.plan"
 	current.StoragePath = ".center-manager/repositories/fire-detector/v1/artifact/1/model.plan"
 	if err := validateCurrentVersion(current); err != nil {
+		t.Fatalf("old NVIDIA profile alias must remain migratable: %v", err)
+	}
+	current.TargetPath = "plan/fire-detector.plan"
+	if err := validateCurrentVersion(current); err != nil {
 		t.Fatalf("flat state rejected: %v", err)
 	}
 	current.TargetPath = format.RepositoryPath

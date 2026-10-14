@@ -45,12 +45,10 @@ scrape_configs:
     metrics_path: /metrics
     static_configs:
       - targets: ["127.0.0.1:8090"]
-
   - job_name: video-transcode-service
     metrics_path: /metrics
     static_configs:
       - targets: ["127.0.0.1:8092"]
-
   - job_name: rabbitmq
     metrics_path: /metrics
     static_configs:
@@ -86,24 +84,26 @@ scrape_configs:
     params:
       module: [http_2xx]
     static_configs:
-      - targets: ["http://127.0.0.1:8181/healthz"]
+      - targets: ["http://127.0.0.1:8181/api/healthz"]
         labels: {worker: "center-cv-service-0", physical_gpu: "0"}
-      - targets: ["http://127.0.0.1:8182/healthz"]
+      - targets: ["http://127.0.0.1:8182/api/healthz"]
         labels: {worker: "center-cv-service-1", physical_gpu: "1"}
-      - targets: ["http://127.0.0.1:8183/healthz"]
+      - targets: ["http://127.0.0.1:8183/api/healthz"]
         labels: {worker: "center-cv-service-2", physical_gpu: "2"}
-      - targets: ["http://127.0.0.1:8184/healthz"]
+      - targets: ["http://127.0.0.1:8184/api/healthz"]
         labels: {worker: "center-cv-service-3", physical_gpu: "3"}
-      - targets: ["http://127.0.0.1:8185/healthz"]
+      - targets: ["http://127.0.0.1:8185/api/healthz"]
         labels: {worker: "center-cv-service-4", physical_gpu: "4"}
-      - targets: ["http://127.0.0.1:8186/healthz"]
+      - targets: ["http://127.0.0.1:8186/api/healthz"]
         labels: {worker: "center-cv-service-5", physical_gpu: "5"}
-      - targets: ["http://127.0.0.1:8187/healthz"]
+      - targets: ["http://127.0.0.1:8187/api/healthz"]
         labels: {worker: "center-cv-service-6", physical_gpu: "6"}
-      - targets: ["http://127.0.0.1:8188/healthz"]
+      - targets: ["http://127.0.0.1:8188/api/healthz"]
         labels: {worker: "center-cv-service-7", physical_gpu: "7"}
       - targets: ["http://127.0.0.1:8090/readyz"]
         labels: {service: "center-cv-ingress"}
+      - targets: ["http://127.0.0.1:8092/readyz"]
+        labels: {service: "video-transcode-service"}
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -117,24 +117,26 @@ scrape_configs:
     params:
       module: [http_2xx]
     static_configs:
-      - targets: ["http://127.0.0.1:8181/readyz"]
+      - targets: ["http://127.0.0.1:8181/api/readyz"]
         labels: {name: "center-cv-service-0"}
-      - targets: ["http://127.0.0.1:8182/readyz"]
+      - targets: ["http://127.0.0.1:8182/api/readyz"]
         labels: {name: "center-cv-service-1"}
-      - targets: ["http://127.0.0.1:8183/readyz"]
+      - targets: ["http://127.0.0.1:8183/api/readyz"]
         labels: {name: "center-cv-service-2"}
-      - targets: ["http://127.0.0.1:8184/readyz"]
+      - targets: ["http://127.0.0.1:8184/api/readyz"]
         labels: {name: "center-cv-service-3"}
-      - targets: ["http://127.0.0.1:8185/readyz"]
+      - targets: ["http://127.0.0.1:8185/api/readyz"]
         labels: {name: "center-cv-service-4"}
-      - targets: ["http://127.0.0.1:8186/readyz"]
+      - targets: ["http://127.0.0.1:8186/api/readyz"]
         labels: {name: "center-cv-service-5"}
-      - targets: ["http://127.0.0.1:8187/readyz"]
+      - targets: ["http://127.0.0.1:8187/api/readyz"]
         labels: {name: "center-cv-service-6"}
-      - targets: ["http://127.0.0.1:8188/readyz"]
+      - targets: ["http://127.0.0.1:8188/api/readyz"]
         labels: {name: "center-cv-service-7"}
       - targets: ["http://127.0.0.1:8090/readyz"]
         labels: {name: "center-cv-ingress"}
+      - targets: ["http://127.0.0.1:8091/readyz"]
+        labels: {name: "chute-verification-service"}
       - targets: ["http://127.0.0.1:8092/readyz"]
         labels: {name: "video-transcode-service"}
     relabel_configs:

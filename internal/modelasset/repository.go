@@ -181,12 +181,18 @@ func runtimeAlias(item ReleaseItem) (aliasPath, linkTarget string, artifact Mani
 		if item.HardwareProfile == "" {
 			return "", "", ManifestArtifact{}, fmt.Errorf("NVIDIA 模型 %s 缺少 hardware_profile", item.Model)
 		}
-		relativeAlias = path.Join("plan", item.HardwareProfile, item.Model+".plan")
+		// TensorRT reads /data/models/plan/<model>.plan. Hardware profiles
+		// select the stored artifact, not the path exposed to inference.
+		relativeAlias = path.Join("plan", item.Model+".plan")
 	default:
 		return "", "", ManifestArtifact{}, fmt.Errorf("不支持的模型平台: %s", item.Platform)
 	}
 	prefix := path.Dir(relativeAlias) + "/"
-	if !strings.HasPrefix(artifact.TargetPath, prefix) {
+	storagePrefix := prefix
+	if item.Platform == "nvidia" {
+		storagePrefix = path.Join("plan", item.HardwareProfile) + "/"
+	}
+	if !strings.HasPrefix(artifact.TargetPath, storagePrefix) {
 		return "", "", ManifestArtifact{}, fmt.Errorf("模型 %s 的运行时文件不在 %s 下", item.Model, path.Dir(relativeAlias))
 	}
 	linkTarget = strings.TrimPrefix(artifact.TargetPath, prefix)
@@ -295,6 +301,40 @@ func ensureRuntimeAliasToStorage(ctx context.Context, files remoteFiles, item Re
 	}
 	r.Logf("已更新扁平运行时模型路径：%s -> %s", alias, linkTarget)
 	return nil
+}
+
+// Repair the old profile-qualified NVIDIA alias and its persisted state together.
+func repairStoredCurrentVersion(ctx context.Context, files remoteFiles, current CurrentVersion, item ReleaseItem, r Reporter) (CurrentVersion, error) {
+	alias, _, artifact, err := runtimeAlias(item)
+	if err != nil {
+		return current, err
+	}
+	if current.TargetPath == alias {
+		return current, ensureRuntimeAliasToStorage(ctx, files, item, current.StoragePath, r)
+	}
+	if !verifyStoredArtifact(ctx, files, current.StoragePath, artifact, true) {
+		return current, fmt.Errorf("内部版本文件 %s 不存在或校验失败", current.StoragePath)
+	}
+	migrated := current
+	migrated.TargetPath = alias
+	data, err := json.Marshal(migrated)
+	if err != nil {
+		return current, err
+	}
+	alias = path.Join(files.root, alias)
+	state := releaseStatePath(files.root, item.Model)
+	backup := path.Join(files.root, ".center-manager", "legacy-backups", item.Model+"-runtime-"+fmt.Sprint(time.Now().UnixNano()))
+	if _, err = files.run(ctx, releasePathGuard(files.root, alias, state, state+".tmp", backup)); err != nil {
+		return current, err
+	}
+	if _, err = files.run(ctx, runtimeActivationCommand(alias, path.Join(files.root, current.StoragePath), state, backup, string(data))); err != nil {
+		return current, err
+	}
+	if !currentVersionFilesReady(ctx, files, migrated, item, true) {
+		return current, fmt.Errorf("模型 %s 运行时路径迁移后校验失败", item.Model)
+	}
+	r.Logf("已修复 NVIDIA 模型运行时路径：%s", alias)
+	return migrated, nil
 }
 
 func runtimeActivationCommand(alias, stored, statePath, backup, stateJSON string) string {
@@ -470,7 +510,7 @@ func releaseRepository(ctx context.Context, files remoteFiles, bucket artifactSi
 	}
 	if current.ManifestDigest == item.ManifestDigest {
 		if current.StoragePath != "" && verifyStoredArtifact(ctx, files, current.StoragePath, runtimeArtifact, true) {
-			if err = ensureRuntimeAliasToStorage(ctx, files, item, current.StoragePath, r); err != nil {
+			if _, err = repairStoredCurrentVersion(ctx, files, current, item, r); err != nil {
 				return err
 			}
 			r.Logf("模型 %s 已是目标版本 %s，扁平运行时文件校验通过，跳过", item.Model, item.Version)

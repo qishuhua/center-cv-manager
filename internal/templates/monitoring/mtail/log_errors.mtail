@@ -3,7 +3,8 @@
 # File format: timestamp|-|logger|-|source|-|level|-|function|-|message.
 counter center_cv_log_errors_total by service
 
-getfilename() =~ /\/(?P<service>[^\/.]+)(?:\.[^\/]*)?\.log$/ {
+# Only current files; extensionless logs are explicitly selected in Compose.
+getfilename() =~ /\/(?P<service>[^\/.]+)(?:\.log)?$/ {
   /(?i)^(?:[^|]*\|-\|){3}(?:error|fatal|critical)\|-\|/ {
     center_cv_log_errors_total[$service]++
   }

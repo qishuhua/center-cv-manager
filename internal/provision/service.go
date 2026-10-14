@@ -43,6 +43,7 @@ func New(centers *center.Service, alerts *alerting.Service) *Service {
 }
 
 type ComposeDocument struct {
+	Revision string `json:"revision"`
 	CenterID string `json:"center_id"`
 	Path     string `json:"path"`
 	Content  string `json:"content"`
@@ -97,7 +98,7 @@ func (discardReporter) Logf(string, ...any) {}
 func (discardReporter) Progress(float64)    {}
 func (discardReporter) Message(string)      {}
 
-func (s *Service) Initialize(ctx context.Context, centerID string, forceTemplate bool, r Reporter) error {
+func (s *Service) Initialize(ctx context.Context, centerID string, r Reporter) error {
 	release, cancelErr := centerlock.AcquireContext(ctx, centerID)
 	if cancelErr != nil {
 		return cancelErr
@@ -130,23 +131,21 @@ func (s *Service) Initialize(ctx context.Context, centerID string, forceTemplate
 
 	preserveCompose := false
 	existingCompose := ""
-	if !forceTemplate {
-		state, stateErr := runSSH(ctx, remote.SSH, "if [ -e "+shellQuote(composeFile)+" ]; then printf exists; else printf missing; fi", "")
-		if stateErr != nil {
-			return fmt.Errorf("检查中心 Compose 是否存在失败: %w", stateErr)
+	state, stateErr := runSSH(ctx, remote.SSH, "if [ -e "+shellQuote(composeFile)+" ]; then printf exists; else printf missing; fi", "")
+	if stateErr != nil {
+		return fmt.Errorf("检查中心 Compose 是否存在失败: %w", stateErr)
+	}
+	if strings.TrimSpace(state) == "exists" {
+		existing, readErr := readRemoteFile(ctx, remote.SSH, composeFile)
+		if readErr != nil {
+			return fmt.Errorf("发现已有 Compose 但无法读取，为避免覆盖已停止初始化: %w", readErr)
 		}
-		if strings.TrimSpace(state) == "exists" {
-			existing, readErr := readRemoteFile(ctx, remote.SSH, composeFile)
-			if readErr != nil {
-				return fmt.Errorf("发现已有 Compose 但无法读取，为避免覆盖已停止初始化: %w", readErr)
-			}
-			if strings.TrimSpace(existing) == "" {
-				return fmt.Errorf("发现已有但内容为空的 Compose，为避免覆盖已停止初始化；确认后可选择强制重新生成")
-			}
-			preserveCompose = true
-			existingCompose = existing
-			r.Logf("发现已有 Compose，将保留原文件并同步其余内置模板：%s", composeFile)
+		if strings.TrimSpace(existing) == "" {
+			return fmt.Errorf("发现已有但内容为空的 Compose，为避免覆盖已停止初始化；请检查中心上的 Compose 文件")
 		}
+		preserveCompose = true
+		existingCompose = existing
+		r.Logf("发现已有 Compose，将保留所有现有部署配置：%s", composeFile)
 	}
 	if preserveCompose && stored.Deployment != nil && stored.Deployment.Status == "preparing" && allPending(stored.Deployment.Modules) {
 		if err = s.centers.UpdateDeployment(centerID, nil); err != nil {
@@ -155,14 +154,21 @@ func (s *Service) Initialize(ctx context.Context, centerID string, forceTemplate
 		stored.Deployment = nil
 		r.Log("发现原有单 Compose，已按兼容模式接管；可在运行详情中单独生成迁移计划")
 	}
+	if preserveCompose {
+		if _, err = runSSH(ctx, remote.SSH, "docker compose -f "+shellQuote(composeFile)+" config --quiet", ""); err != nil {
+			return err
+		}
+		if err = s.centers.UpdateRuntime(centerID, accelerator, cpuCount, gpuCount, composeFile, existingCompose); err != nil {
+			return err
+		}
+		r.Progress(100)
+		r.Message("已验证并保留现有配置；采用新内置模板请先重置中心")
+		return nil
+	}
 	if accelerator == "cpu" && !preserveCompose {
 		return fmt.Errorf("当前内置完整部署模板需要 NVIDIA 或登临 GPU")
 	}
-	if preserveCompose {
-		r.Message("正在按硬件生成配套部署模板")
-	} else {
-		r.Message("正在按硬件生成 Compose 模板")
-	}
+	r.Message("正在按硬件生成 Compose 模板")
 	root, err := os.MkdirTemp("", "center-compose-")
 	if err != nil {
 		return err
@@ -199,6 +205,9 @@ func (s *Service) Initialize(ctx context.Context, centerID string, forceTemplate
 	modelsRoot := centerpath.ModelsRoot(composeFile)
 	logsRoot := centerpath.LogsRoot(composeFile)
 	mediaResourcesRoot := centerpath.MediaResourcesRoot(composeFile)
+	if stored.Deployment != nil && stored.Deployment.Status != "preparing" {
+		modelsRoot, logsRoot, mediaResourcesRoot = stored.Deployment.ModelsRoot, stored.Deployment.LogsRoot, stored.Deployment.MediaRoot
+	}
 	prepareData := "umask 022; mkdir -p " + shellQuote(modelsRoot) + " " + shellQuote(logsRoot) + " " + shellQuote(mediaResourcesRoot) +
 		" && test -w " + shellQuote(modelsRoot) + " && test -w " + shellQuote(logsRoot) + " && test -w " + shellQuote(mediaResourcesRoot)
 	if output, prepareErr := runSSH(ctx, remote.SSH, prepareData, ""); prepareErr != nil {
@@ -222,26 +231,6 @@ func (s *Service) Initialize(ctx context.Context, centerID string, forceTemplate
 	if err != nil {
 		return err
 	}
-	if preserveCompose {
-		composeContent = []byte(existingCompose)
-	}
-	preserveRemoteWebhook := false
-	if preserveCompose && mode != "business" && strings.TrimSpace(alertConfig.FeishuWebhook) == "" {
-		webhookPath := path.Join(path.Dir(composeFile), "monitoring", "alerting", "feishu-webhook-url")
-		state, stateErr := runSSH(ctx, remote.SSH, "if [ -f "+shellQuote(webhookPath)+" ]; then printf exists; else printf missing; fi", "")
-		if stateErr != nil {
-			return fmt.Errorf("检查中心飞书 Webhook 文件失败: %w", stateErr)
-		}
-		preserveRemoteWebhook = strings.TrimSpace(state) == "exists"
-		if preserveRemoteWebhook {
-			r.Log("未配置集中飞书 Webhook，已保留中心现有密钥文件")
-		}
-	}
-	if forceTemplate {
-		if _, backupErr := runSSH(ctx, remote.SSH, "if [ -f "+shellQuote(composeFile)+" ]; then cp "+shellQuote(composeFile)+" "+shellQuote(composeFile+".bak."+strconv.FormatInt(time.Now().Unix(), 10))+"; fi", ""); backupErr != nil {
-			return fmt.Errorf("备份已有 Compose 失败: %w", backupErr)
-		}
-	}
 	r.Progress(35)
 	r.Message("正在上传中心部署模板")
 	files := 0
@@ -255,14 +244,6 @@ func (s *Service) Initialize(ctx context.Context, centerID string, forceTemplate
 		relative, relErr := filepath.Rel(root, localPath)
 		if relErr != nil {
 			return relErr
-		}
-		if preserveCompose && localPath == generatedCompose {
-			return nil
-		}
-		// A centrally configured webhook is authoritative. Without one, keep an
-		// existing center's secret instead of replacing it with the placeholder.
-		if preserveRemoteWebhook && filepath.ToSlash(relative) == "monitoring/alerting/feishu-webhook-url" {
-			return nil
 		}
 		remotePath := path.Join(path.Dir(composeFile), filepath.ToSlash(relative))
 		if localPath == generatedCompose {
@@ -294,40 +275,7 @@ func (s *Service) Initialize(ctx context.Context, centerID string, forceTemplate
 		return err
 	}
 	r.Progress(100)
-	if preserveCompose {
-		r.Message("中心硬件检测完成，已保留 Compose 并同步配套模板")
-	} else {
-		r.Message("中心硬件检测与 Compose 初始化完成")
-	}
-	return nil
-}
-
-func (s *Service) Detect(ctx context.Context, centerID string, r Reporter) error {
-	release, cancelErr := centerlock.AcquireContext(ctx, centerID)
-	if cancelErr != nil {
-		return cancelErr
-	}
-	defer release()
-	r.Message("正在检测中心硬件")
-	r.Progress(5)
-	remote, stored, err := s.connect(centerID)
-	if err != nil {
-		return err
-	}
-	defer remote.Close()
-	composeFile := stored.ComposeFile
-	if composeFile == "" {
-		composeFile = centerpath.DefaultComposeFile
-	}
-	accelerator, cpuCount, gpuCount, err := probeHardware(ctx, remote, stored, composeFile, r)
-	if err != nil {
-		return err
-	}
-	if err = s.centers.UpdateHardware(centerID, accelerator, cpuCount, gpuCount); err != nil {
-		return err
-	}
-	r.Progress(100)
-	r.Message("中心硬件检测完成；未修改 Compose，也未同步镜像")
+	r.Message("中心硬件检测与 Compose 初始化完成")
 	return nil
 }
 
@@ -517,7 +465,7 @@ func writableComposeFile(ctx context.Context, client *ssh.Client, requested stri
 	return resolved, nil
 }
 
-func (s *Service) ReadCompose(ctx context.Context, centerID string) (ComposeDocument, error) {
+func (s *Service) ReadCompose(ctx context.Context, centerID string, files ...string) (ComposeDocument, error) {
 	remote, stored, err := s.connect(centerID)
 	if err != nil {
 		return ComposeDocument{}, err
@@ -526,14 +474,18 @@ func (s *Service) ReadCompose(ctx context.Context, centerID string) (ComposeDocu
 	if stored.Deployment != nil {
 		return ComposeDocument{}, fmt.Errorf("模块化中心请在模块列表中选择 Compose")
 	}
-	content, err := readRemoteFile(ctx, remote.SSH, stored.ComposeFile)
+	target, err := legacyComposeTarget(ctx, remote, stored.ComposeFile, files)
+	if err != nil {
+		return ComposeDocument{}, err
+	}
+	content, err := readRemoteFile(ctx, remote.SSH, target)
 	if err != nil {
 		return ComposeDocument{}, fmt.Errorf("读取中心 Compose 失败: %w", err)
 	}
-	return ComposeDocument{CenterID: centerID, Path: stored.ComposeFile, Content: content}, nil
+	return ComposeDocument{CenterID: centerID, Path: target, Content: content, Revision: modular.Hash(content)}, nil
 }
 
-func (s *Service) SaveCompose(ctx context.Context, centerID, content string) (ComposeDocument, error) {
+func (s *Service) SaveCompose(ctx context.Context, centerID, content string, files ...string) (ComposeDocument, error) {
 	release, cancelErr := centerlock.AcquireContext(ctx, centerID)
 	if cancelErr != nil {
 		return ComposeDocument{}, cancelErr
@@ -550,7 +502,23 @@ func (s *Service) SaveCompose(ctx context.Context, centerID, content string) (Co
 	if stored.Deployment != nil {
 		return ComposeDocument{}, fmt.Errorf("模块化中心请在模块列表中选择 Compose")
 	}
-	temporary := stored.ComposeFile + ".validate." + strconv.FormatInt(time.Now().UnixNano(), 10)
+	target, err := legacyComposeTarget(ctx, remote, stored.ComposeFile, files)
+	if err != nil {
+		return ComposeDocument{}, err
+	}
+	if len(files) > 1 && files[1] != "" {
+		old, e := readRemoteFile(ctx, remote.SSH, target)
+		if e != nil {
+			return ComposeDocument{}, e
+		}
+		if modular.Hash(old) != files[1] {
+			return ComposeDocument{}, fmt.Errorf("配置已变更，请重新读取后保存")
+		}
+	}
+	if err = s.captureComposeBaseline(ctx, remote, stored, path.Base(target)); err != nil {
+		return ComposeDocument{}, err
+	}
+	temporary := target + ".validate." + strconv.FormatInt(time.Now().UnixNano(), 10)
 	if err = uploadRemoteFile(ctx, remote.SSH, temporary, content, "0600"); err != nil {
 		return ComposeDocument{}, err
 	}
@@ -558,8 +526,8 @@ func (s *Service) SaveCompose(ctx context.Context, centerID, content string) (Co
 	if output, validateErr := runSSH(ctx, remote.SSH, "docker compose -f "+shellQuote(temporary)+" config >/dev/null", ""); validateErr != nil {
 		return ComposeDocument{}, fmt.Errorf("Compose 校验失败: %s %w", strings.TrimSpace(output), validateErr)
 	}
-	backup := stored.ComposeFile + ".bak." + strconv.FormatInt(time.Now().Unix(), 10)
-	command := "if [ -f " + shellQuote(stored.ComposeFile) + " ]; then cp " + shellQuote(stored.ComposeFile) + " " + shellQuote(backup) + "; fi; chmod 0644 " + shellQuote(temporary) + " && mv " + shellQuote(temporary) + " " + shellQuote(stored.ComposeFile)
+	backup := target + ".bak." + strconv.FormatInt(time.Now().Unix(), 10)
+	command := "if [ -f " + shellQuote(target) + " ]; then cp " + shellQuote(target) + " " + shellQuote(backup) + "; fi; chmod 0644 " + shellQuote(temporary) + " && mv " + shellQuote(temporary) + " " + shellQuote(target)
 	if output, saveErr := runSSH(ctx, remote.SSH, command, ""); saveErr != nil {
 		return ComposeDocument{}, fmt.Errorf("保存 Compose 失败: %s %w", strings.TrimSpace(output), saveErr)
 	}
@@ -567,10 +535,12 @@ func (s *Service) SaveCompose(ctx context.Context, centerID, content string) (Co
 	if accelerator == "" {
 		accelerator = stored.Accelerator
 	}
-	if err = s.centers.UpdateRuntime(centerID, accelerator, stored.CPUCount, stored.GPUCount, stored.ComposeFile, content); err != nil {
-		return ComposeDocument{}, err
+	if target == stored.ComposeFile {
+		if err = s.centers.UpdateRuntime(centerID, accelerator, stored.CPUCount, stored.GPUCount, stored.ComposeFile, content); err != nil {
+			return ComposeDocument{}, err
+		}
 	}
-	return ComposeDocument{CenterID: centerID, Path: stored.ComposeFile, Content: content}, nil
+	return ComposeDocument{CenterID: centerID, Path: target, Content: content, Revision: modular.Hash(content)}, nil
 }
 
 func (s *Service) connect(centerID string) (*sshx.DockerClient, domain.Center, error) {
@@ -979,32 +949,6 @@ func formatCPUSet(ids []int) string {
 	return strings.Join(parts, ",")
 }
 
-func distributeCPUs(cpus, workers int) []string {
-	if cpus < 1 || workers < 1 {
-		return nil
-	}
-	sets := make([]string, workers)
-	base, remainder, start := cpus/workers, cpus%workers, 0
-	for index := 0; index < workers; index++ {
-		count := base
-		if index < remainder {
-			count++
-		}
-		if count < 1 {
-			sets[index] = strconv.Itoa(index % cpus)
-			continue
-		}
-		end := start + count - 1
-		if start == end {
-			sets[index] = strconv.Itoa(start)
-		} else {
-			sets[index] = fmt.Sprintf("%d-%d", start, end)
-		}
-		start = end + 1
-	}
-	return sets
-}
-
 func readRemoteFile(ctx context.Context, client *ssh.Client, remotePath string) (string, error) {
 	return runSSH(ctx, client, "cat "+shellQuote(remotePath), "")
 }
@@ -1021,16 +965,6 @@ func uploadRemoteFile(ctx context.Context, client *ssh.Client, remotePath, conte
 
 func runSSH(ctx context.Context, client *ssh.Client, command, stdin string) (string, error) {
 	return modular.Run(ctx, client, command, stdin)
-}
-
-func combineSSHOutput(stdout, stderr string) string {
-	if stdout == "" {
-		return stderr
-	}
-	if stderr == "" {
-		return stdout
-	}
-	return strings.TrimRight(stdout, "\r\n") + "\n" + stderr
 }
 
 func shellQuote(value string) string { return centerpath.ShellQuote(value) }

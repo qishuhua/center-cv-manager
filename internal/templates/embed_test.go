@@ -284,13 +284,13 @@ func TestRenderHostMounts(t *testing.T) {
 }
 
 func TestRenderDynamicPrometheus(t *testing.T) {
-	source := []byte("  - job_name: center-cv-service\r\n    static_configs:\r\n      - targets: [\"127.0.0.1:8181\"]\r\n        labels: {worker: old}\r\n    metric_relabel_configs:\r\n      - action: drop\r\n  - job_name: service-http-health\r\n    static_configs:\r\n      - targets: [\"http://127.0.0.1:8181/healthz\"]\r\n        labels: {worker: old}\r\n      - targets: [\"http://127.0.0.1:8090/readyz\"]\r\n        labels: {service: ingress}\r\n    relabel_configs:\r\n  - job_name: service-readiness\r\n    static_configs:\r\n      - targets: [\"http://127.0.0.1:8181/readyz\"]\r\n        labels: {name: old}\r\n      - targets: [\"http://127.0.0.1:8090/readyz\"]\r\n        labels: {name: ingress}\r\n    relabel_configs:\r\n")
+	source := []byte("  - job_name: center-cv-service\r\n    static_configs:\r\n      - targets: [\"127.0.0.1:8181\"]\r\n        labels: {worker: old}\r\n    metric_relabel_configs:\r\n      - action: drop\r\n  - job_name: service-http-health\r\n    static_configs:\r\n      - targets: [\"http://127.0.0.1:8181/api/healthz\"]\r\n        labels: {worker: old}\r\n      - targets: [\"http://127.0.0.1:8090/readyz\"]\r\n        labels: {service: ingress}\r\n    relabel_configs:\r\n  - job_name: service-readiness\r\n    static_configs:\r\n      - targets: [\"http://127.0.0.1:8181/api/readyz\"]\r\n        labels: {name: old}\r\n      - targets: [\"http://127.0.0.1:8090/readyz\"]\r\n        labels: {name: ingress}\r\n    relabel_configs:\r\n")
 	result, err := renderDynamicPrometheus(source, "tensorrt", 2)
 	if err != nil {
 		t.Fatal(err)
 	}
 	text := string(result)
-	for _, want := range []string{"127.0.0.1:8181", "127.0.0.1:8182", "center-cv-service-1", "http://127.0.0.1:8182/healthz", "http://127.0.0.1:8182/readyz"} {
+	for _, want := range []string{"127.0.0.1:8181", "127.0.0.1:8182", "center-cv-service-1", "http://127.0.0.1:8182/api/healthz", "http://127.0.0.1:8182/api/readyz"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("generated prometheus config missing %q:\n%s", want, text)
 		}
@@ -298,24 +298,24 @@ func TestRenderDynamicPrometheus(t *testing.T) {
 	if strings.Contains(text, "worker: old") || strings.Contains(text, "name: old") {
 		t.Fatalf("old worker targets were not removed:\n%s", text)
 	}
-	if strings.Contains(text, "/api/healthz") || strings.Contains(text, "/api/readyz") {
-		t.Fatalf("generated health endpoints still contain /api:\n%s", text)
+	if strings.Contains(text, ":8181/healthz") || strings.Contains(text, ":8181/readyz") {
+		t.Fatalf("generated worker endpoints are missing /api:\n%s", text)
 	}
 }
 
-func TestPrometheusHealthEndpointsHaveNoAPIPrefix(t *testing.T) {
+func TestPrometheusWorkerHealthEndpointsHaveAPIPrefix(t *testing.T) {
 	for _, name := range []string{"prometheus.denglin.yml", "prometheus.nvidia.yml"} {
 		content, err := fs.ReadFile(templateFiles, "monitoring/prometheus/"+name)
 		if err != nil {
 			t.Fatal(err)
 		}
 		text := string(content)
-		if strings.Contains(text, "/api/healthz") || strings.Contains(text, "/api/readyz") {
-			t.Fatalf("%s contains a health endpoint with the obsolete /api prefix", name)
+		if strings.Contains(text, ":8181/healthz") || strings.Contains(text, ":8181/readyz") {
+			t.Fatalf("%s contains a worker endpoint without the required /api prefix", name)
 		}
 		for _, want := range []string{
-			`targets: ["http://127.0.0.1:8181/healthz"]`,
-			`targets: ["http://127.0.0.1:8181/readyz"]`,
+			`targets: ["http://127.0.0.1:8181/api/healthz"]`,
+			`targets: ["http://127.0.0.1:8181/api/readyz"]`,
 			`targets: ["http://127.0.0.1:8090/readyz"]`,
 			`targets: ["http://127.0.0.1:8092/readyz"]`,
 		} {

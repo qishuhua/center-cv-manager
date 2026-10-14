@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"net/http"
 	"os"
@@ -38,20 +37,21 @@ import (
 )
 
 type Server struct {
-	auth          *auth.Manager
-	centers       *center.Service
-	centerActions *centeraction.Service
-	sources       *source.Service
-	builds        *build.Service
-	deployments   *deploy.Service
-	provisioning  *provision.Service
-	baseImages    *baseimage.Service
-	models        *modelasset.Service
-	alerts        *alerting.Service
-	store         *store.Store
-	tasks         *task.Manager
-	sourceRoot    string
-	static        fs.FS
+	initializationMu sync.Mutex
+	auth             *auth.Manager
+	centers          *center.Service
+	centerActions    *centeraction.Service
+	sources          *source.Service
+	builds           *build.Service
+	deployments      *deploy.Service
+	provisioning     *provision.Service
+	baseImages       *baseimage.Service
+	models           *modelasset.Service
+	alerts           *alerting.Service
+	store            *store.Store
+	tasks            *task.Manager
+	sourceRoot       string
+	static           fs.FS
 }
 
 func New(authManager *auth.Manager, centers *center.Service, centerActions *centeraction.Service, sources *source.Service, builds *build.Service, deployments *deploy.Service, provisioning *provision.Service, baseImages *baseimage.Service, models *modelasset.Service, alerts *alerting.Service, st *store.Store, tasks *task.Manager, sourceRoot string, static fs.FS) *Server {
@@ -82,71 +82,86 @@ func (s *Server) Router() *gin.Engine {
 	root.POST("/auth/logout", s.logout)
 	root.POST("/auth/change-password", s.changePassword)
 	root.POST("/auth/skip-password-change", s.skipPasswordChange)
+	// 查看用户可访问的只读数据接口；硬件检测只读取远端状态并刷新本地缓存。
 	api := root.Group("")
 	api.Use(s.requireAuth())
 	api.GET("/centers", s.listCenters)
-	api.POST("/centers", s.saveCenter)
-	api.PUT("/centers/:id", s.saveCenter)
-	api.DELETE("/centers/:id", s.deleteCenter)
-	api.POST("/centers/:id/test", s.testCenter)
 	api.POST("/centers/:id/detect", s.detectCenter)
-	api.POST("/centers/:id/initialize", s.initializeCenter)
-	api.POST("/centers/:id/actions", s.runCenterAction)
 	api.GET("/centers/:id/modules", s.listModules)
-	api.POST("/centers/:id/migration/plan", s.migrationPlan)
-	api.POST("/centers/:id/migration", s.migrateCenter)
-	api.POST("/centers/:id/modules", s.saveModuleMetadata)
-	api.PUT("/centers/:id/modules/:module", s.saveModuleMetadata)
-	api.DELETE("/centers/:id/modules/:module", s.deleteModule)
 	api.GET("/centers/:id/modules/:module/revisions", s.moduleHistory)
 	api.GET("/centers/:id/modules/:module/compose", s.readModule)
-	api.PUT("/centers/:id/modules/:module/compose", s.saveModule)
-	api.POST("/centers/:id/modules/:module/actions", s.moduleAction)
-	api.POST("/centers/:id/modules/:module/plan", s.planModule)
 	api.GET("/centers/:id/compose", s.getCenterCompose)
-	api.PUT("/centers/:id/compose", s.saveCenterCompose)
 	api.GET("/centers/:id/images", s.centerImages)
 	api.GET("/centers/:id/overview", s.centerOverview)
 	api.GET("/centers/:id/models", s.centerModels)
-	api.PUT("/centers/:id/models/pin", s.setCenterModelPin)
-	api.GET("/centers/:id/terminal", func(c *gin.Context) {
-		centerID := c.Param("id")
-		websocket.Handler(func(ws *websocket.Conn) { s.terminalSocket(centerID, ws) }).ServeHTTP(c.Writer, c.Request)
-	})
 	api.GET("/overview", s.overview)
 	api.GET("/sources", s.listSources)
-	api.GET("/git-credential", s.getGitCredential)
-	api.PUT("/git-credential", s.saveGitCredential)
-	api.GET("/oss-credential", s.getOSSCredential)
-	api.PUT("/oss-credential", s.saveOSSCredential)
-	api.GET("/alert-credential", s.getAlertCredential)
-	api.PUT("/alert-credential", s.saveAlertCredential)
-	api.GET("/base-images", s.baseImageCatalog)
-	api.POST("/base-images/upgrade", s.upgradeBaseImages)
-	api.GET("/models", s.modelCatalog)
-	api.DELETE("/models/:model", s.deleteModel)
-	api.POST("/model-uploads", s.createModelUpload)
-	api.PUT("/model-uploads/:id/file", s.uploadModelFile)
-	api.POST("/model-uploads/:id/finalize", s.finalizeModelUpload)
-	api.DELETE("/model-uploads/:id", s.abortModelUpload)
-	api.POST("/model-releases/plan", s.modelReleasePlan)
-	api.POST("/model-releases", s.releaseModels)
-	api.POST("/sources", s.saveSource)
-	api.PUT("/sources/:id", s.saveSource)
-	api.DELETE("/sources/:id", s.deleteSource)
 	api.GET("/sources/:id/versions", s.versions)
 	api.GET("/sources/:id/checkouts", s.checkouts)
-	api.POST("/sources/:id/download", s.download)
-	api.POST("/releases/plan", s.releasePlan)
-	api.POST("/releases", s.release)
+	api.GET("/base-images", s.baseImageCatalog)
+	api.GET("/models", s.modelCatalog)
 	api.GET("/tasks", s.listTasks)
 	api.GET("/tasks/:id", s.getTask)
 	api.GET("/tasks/:id/logs", s.taskLogs)
 	api.GET("/tasks/:id/events", s.taskEvents)
-	api.POST("/tasks/:id/cancel", s.cancelTask)
-	api.POST("/tasks/cancel-all", s.cancelAllTasks)
-	api.POST("/tasks/:id/retry", s.retryTask)
-	api.DELETE("/tasks/:id", s.deleteTask)
+	api.GET("/settings/status", s.settingsStatus)
+
+	// 管理员专属：一切变更操作、凭据、SSH 终端和用户管理。
+	admin := api.Group("")
+	admin.Use(s.requireAdmin())
+	admin.POST("/centers", s.saveCenter)
+	admin.PUT("/centers/:id", s.saveCenter)
+	admin.DELETE("/centers/:id", s.deleteCenter)
+	admin.POST("/centers/:id/test", s.testCenter)
+	admin.POST("/centers/:id/initialize", s.initializeCenter)
+	admin.POST("/centers/:id/reset", s.resetCenterDeployment)
+	admin.POST("/centers/:id/actions", s.runCenterAction)
+	admin.POST("/centers/:id/modules/:module/publish-plan", s.planComposePublish)
+	admin.POST("/centers/:id/modules/:module/publish", s.publishCompose)
+	admin.POST("/centers/:id/modules/prepare", s.prepareModuleFiles)
+	admin.POST("/centers/:id/migration/plan", s.migrationPlan)
+	admin.POST("/centers/:id/migration", s.migrateCenter)
+	admin.POST("/centers/:id/modules", s.saveModuleMetadata)
+	admin.PUT("/centers/:id/modules/:module", s.saveModuleMetadata)
+	admin.DELETE("/centers/:id/modules/:module", s.deleteModule)
+	admin.PUT("/centers/:id/modules/:module/compose", s.saveModule)
+	admin.POST("/centers/:id/modules/:module/actions", s.moduleAction)
+	admin.POST("/centers/:id/modules/:module/plan", s.planModule)
+	admin.PUT("/centers/:id/compose", s.saveCenterCompose)
+	admin.PUT("/centers/:id/models/pin", s.setCenterModelPin)
+	admin.GET("/centers/:id/terminal", func(c *gin.Context) {
+		centerID := c.Param("id")
+		websocket.Handler(func(ws *websocket.Conn) { s.terminalSocket(centerID, ws) }).ServeHTTP(c.Writer, c.Request)
+	})
+	admin.GET("/git-credential", s.getGitCredential)
+	admin.PUT("/git-credential", s.saveGitCredential)
+	admin.GET("/oss-credential", s.getOSSCredential)
+	admin.PUT("/oss-credential", s.saveOSSCredential)
+	admin.GET("/alert-credential", s.getAlertCredential)
+	admin.PUT("/alert-credential", s.saveAlertCredential)
+	admin.POST("/base-images/upgrade", s.upgradeBaseImages)
+	admin.DELETE("/models/:model", s.deleteModel)
+	admin.POST("/model-uploads", s.createModelUpload)
+	admin.PUT("/model-uploads/:id/file", s.uploadModelFile)
+	admin.POST("/model-uploads/:id/finalize", s.finalizeModelUpload)
+	admin.DELETE("/model-uploads/:id", s.abortModelUpload)
+	admin.POST("/model-releases/plan", s.modelReleasePlan)
+	admin.POST("/model-releases", s.releaseModels)
+	admin.POST("/sources", s.saveSource)
+	admin.PUT("/sources/:id", s.saveSource)
+	admin.DELETE("/sources/:id", s.deleteSource)
+	admin.POST("/sources/:id/download", s.download)
+	admin.POST("/releases/plan", s.releasePlan)
+	admin.POST("/releases", s.release)
+	admin.POST("/tasks/:id/cancel", s.cancelTask)
+	admin.POST("/tasks/cancel-all", s.cancelAllTasks)
+	admin.POST("/tasks/:id/retry", s.retryTask)
+	admin.DELETE("/tasks/:id", s.deleteTask)
+	admin.GET("/users", s.listUsers)
+	admin.POST("/users", s.createUser)
+	admin.PUT("/users/:username/role", s.setUserRole)
+	admin.POST("/users/:username/reset-password", s.resetUserPassword)
+	admin.DELETE("/users/:username", s.deleteUser)
 	if s.static != nil {
 		r.NoRoute(func(c *gin.Context) {
 			path := c.Request.URL.Path
@@ -160,6 +175,10 @@ func (s *Server) Router() *gin.Engine {
 			if err != nil {
 				c.Status(404)
 				return
+			}
+			// Revalidate the SPA entry after deployments; hashed assets remain versioned.
+			if path == "/index.html" || !fs.ValidPath(strings.TrimPrefix(path, "/")) || strings.HasPrefix(strings.TrimSpace(string(data)), "<!doctype html>") {
+				c.Header("Cache-Control", "no-store")
 			}
 			ctype := http.DetectContentType(data)
 			if filepath.Ext(path) == ".js" {
@@ -186,7 +205,6 @@ func (s *Server) saveCenter(c *gin.Context) {
 		fail(c, 400, e)
 		return
 	}
-	isNew := c.Param("id") == "" && v.ID == ""
 	if id := c.Param("id"); id != "" {
 		v.ID = id
 	}
@@ -195,37 +213,87 @@ func (s *Server) saveCenter(c *gin.Context) {
 		fail(c, 400, e)
 		return
 	}
-	if isNew {
-		initialization := s.submitCenterInitialization(out, false, true)
-		ok(c, map[string]any{"center": out, "task": initialization})
-		return
-	}
 	ok(c, out)
 }
 
-func (s *Server) submitCenterInitialization(v domain.Center, forceTemplate, downloadImages bool) *domain.Task {
-	params := map[string]string{"center_id": v.ID, "center_name": v.Name, "force_template": strconv.FormatBool(forceTemplate), "download_images": strconv.FormatBool(downloadImages)}
+func (s *Server) submitCenterInitialization(v domain.Center, items []deploy.Item, models []modelasset.ReleaseItem) (*domain.Task, error) {
+	s.initializationMu.Lock()
+	defer s.initializationMu.Unlock()
+	current, err := s.centers.GetPublic(v.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err = validateInitialization(current, len(items), len(models)); err != nil {
+		return nil, err
+	}
+	if s.tasks.HasActive("INITIALIZE_CENTER", "center_id", v.ID) {
+		return nil, fmt.Errorf("该中心正在初始化，请查看现有任务")
+	}
+	softwareJSON, _ := json.Marshal(items)
+	modelsJSON, _ := json.Marshal(models)
+	params := map[string]string{"center_id": v.ID, "center_name": v.Name, "items": string(softwareJSON), "models": string(modelsJSON)}
 	return s.tasks.Submit("INITIALIZE_CENTER", params, func(ctx context.Context, h *task.Handle) error {
 		return centerlock.Within(ctx, v.ID, func(ctx context.Context) error {
-			if err := s.provisioning.Initialize(ctx, v.ID, forceTemplate, h); err != nil {
+			current, err := s.centers.GetPublic(v.ID)
+			if err != nil {
 				return err
 			}
-			if downloadImages {
-				credential, err := s.baseImages.Credential()
-				if err != nil {
+			if err = validateInitialization(current, len(items), len(models)); err != nil {
+				return err
+			}
+			if err = s.provisioning.Initialize(ctx, v.ID, h); err != nil {
+				return err
+			}
+			current, err = s.centers.GetPublic(v.ID)
+			if err != nil {
+				return err
+			}
+			if current.Deployment != nil {
+				current.Deployment.ReselectionRequired = true
+				if err = s.centers.UpdateDeployment(v.ID, current.Deployment); err != nil {
 					return err
 				}
-				if credential.Configured {
-					if err = s.baseImages.UpgradeCenter(ctx, v.ID, false, h); err != nil {
-						return err
-					}
-				} else {
-					h.Log("尚未配置 OSS，使用中心已有镜像或 Compose 镜像拉取策略")
+			}
+			credential, err := s.baseImages.Credential()
+			if err != nil {
+				return err
+			}
+			if credential.Configured {
+				if err = s.baseImages.UpgradeCenter(ctx, v.ID, false, h); err != nil {
+					return err
 				}
 			}
-			return s.provisioning.ResumeModules(ctx, v.ID, h)
+			if err = s.provisioning.ResumeModules(ctx, v.ID, h); err != nil {
+				return err
+			}
+			plan := s.checkUnifiedRelease(ctx, v.ID, items, models)
+			if !plan.Ready {
+				return fmt.Errorf("初始化版本检查失败: %s", plan.Error)
+			}
+			if err = s.runReleaseLocked(ctx, v.ID, items, plan.ModelPlan.Targets, h); err != nil {
+				return err
+			}
+			finished, err := s.centers.GetPublic(v.ID)
+			if err != nil {
+				return err
+			}
+			if finished.Deployment != nil && finished.Deployment.Status != "ready" {
+				return fmt.Errorf("初始化未完成，当前状态: %s", finished.Deployment.Status)
+			}
+			h.Message("初始化部署完成，所选业务代码与模型已发布，全部模块已就绪")
+			return nil
 		})
-	})
+	}), nil
+}
+
+func validateInitialization(c domain.Center, softwareCount, modelCount int) error {
+	if c.InitializedAt != nil || (c.Deployment != nil && c.Deployment.Status == "ready") {
+		return fmt.Errorf("中心已经完成初始化；如需重新初始化，请先重置服务器")
+	}
+	if softwareCount == 0 || modelCount == 0 {
+		return fmt.Errorf("初始化前必须选择业务代码分支和模型版本")
+	}
+	return nil
 }
 
 func (s *Server) detectCenter(c *gin.Context) {
@@ -247,20 +315,39 @@ func (s *Server) initializeCenter(c *gin.Context) {
 		return
 	}
 	var in struct {
-		ForceTemplate  bool `json:"force_template"`
-		DownloadImages bool `json:"download_images"`
+		Items  []deploymentSelection  `json:"items"`
+		Models []modelasset.Selection `json:"model_selections"`
 	}
-	if err = c.ShouldBindJSON(&in); err != nil && !errors.Is(err, io.EOF) {
+	if err = c.ShouldBindJSON(&in); err != nil {
 		fail(c, 400, err)
 		return
 	}
-	ok(c, s.submitCenterInitialization(v, in.ForceTemplate, in.DownloadImages))
+	if err = validateInitialization(v, len(in.Items), len(in.Models)); err != nil {
+		fail(c, 409, err)
+		return
+	}
+	items, err := s.prepareDeploymentItems(c.Request.Context(), in.Items)
+	if err != nil {
+		fail(c, 400, err)
+		return
+	}
+	models, err := s.models.PrepareSelections(in.Models)
+	if err != nil {
+		fail(c, 400, err)
+		return
+	}
+	result, err := s.submitCenterInitialization(v, items, models)
+	if err != nil {
+		fail(c, 409, err)
+		return
+	}
+	ok(c, result)
 }
 
 func (s *Server) getCenterCompose(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
-	document, err := s.provisioning.ReadCompose(ctx, c.Param("id"))
+	document, err := s.provisioning.ReadCompose(ctx, c.Param("id"), c.Query("file"))
 	if err != nil {
 		fail(c, 400, err)
 		return
@@ -270,7 +357,8 @@ func (s *Server) getCenterCompose(c *gin.Context) {
 
 func (s *Server) saveCenterCompose(c *gin.Context) {
 	var in struct {
-		Content string `json:"content"`
+		Content  string `json:"content"`
+		Revision string `json:"revision"`
 	}
 	if err := c.ShouldBindJSON(&in); err != nil {
 		fail(c, 400, err)
@@ -278,7 +366,7 @@ func (s *Server) saveCenterCompose(c *gin.Context) {
 	}
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 45*time.Second)
 	defer cancel()
-	document, err := s.provisioning.SaveCompose(ctx, c.Param("id"), in.Content)
+	document, err := s.provisioning.SaveCompose(ctx, c.Param("id"), in.Content, c.Query("file"), in.Revision)
 	if err != nil {
 		fail(c, 400, err)
 		return
@@ -304,12 +392,11 @@ func (s *Server) testCenter(c *gin.Context) {
 
 func (s *Server) runCenterAction(c *gin.Context) {
 	var in struct {
-		Action        string `json:"action" binding:"required"`
-		ContainerID   string `json:"container_id"`
-		AdminPassword string `json:"admin_password" binding:"required"`
+		Action      string `json:"action" binding:"required"`
+		ContainerID string `json:"container_id"`
 	}
 	if err := c.ShouldBindJSON(&in); err != nil {
-		fail(c, 400, fmt.Errorf("请选择操作并输入管理员密码"))
+		fail(c, 400, fmt.Errorf("请选择需要执行的操作"))
 		return
 	}
 	switch in.Action {
@@ -321,15 +408,6 @@ func (s *Server) runCenterAction(c *gin.Context) {
 	case centeraction.RestartCompose, centeraction.RedeployCompose, centeraction.StopCompose, centeraction.RemoveAllContainers:
 	default:
 		fail(c, 400, fmt.Errorf("不支持的中心操作"))
-		return
-	}
-	token, _ := c.Cookie(authCookieName)
-	if err := s.auth.VerifyPassword(token, in.AdminPassword); err != nil {
-		status := http.StatusForbidden
-		if errors.Is(err, auth.ErrInvalidSession) {
-			status = http.StatusUnauthorized
-		}
-		fail(c, status, err)
 		return
 	}
 	center, err := s.centers.GetPublic(c.Param("id"))
@@ -608,6 +686,21 @@ func (s *Server) saveGitCredential(c *gin.Context) {
 	if e != nil {
 		fail(c, 400, e)
 		return
+	}
+	ok(c, out)
+}
+
+// settingsStatus 返回各凭据的配置状态布尔值，供查看用户渲染页面提示，不暴露凭据内容。
+func (s *Server) settingsStatus(c *gin.Context) {
+	out := map[string]bool{"git_configured": false, "oss_configured": false, "alert_configured": false}
+	if v, err := s.sources.Credential(); err == nil {
+		out["git_configured"] = v.Configured
+	}
+	if v, err := s.baseImages.Credential(); err == nil {
+		out["oss_configured"] = v.Configured
+	}
+	if v, err := s.alerts.Credential(); err == nil {
+		out["alert_configured"] = v.Configured
 	}
 	ok(c, out)
 }
@@ -895,6 +988,14 @@ func (s *Server) runModelRelease(ctx context.Context, centerID string, items []m
 	return centerlock.Within(ctx, centerID, func(ctx context.Context) error { return s.runModelReleaseLocked(ctx, centerID, items, restartStack, h) })
 }
 func (s *Server) runModelReleaseLocked(ctx context.Context, centerID string, items []modelasset.ReleaseItem, restartStack bool, h *task.Handle) error {
+	center, err := s.centers.GetPublic(centerID)
+	if err != nil {
+		return err
+	}
+	if err = validateReselection(center, 0, len(items)); err != nil {
+		return err
+	}
+
 	if !restartStack {
 		return s.models.ReleaseCenter(ctx, centerID, items, h)
 	}
@@ -906,55 +1007,9 @@ func (s *Server) runModelReleaseLocked(ctx context.Context, centerID string, ite
 	if err := s.centerActions.RestartModels(ctx, centerID, nil, h); err != nil {
 		return err
 	}
-	return s.finishModuleInitialization(ctx, centerID, h)
+	return s.finishModuleInitialization(ctx, centerID, nil, h)
 }
 
-func (s *Server) syncModels(c *gin.Context) {
-	var in struct {
-		CenterIDs []string `json:"center_ids"`
-		Keys      []string `json:"keys"`
-	}
-	if err := c.ShouldBindJSON(&in); err != nil {
-		fail(c, http.StatusBadRequest, err)
-		return
-	}
-	in.CenterIDs = uniqueStrings(in.CenterIDs)
-	in.Keys = uniqueStrings(in.Keys)
-	if len(in.CenterIDs) == 0 {
-		fail(c, http.StatusBadRequest, fmt.Errorf("请至少选择一个中心服务器"))
-		return
-	}
-	if len(in.Keys) == 0 {
-		fail(c, http.StatusBadRequest, fmt.Errorf("请至少选择一个模型文件"))
-		return
-	}
-	credential, err := s.baseImages.Credential()
-	if err != nil || !credential.Configured {
-		fail(c, http.StatusBadRequest, modelasset.ErrNotConfigured)
-		return
-	}
-	created := make([]*domain.Task, 0, len(in.CenterIDs))
-	for _, centerID := range in.CenterIDs {
-		currentCenter, getErr := s.centers.GetPublic(centerID)
-		if getErr != nil {
-			s.storeError(c, getErr)
-			return
-		}
-		centerID, centerName := centerID, currentCenter.Name
-		keys := append([]string(nil), in.Keys...)
-		params := map[string]string{
-			"center_id":   centerID,
-			"center_name": centerName,
-			"model_count": strconv.Itoa(len(keys)),
-		}
-		encodedKeys, _ := json.Marshal(keys)
-		params["keys"] = string(encodedKeys)
-		created = append(created, s.tasks.Submit("MODEL_SYNC", params, func(ctx context.Context, h *task.Handle) error {
-			return s.models.SyncCenter(ctx, centerID, keys, h)
-		}))
-	}
-	ok(c, created)
-}
 func (s *Server) saveSource(c *gin.Context) {
 	var v domain.Source
 	if e := c.ShouldBindJSON(&v); e != nil {
@@ -1026,116 +1081,15 @@ func (s *Server) download(c *gin.Context) {
 	})
 	ok(c, t)
 }
-func (s *Server) build(c *gin.Context) {
-	var in struct {
-		CenterIDs []string `json:"center_ids"`
-		Items     []struct {
-			SourceID   string            `json:"source_id"`
-			Ref        string            `json:"ref"`
-			Dockerfile string            `json:"dockerfile"`
-			ImageTag   string            `json:"image_tag"`
-			BuildArgs  map[string]string `json:"build_args"`
-		} `json:"items"`
-		NoCache bool `json:"no_cache"`
-	}
-	if e := c.ShouldBindJSON(&in); e != nil {
-		fail(c, 400, e)
-		return
-	}
-	in.CenterIDs = uniqueStrings(in.CenterIDs)
-	if len(in.CenterIDs) == 0 {
-		fail(c, 400, fmt.Errorf("请至少选择一个中心服务器"))
-		return
-	}
-	if len(in.Items) == 0 {
-		fail(c, 400, fmt.Errorf("请至少选择一个需要构建的软件"))
-		return
-	}
-	centerNames := map[string]string{}
-	for _, centerID := range in.CenterIDs {
-		center, e := s.store.GetCenter(centerID)
-		if e != nil {
-			s.storeError(c, e)
-			return
-		}
-		centerNames[centerID] = center.Name
-	}
-	type preparedBuild struct {
-		source     domain.Source
-		checkout   domain.Checkout
-		dockerfile string
-		imageTag   string
-		buildArgs  map[string]string
-	}
-	prepared := make([]preparedBuild, 0, len(in.Items))
-	seenSources := map[string]bool{}
-	for _, item := range in.Items {
-		if seenSources[item.SourceID] {
-			fail(c, 400, fmt.Errorf("同一个软件不能重复选择"))
-			return
-		}
-		seenSources[item.SourceID] = true
-		src, e := s.sources.Get(item.SourceID)
-		if e != nil {
-			s.storeError(c, e)
-			return
-		}
-		if e = source.ValidateRef(item.Ref); e != nil {
-			fail(c, 400, fmt.Errorf("%s 的版本无效", src.Name))
-			return
-		}
-		checkout, e := s.store.GetCheckout(item.SourceID, item.Ref)
-		if e != nil {
-			fail(c, 400, fmt.Errorf("请先下载 %s 的 %s 版本", src.Name, item.Ref))
-			return
-		}
-		if _, e = os.Stat(checkout.Path); e != nil {
-			fail(c, 400, fmt.Errorf("%s 的本地源码缓存不存在，请重新下载", src.Name))
-			return
-		}
-		if item.ImageTag == "" {
-			item.ImageTag = build.DefaultImageTag(src, item.Ref)
-		}
-		if e = build.ValidateImageTag(item.ImageTag); e != nil {
-			fail(c, 400, fmt.Errorf("%s: %w", src.Name, e))
-			return
-		}
-		prepared = append(prepared, preparedBuild{source: src, checkout: checkout, dockerfile: item.Dockerfile, imageTag: item.ImageTag, buildArgs: item.BuildArgs})
-	}
-	tasks := make([]*domain.Task, 0, len(in.CenterIDs)*len(prepared))
-	for _, centerID := range in.CenterIDs {
-		for _, item := range prepared {
-			centerID, item := centerID, item
-			params := map[string]string{"center_id": centerID, "center_name": centerNames[centerID], "source_id": item.source.ID, "source_name": item.source.Name, "ref": item.checkout.Ref, "image_tag": item.imageTag}
-			params["dockerfile"] = item.dockerfile
-			params["no_cache"] = strconv.FormatBool(in.NoCache)
-			encodedArgs, _ := json.Marshal(item.buildArgs)
-			params["build_args"] = string(encodedArgs)
-			t := s.tasks.Submit("BUILD_IMAGE", params, func(ctx context.Context, h *task.Handle) error {
-				return s.builds.Run(ctx, build.Options{CenterID: centerID, ContextDir: item.checkout.Path, Dockerfile: item.dockerfile, ImageTag: item.imageTag, NoCache: in.NoCache, BuildArgs: item.buildArgs, SourceID: item.source.ID, SourceName: item.source.Name, SourceRef: item.checkout.Ref, Commit: item.checkout.Commit}, h)
-			})
-			tasks = append(tasks, t)
-		}
-	}
-	ok(c, tasks)
-}
 
 type deploymentSelection struct {
 	SourceID string `json:"source_id"`
 	Ref      string `json:"ref"`
 	Commit   string `json:"commit"`
+	Kind     string `json:"kind"`
 }
 
-type deploymentCenterPlan struct {
-	Center          domain.Center     `json:"center"`
-	Ready           bool              `json:"ready"`
-	Error           string            `json:"error,omitempty"`
-	Images          map[string]string `json:"images"`
-	MissingImages   []string          `json:"missing_images"`
-	MissingServices []string          `json:"missing_services"`
-}
-
-func (s *Server) prepareDeploymentItems(selections []deploymentSelection) ([]deploy.Item, error) {
+func (s *Server) prepareDeploymentItems(ctx context.Context, selections []deploymentSelection) ([]deploy.Item, error) {
 	if len(selections) == 0 {
 		return nil, fmt.Errorf("请至少选择一个需要部署的软件")
 	}
@@ -1154,20 +1108,14 @@ func (s *Server) prepareDeploymentItems(selections []deploymentSelection) ([]dep
 			return nil, fmt.Errorf("%s 的版本无效", src.Name)
 		}
 		commit := strings.ToLower(strings.TrimSpace(selection.Commit))
-		if commit == "" {
-			// Keep historical build/deploy API callers working while new release
-			// clients pin the commit returned by Git explicitly.
-			checkout, checkoutErr := s.store.GetCheckout(src.ID, selection.Ref)
-			if checkoutErr != nil {
-				return nil, fmt.Errorf("%s 的 %s 未锁定 commit，请刷新远端版本后重试", src.Name, selection.Ref)
-			}
-			if _, checkoutErr = os.Stat(checkout.Path); checkoutErr != nil {
-				return nil, fmt.Errorf("%s 的本地源码缓存不存在，请刷新远端版本后重试", src.Name)
-			}
-			commit = checkout.Commit
-		}
 		if err = source.ValidateCommit(commit); err != nil {
-			return nil, fmt.Errorf("%s 的 commit 无效", src.Name)
+			return nil, fmt.Errorf("%s 的 commit 无效，请刷新版本", src.Name)
+		}
+		verifyCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		err = s.sources.VerifySelection(verifyCtx, src, selection.Ref, selection.Kind, commit)
+		cancel()
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", src.Name, err)
 		}
 		items = append(items, deploy.Item{
 			SourceID:      src.ID,
@@ -1194,6 +1142,17 @@ type releaseCenterPlan struct {
 
 func (s *Server) checkUnifiedRelease(ctx context.Context, centerID string, softwareItems []deploy.Item, modelItems []modelasset.ReleaseItem) releaseCenterPlan {
 	plan := releaseCenterPlan{Images: map[string]string{}, ModelPlan: modelasset.ReleasePlan{Ready: true, Action: "keep_current", Current: map[string]modelasset.CurrentVersion{}}}
+	center, err := s.centers.GetPublic(centerID)
+	if err != nil {
+		plan.Ready = false
+		plan.Error = err.Error()
+		return plan
+	}
+	if err = validateReselection(center, len(softwareItems), len(modelItems)); err != nil {
+		plan.Ready = false
+		plan.Error = err.Error()
+		return plan
+	}
 	errors := make([]string, 0, 2)
 	softwareReady := true
 	if len(softwareItems) > 0 {
@@ -1204,6 +1163,10 @@ func (s *Server) checkUnifiedRelease(ctx context.Context, centerID string, softw
 		plan.MissingServices = check.MissingServices
 		plan.ServiceMappings = check.ServiceMappings
 		softwareReady = check.Error == "" && len(check.MissingServices) == 0
+		if e := validateRebuildSoftware(center, check); e != nil {
+			softwareReady = false
+			errors = append(errors, e.Error())
+		}
 		if check.Error != "" {
 			errors = append(errors, check.Error)
 		}
@@ -1291,7 +1254,7 @@ func (s *Server) releasePlan(c *gin.Context) {
 	var items []deploy.Item
 	var err error
 	if len(in.Items) > 0 {
-		items, err = s.prepareDeploymentItems(in.Items)
+		items, err = s.prepareDeploymentItems(c.Request.Context(), in.Items)
 		if err != nil {
 			fail(c, 400, err)
 			return
@@ -1347,7 +1310,7 @@ func (s *Server) release(c *gin.Context) {
 	var items []deploy.Item
 	var err error
 	if len(in.Items) > 0 {
-		items, err = s.prepareDeploymentItems(in.Items)
+		items, err = s.prepareDeploymentItems(c.Request.Context(), in.Items)
 		if err != nil {
 			fail(c, 400, err)
 			return
@@ -1383,10 +1346,16 @@ func (s *Server) release(c *gin.Context) {
 		fail(c, http.StatusConflict, fmt.Errorf("没有中心通过发布前复检: %s", strings.Join(blocked, "；")))
 		return
 	}
-	created := make([]*domain.Task, 0, len(releaseCenters))
+	type releaseJob struct {
+		center       domain.Center
+		modelItems   []modelasset.ReleaseItem
+		encoded      string
+		versionsText string
+	}
+	jobs := make([]releaseJob, 0, len(releaseCenters))
+	centerLines := make([]string, 0, len(releaseCenters))
 	for _, center := range releaseCenters {
-		centerID := center.ID
-		centerModelItems := resolvedModels[centerID]
+		centerModelItems := resolvedModels[center.ID]
 		allVersions := append([]string{}, versions...)
 		for _, item := range centerModelItems {
 			variant := item.Platform
@@ -1396,18 +1365,39 @@ func (s *Server) release(c *gin.Context) {
 			allVersions = append(allVersions, item.Model+":"+item.Version+"["+variant+"]@"+item.ManifestDigest[:12])
 		}
 		encodedModelItems, _ := json.Marshal(centerModelItems)
+		job := releaseJob{center: center, modelItems: centerModelItems, encoded: string(encodedModelItems), versionsText: strings.Join(allVersions, "、")}
+		jobs = append(jobs, job)
+		centerLines = append(centerLines, center.Name+"："+job.versionsText)
+	}
+	// 发版开始/结束向飞书群发送通知，告知哪些中心正在发版（尽力而为，不影响发布）。
+	notifier := newReleaseNotifier(s.alerts, releaseOperator(c), centerLines)
+	created := make([]*domain.Task, 0, len(jobs))
+	for _, job := range jobs {
 		params := map[string]string{
-			"center_id":   centerID,
-			"center_name": center.Name,
-			"versions":    strings.Join(allVersions, "、"),
+			"center_id":   job.center.ID,
+			"center_name": job.center.Name,
+			"versions":    job.versionsText,
 			"items":       string(encodedItems),
-			"model_items": string(encodedModelItems),
+			"model_items": job.encoded,
 		}
+		centerID, centerName, modelItems := job.center.ID, job.center.Name, job.modelItems
 		created = append(created, s.tasks.Submit("RELEASE_VERSION", params, func(ctx context.Context, h *task.Handle) error {
-			return s.runRelease(ctx, centerID, items, centerModelItems, h)
+			err := s.runRelease(ctx, centerID, items, modelItems, h)
+			notifier.record(centerName, err)
+			return err
 		}))
 	}
 	ok(c, created)
+}
+
+// releaseOperator 从会话上下文取当前操作人，用于发布通知。
+func releaseOperator(c *gin.Context) string {
+	if value, exists := c.Get("auth_username"); exists {
+		if name, ok := value.(string); ok {
+			return name
+		}
+	}
+	return ""
 }
 
 func checkReleaseCentersConcurrently(ctx context.Context, centers []domain.Center, check func(context.Context, string) releaseCenterPlan) []releaseCenterPlan {
@@ -1449,6 +1439,13 @@ func (s *Server) runRelease(ctx context.Context, centerID string, items []deploy
 	return centerlock.Within(ctx, centerID, func(ctx context.Context) error { return s.runReleaseLocked(ctx, centerID, items, modelItems, h) })
 }
 func (s *Server) runReleaseLocked(ctx context.Context, centerID string, items []deploy.Item, modelItems []modelasset.ReleaseItem, h *task.Handle) error {
+	center, err := s.centers.GetPublic(centerID)
+	if err != nil {
+		return err
+	}
+	if err = validateReselection(center, len(items), len(modelItems)); err != nil {
+		return err
+	}
 	if len(items) == 0 && len(modelItems) == 0 {
 		return fmt.Errorf("发布任务没有软件或模型版本快照")
 	}
@@ -1476,28 +1473,53 @@ func (s *Server) runReleaseLocked(ctx context.Context, centerID string, items []
 		return err
 	}
 	h.Message("阶段 2/3：发布软件版本")
-	if err := s.deployments.Run(ctx, centerID, items, phaseReporter{reporter: h, prefix: "阶段 2/3：软件发布", start: 25, end: 90}); err != nil {
+	scope, err := s.deployments.Run(ctx, centerID, items, phaseReporter{reporter: h, prefix: "阶段 2/3：软件发布", start: 25, end: 90})
+	if err != nil {
 		return err
 	}
 	if err := s.centerActions.RestartModels(ctx, centerID, before, h); err != nil {
 		return err
 	}
-	return s.finishModuleInitialization(ctx, centerID, h)
+	if err := s.provisioning.RecordBusinessPublication(ctx, centerID, scope...); err != nil {
+		return err
+	}
+	if center.Deployment != nil && center.Deployment.ReselectionRequired {
+		// Fetch current module status after deployment; never overwrite it with
+		// the pre-release deployment snapshot.
+		current, err := s.centers.GetPublic(centerID)
+		if err != nil {
+			return err
+		}
+		current.Deployment.ReselectionRequired = false
+		if err = s.centers.UpdateDeployment(centerID, current.Deployment); err != nil {
+			return err
+		}
+	}
+	return s.finishModuleInitialization(ctx, centerID, scope, h)
 }
 
 func (s *Server) runSoftwareRelease(ctx context.Context, centerID string, items []deploy.Item, r releaseReporter) error {
 	if err := s.prepareSoftwareRelease(ctx, centerID, items, r); err != nil {
 		return err
 	}
-	if err := s.deployments.Run(ctx, centerID, items, r); err != nil {
+	scope, err := s.deployments.Run(ctx, centerID, items, r)
+	if err != nil {
 		return err
 	}
-	return s.finishModuleInitialization(ctx, centerID, r)
+	return s.finishModuleInitialization(ctx, centerID, scope, r)
 }
 func (s *Server) prepareSoftwareRelease(ctx context.Context, centerID string, items []deploy.Item, r releaseReporter) error {
 	r.Message("阶段 1/4：正在检查发布条件")
 	r.Progress(3)
 	check := s.deployments.Check(ctx, centerID, items)
+	center, err := s.centers.GetPublic(centerID)
+	if err != nil {
+		return err
+	}
+	if err = validateRebuildSoftware(center, check); err != nil {
+		return err
+	}
+
 	if check.Error != "" || len(check.MissingServices) > 0 {
 		return fmt.Errorf("发布预检失败: %s", releaseCheckSummary(check))
 	}
@@ -1581,105 +1603,6 @@ func shortCommit(commit string) string {
 	return commit
 }
 
-func (s *Server) deploymentPlan(c *gin.Context) {
-	var in struct {
-		Items []deploymentSelection `json:"items"`
-	}
-	if err := c.ShouldBindJSON(&in); err != nil {
-		fail(c, 400, err)
-		return
-	}
-	items, err := s.prepareDeploymentItems(in.Items)
-	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			s.storeError(c, err)
-		} else {
-			fail(c, 400, err)
-		}
-		return
-	}
-	centers, err := s.centers.List()
-	if err != nil {
-		fail(c, 500, err)
-		return
-	}
-	plans := make([]deploymentCenterPlan, len(centers))
-	var wg sync.WaitGroup
-	for index, currentCenter := range centers {
-		index, currentCenter := index, currentCenter
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
-			defer cancel()
-			check := s.deployments.Check(ctx, currentCenter.ID, items)
-			plans[index] = deploymentCenterPlan{
-				Center:          currentCenter,
-				Ready:           check.Ready,
-				Error:           check.Error,
-				Images:          check.Images,
-				MissingImages:   check.MissingImages,
-				MissingServices: check.MissingServices,
-			}
-		}()
-	}
-	wg.Wait()
-	ok(c, plans)
-}
-
-func (s *Server) deploy(c *gin.Context) {
-	var in struct {
-		CenterIDs []string              `json:"center_ids"`
-		Items     []deploymentSelection `json:"items"`
-	}
-	if err := c.ShouldBindJSON(&in); err != nil {
-		fail(c, 400, err)
-		return
-	}
-	in.CenterIDs = uniqueStrings(in.CenterIDs)
-	if len(in.CenterIDs) == 0 {
-		fail(c, 400, fmt.Errorf("请至少选择一个发布中心"))
-		return
-	}
-	items, err := s.prepareDeploymentItems(in.Items)
-	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			s.storeError(c, err)
-		} else {
-			fail(c, 400, err)
-		}
-		return
-	}
-	centerNames := map[string]string{}
-	for _, centerID := range in.CenterIDs {
-		currentCenter, err := s.store.GetCenter(centerID)
-		if err != nil {
-			s.storeError(c, err)
-			return
-		}
-		centerNames[centerID] = currentCenter.Name
-	}
-	versions := make([]string, 0, len(items))
-	for _, item := range items {
-		versions = append(versions, item.SourceName+":"+item.Ref)
-	}
-	created := make([]*domain.Task, 0, len(in.CenterIDs))
-	for _, centerID := range in.CenterIDs {
-		centerID := centerID
-		params := map[string]string{
-			"center_id":   centerID,
-			"center_name": centerNames[centerID],
-			"versions":    strings.Join(versions, "、"),
-		}
-		encodedItems, _ := json.Marshal(items)
-		params["items"] = string(encodedItems)
-		created = append(created, s.tasks.Submit("DEPLOY_STACK", params, func(ctx context.Context, h *task.Handle) error {
-			return s.deployments.Run(ctx, centerID, items, h)
-		}))
-	}
-	ok(c, created)
-}
-
 func uniqueStrings(values []string) []string {
 	seen := map[string]bool{}
 	result := make([]string, 0, len(values))
@@ -1753,13 +1676,56 @@ func (s *Server) storeError(c *gin.Context, e error) {
 	}
 }
 
-func (s *Server) finishModuleInitialization(ctx context.Context, id string, r releaseReporter) error {
-	c, err := s.centers.GetPublic(id)
+func (s *Server) finishModuleInitialization(ctx context.Context, id string, scope []string, r releaseReporter) error {
+	r.Message("正在核验业务 Compose 整体发布状态")
+	if err := s.provisioning.RecordBusinessPublication(ctx, id, scope...); err != nil {
+		return err
+	}
+	center, err := s.centers.GetPublic(id)
 	if err != nil {
 		return err
 	}
-	if c.Deployment != nil && c.Deployment.Status != "ready" {
+	if center.Deployment != nil && center.InitializedAt == nil {
 		return s.provisioning.ResumeModules(ctx, id, r)
+	}
+	return nil
+}
+
+func validateReselection(c domain.Center, softwareCount, modelCount int) error {
+	if c.Deployment == nil || !c.Deployment.ReselectionRequired {
+		return nil
+	}
+	if c.Deployment.Status == "reset" {
+		return fmt.Errorf("请先重新初始化中心，再选择软件与模型版本")
+	}
+	if softwareCount == 0 || modelCount == 0 {
+		return fmt.Errorf("中心已重置，请同时重新选择软件和模型版本进行联合发布；原模型文件保留但不会自动沿用")
+	}
+	return nil
+}
+
+func validateRebuildSoftware(c domain.Center, check deploy.CheckResult) error {
+	if c.Deployment == nil || !c.Deployment.ReselectionRequired {
+		return nil
+	}
+	business, ok := check.Modules["business"]
+	if !ok || len(business.BaseServices) == 0 {
+		return fmt.Errorf("重建中心缺少已初始化的业务 Compose")
+	}
+	selected := map[string]bool{}
+	for _, names := range business.ServiceMappings {
+		for _, name := range names {
+			selected[name] = true
+		}
+	}
+	missing := []string{}
+	for _, name := range business.BaseServices {
+		if !selected[name] {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("重建时请为全部业务服务选择软件版本，尚未选择：%s", strings.Join(missing, "、"))
 	}
 	return nil
 }

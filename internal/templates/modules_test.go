@@ -23,6 +23,13 @@ func TestIndependentModuleTemplates(t *testing.T) {
 					t.Fatal(doc["name"])
 				}
 				services := doc["services"].(map[string]any)
+				if id == "monitoring" {
+					cadvisor := services["cadvisor"].(map[string]any)
+					env, ok := cadvisor["environment"].(map[string]any)
+					if !ok || env["CADVISOR_HEALTHCHECK_URL"] != "http://127.0.0.1:8084/healthz" {
+						t.Fatal("cAdvisor healthcheck must use its configured port 8084")
+					}
+				}
 				for name, value := range services {
 					svc := value.(map[string]any)
 					switch deps := svc["depends_on"].(type) {
@@ -41,8 +48,8 @@ func TestIndependentModuleTemplates(t *testing.T) {
 					}
 				}
 				if id == "business" {
-					if len(services) != 5 {
-						t.Fatalf("expected 2 workers + 3 services, got %d", len(services))
+					if len(services) != 4 {
+						t.Fatalf("expected 2 workers + 2 services, got %d", len(services))
 					}
 					if !strings.Contains(files[id+"/compose.yml"], "/home/test/data/models") {
 						t.Fatal("model mount not rendered")

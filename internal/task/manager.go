@@ -289,3 +289,15 @@ func (m *Manager) Subscribe(id string) (chan Event, []Event, func(), error) {
 	cancel := func() { r.mu.Lock(); delete(r.subscribers, ch); r.mu.Unlock() }
 	return ch, history, cancel, nil
 }
+
+// HasActive checks the complete in-memory task set, independent of pagination.
+func (m *Manager) HasActive(kind, key, value string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, r := range m.active {
+		if r.task.Type == kind && r.task.Params[key] == value && (r.task.Status == Pending || r.task.Status == Running) {
+			return true
+		}
+	}
+	return false
+}

@@ -3,6 +3,7 @@ package modular
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -67,6 +68,15 @@ func CheckOwnership(ctx context.Context, remote *sshx.DockerClient, m domain.Com
 
 // Inspect checks actual containers (including one-shot exit codes), not the
 // last recorded module status. Every expected service must be accounted for.
+type initFailure struct {
+	service string
+	code    int
+}
+
+func (e *initFailure) Error() string {
+	return fmt.Sprintf("初始化服务 %s 已失败 (exit %d)，请查看该容器日志", e.service, e.code)
+}
+
 func Inspect(ctx context.Context, remote *sshx.DockerClient, m domain.ComposeModule, services []string) error {
 	opts := containertypes.ListOptions{All: true}
 	if m.Project != "" {
@@ -98,6 +108,9 @@ func Inspect(ctx context.Context, remote *sshx.DockerClient, m domain.ComposeMod
 				return fmt.Errorf("%s 状态不可读", name)
 			}
 			if init[name] {
+				if state.Status == "exited" && state.ExitCode != 0 {
+					return &initFailure{service: name, code: state.ExitCode}
+				}
 				if state.Status != "exited" || state.ExitCode != 0 {
 					return fmt.Errorf("初始化服务 %s: %s (exit %d)", name, state.Status, state.ExitCode)
 				}
@@ -113,6 +126,25 @@ func Inspect(ctx context.Context, remote *sshx.DockerClient, m domain.ComposeMod
 }
 
 func Wait(ctx context.Context, remote *sshx.DockerClient, m domain.ComposeModule, services []string, urls []string) error {
+	// Older built-in deployments included the optional chute service probe.
+	// Keep custom probes, but do not wait on a service absent from this operation.
+	if m.ID == "business" {
+		hasChute := false
+		for _, service := range services {
+			if service == "chute-verification-service" {
+				hasChute = true
+			}
+		}
+		if !hasChute {
+			filtered := make([]string, 0, len(urls))
+			for _, u := range urls {
+				if u != "http://127.0.0.1:8091/readyz" {
+					filtered = append(filtered, u)
+				}
+			}
+			urls = filtered
+		}
+	}
 	timeout := m.Timeout
 	if timeout < 10 {
 		timeout = 600
@@ -122,6 +154,10 @@ func Wait(ctx context.Context, remote *sshx.DockerClient, m domain.ComposeModule
 	var last error
 	for {
 		last = Inspect(waitCtx, remote, m, services)
+		var failed *initFailure
+		if errors.As(last, &failed) {
+			return fmt.Errorf("模块 %s 等待失败: %w", m.ID, last)
+		}
 		if last == nil {
 			for _, u := range urls {
 				_, last = Run(waitCtx, remote.SSH, "code=$(curl --silent --show-error --max-time 5 -o /dev/null -w '%{http_code}' "+centerpath.ShellQuote(u)+") && case \"$code\" in 2??) ;; *) exit 1;; esac", "")

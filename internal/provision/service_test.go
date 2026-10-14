@@ -7,16 +7,6 @@ import (
 	"testing"
 )
 
-func TestDistributeCPUs(t *testing.T) {
-	got := distributeCPUs(10, 3)
-	want := []string{"0-3", "4-6", "7-9"}
-	for index := range want {
-		if got[index] != want[index] {
-			t.Fatalf("sets = %#v, want %#v", got, want)
-		}
-	}
-}
-
 func TestDistributeCPUTopologyKeepsSMTSiblingsAndNUMANodesTogether(t *testing.T) {
 	var topology strings.Builder
 	for cpu := 0; cpu < 104; cpu++ {
@@ -121,12 +111,6 @@ func TestCountWorkerServices(t *testing.T) {
 	output := "prometheus\ncenter-cv-service-0\ncenter-cv-service-1\ncenter-cv-service-1\n"
 	if got := countWorkerServices(output); got != 2 {
 		t.Fatalf("countWorkerServices() = %d, want 2", got)
-	}
-}
-
-func TestCombineSSHOutput(t *testing.T) {
-	if got := combineSSHOutput("128\n", "warning\n"); got != "128\nwarning\n" {
-		t.Fatalf("combineSSHOutput() = %q", got)
 	}
 }
 

@@ -174,13 +174,25 @@ func (s *Service) Check(ctx context.Context, centerID string, items []Item) Chec
 	return result
 }
 
-func (s *Service) Run(ctx context.Context, centerID string, items []Item, r Reporter) error {
-	return centerlock.Within(ctx, centerID, func(ctx context.Context) error { return s.runLocked(ctx, centerID, items, r) })
+// Run 应用本次发布并返回实际重建的服务名。legacy 中心只重建映射到所选
+// 软件版本的服务（中间件、网关、监控既不修改也不重启）；模块化中心返回
+// 实际执行发布的各模块的全部服务。
+func (s *Service) Run(ctx context.Context, centerID string, items []Item, r Reporter) ([]string, error) {
+	var restarted []string
+	err := centerlock.Within(ctx, centerID, func(ctx context.Context) error {
+		services, runErr := s.runLocked(ctx, centerID, items, r)
+		restarted = services
+		return runErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	return restarted, nil
 }
-func (s *Service) runLocked(ctx context.Context, centerID string, items []Item, r Reporter) error {
+func (s *Service) runLocked(ctx context.Context, centerID string, items []Item, r Reporter) ([]string, error) {
 	_, _, currentCenter, resolveErr := s.centers.Connection(centerID)
 	if resolveErr != nil {
-		return resolveErr
+		return nil, resolveErr
 	}
 	if currentCenter.Deployment != nil {
 		return s.runModules(ctx, centerID, currentCenter, items, r)
@@ -189,15 +201,15 @@ func (s *Service) runLocked(ctx context.Context, centerID string, items []Item, 
 	r.Progress(5)
 	check := s.Check(ctx, centerID, items)
 	if !check.Ready {
-		return fmt.Errorf("中心未满足部署条件: %s", checkSummary(check))
+		return nil, fmt.Errorf("中心未满足部署条件: %s", checkSummary(check))
 	}
 	cfg, socket, center, err := s.centers.Connection(centerID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	remote, fingerprint, err := sshx.NewDocker(cfg, socket)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer remote.Close()
 	_ = s.centers.RememberHostKey(center, fingerprint)
@@ -205,14 +217,14 @@ func (s *Service) runLocked(ctx context.Context, centerID string, items []Item, 
 	temporaryCompose := fmt.Sprintf("%s.tmp.%d", center.ComposeFile, time.Now().UnixNano())
 	content, err := renderComposeRelease(check.ComposeConfig, nil, items, check.Images, check.ServiceMappings)
 	if err != nil {
-		return fmt.Errorf("生成 Compose 发布配置失败: %w", err)
+		return nil, fmt.Errorf("生成 Compose 发布配置失败: %w", err)
 	}
 	r.Progress(25)
 	r.Message("正在写入 Compose 镜像版本")
 	r.Logf("Compose 文件: %s", center.ComposeFile)
 	uploadCommand := "umask 022; cat > " + shellQuote(temporaryCompose)
 	if output, commandErr := runSSH(ctx, remote.SSH, uploadCommand, content); commandErr != nil {
-		return fmt.Errorf("写入临时 Compose 失败: %s %w", output, commandErr)
+		return nil, fmt.Errorf("写入临时 Compose 失败: %s %w", output, commandErr)
 	}
 	r.Progress(45)
 	r.Message("正在校验 Compose 配置")
@@ -221,39 +233,38 @@ func (s *Service) runLocked(ctx context.Context, centerID string, items []Item, 
 	temporaryComposeArgs := modular.CenterCommand(candidate)
 	if output, commandErr := runSSH(ctx, remote.SSH, temporaryComposeArgs+" config >/dev/null", ""); commandErr != nil {
 		_, _ = runSSH(context.Background(), remote.SSH, "rm -f "+shellQuote(temporaryCompose), "")
-		return fmt.Errorf("Compose 配置校验失败: %s %w", output, commandErr)
+		return nil, fmt.Errorf("Compose 配置校验失败: %s %w", output, commandErr)
 	}
 	original, readErr := runSSH(ctx, remote.SSH, "cat "+shellQuote(center.ComposeFile), "")
 	if readErr != nil {
-		return readErr
+		return nil, readErr
 	}
 	if modular.Hash(original) != modular.Hash(check.ComposeConfig) {
-		return fmt.Errorf("远端 Compose 在发布期间已修改，未覆盖配置")
+		return nil, fmt.Errorf("远端 Compose 在发布期间已修改，未覆盖配置")
 	}
 	if output, commandErr := runSSH(ctx, remote.SSH, "cp -p "+shellQuote(center.ComposeFile)+" "+shellQuote(center.ComposeFile+".bak."+fmt.Sprint(time.Now().UnixNano()))+" && mv -f "+shellQuote(temporaryCompose)+" "+shellQuote(center.ComposeFile), ""); commandErr != nil {
-		return fmt.Errorf("启用 Compose 发布配置失败: %s %w", output, commandErr)
+		return nil, fmt.Errorf("启用 Compose 发布配置失败: %s %w", output, commandErr)
 	}
 	accelerator := center.DetectedAccelerator
 	if accelerator == "" {
 		accelerator = center.Accelerator
 	}
 	if err = s.centers.UpdateRuntime(centerID, accelerator, center.CPUCount, center.GPUCount, center.ComposeFile, content); err != nil {
-		return fmt.Errorf("保存中心 Compose 状态失败: %w", err)
+		return nil, fmt.Errorf("保存中心 Compose 状态失败: %w", err)
 	}
 	r.Progress(60)
 	r.Message("正在更新目标服务")
-	composeArgs := modular.CenterCommand(center) + " up -d"
+	targets := releaseTargets(check, items)
 	if center.ComposeProject != "" {
-		composeArgs += " --no-deps"
+		// 模块化路径（moduleResolver 注入项目名）：整体发布该模块的服务。
+		targets = uniqueSorted(check.BaseServices)
 	}
-	targets := []string{}
-	for _, names := range check.ServiceMappings {
-		targets = append(targets, names...)
-	}
-	targets = uniqueSorted(targets)
 	if len(targets) == 0 {
-		return fmt.Errorf("未选择任何目标服务")
+		return nil, fmt.Errorf("未选择任何目标服务")
 	}
+	// --force-recreate 会连带重建依赖服务，必须配合 --no-deps 把重启范围
+	// 限定在本次映射到的业务服务，中间件、网关、监控保持不动。
+	composeArgs := modular.CenterCommand(center) + " up -d --force-recreate --no-deps"
 	for _, name := range targets {
 		composeArgs += " " + shellQuote(name)
 	}
@@ -262,11 +273,20 @@ func (s *Service) runLocked(ctx context.Context, centerID string, items []Item, 
 		r.Log(strings.TrimSpace(output))
 	}
 	if commandErr != nil {
-		return fmt.Errorf("启动 Compose 服务失败: %w", commandErr)
+		return nil, fmt.Errorf("启动 Compose 服务失败: %w", commandErr)
 	}
 	r.Progress(100)
 	r.Message("目标服务部署完成")
-	return nil
+	return targets, nil
+}
+
+// releaseTargets 汇总本次发布要重建的服务：仅映射到所选软件版本的服务。
+func releaseTargets(check CheckResult, items []Item) []string {
+	targets := []string{}
+	for _, item := range items {
+		targets = append(targets, check.ServiceMappings[item.SourceID]...)
+	}
+	return uniqueSorted(targets)
 }
 
 func findImage(images []image.Summary, item Item) string {
@@ -437,30 +457,6 @@ func yamlSetScalar(mapping *yaml.Node, key, value string) {
 	)
 }
 
-// composeConfigServices 对应 docker compose config 输出中的 services 部分，
-// 只关心每个 service 解析后的镜像引用。
-type composeConfigServices struct {
-	Services map[string]struct {
-		Image string `yaml:"image"`
-	} `yaml:"services"`
-}
-
-// parseComposeServices 解析 docker compose config 的 YAML 输出，
-// 返回 service 名到镜像引用的映射；没有 image 的 service（纯 build）跳过。
-func parseComposeServices(output string) (map[string]string, error) {
-	var parsed composeConfigServices
-	if err := yaml.Unmarshal([]byte(output), &parsed); err != nil {
-		return nil, fmt.Errorf("输出不是有效的 Compose 配置: %w", err)
-	}
-	services := map[string]string{}
-	for name, service := range parsed.Services {
-		if service.Image != "" {
-			services[name] = service.Image
-		}
-	}
-	return services, nil
-}
-
 // parseDeploymentServices 使用模板的显式仓库映射，旧配置仅接受精确仓库名。
 func parseDeploymentServices(output string) (map[string]string, error) {
 	var parsed struct {
@@ -498,16 +494,6 @@ func imageRepository(reference string) string {
 
 func runSSH(ctx context.Context, client *ssh.Client, command, stdin string) (string, error) {
 	return modular.Run(ctx, client, command, stdin)
-}
-
-func combineSSHOutput(stdout, stderr string) string {
-	if stdout == "" {
-		return stderr
-	}
-	if stderr == "" {
-		return stdout
-	}
-	return strings.TrimRight(stdout, "\r\n") + "\n" + stderr
 }
 
 func checkSummary(result CheckResult) string {

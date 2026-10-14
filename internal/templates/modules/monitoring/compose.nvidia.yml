@@ -91,6 +91,8 @@ services:
     image: gcr.io/cadvisor/cadvisor:v0.55.1
     pull_policy: missing
     container_name: cadvisor
+    environment:
+      CADVISOR_HEALTHCHECK_URL: http://127.0.0.1:8084/healthz
     restart: unless-stopped
     network_mode: host
     privileged: true

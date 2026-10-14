@@ -562,7 +562,7 @@ func RepairRuntimePathsOnClient(ctx context.Context, client *ssh.Client, passwor
 		if current.StoragePath == "" {
 			current, err = migrateLegacyCurrentVersion(ctx, files, current, item, r)
 		} else {
-			err = ensureRuntimeAliasToStorage(ctx, files, item, current.StoragePath, r)
+			current, err = repairStoredCurrentVersion(ctx, files, current, item, r)
 		}
 		if err != nil {
 			return fmt.Errorf("修复模型 %s 的扁平运行时路径: %w", current.Model, err)
@@ -600,7 +600,8 @@ func validateCurrentVersion(current CurrentVersion) error {
 		}
 		return nil
 	}
-	if current.TargetPath != alias {
+	legacyNVIDIAAlias := current.Platform == "nvidia" && current.TargetPath == path.Join("plan", current.HardwareProfile, current.Model+".plan")
+	if current.TargetPath != alias && !legacyNVIDIAAlias {
 		return fmt.Errorf("target_path 必须是扁平运行时路径 %s", alias)
 	}
 	if !safeStoragePath(current.StoragePath) {

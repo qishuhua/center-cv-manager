@@ -83,33 +83,32 @@ func (s *Service) checkModules(ctx context.Context, id string, c domain.Center, 
 	return result
 }
 
-func (s *Service) runModules(ctx context.Context, id string, c domain.Center, items []Item, r Reporter) error {
+func (s *Service) runModules(ctx context.Context, id string, c domain.Center, items []Item, r Reporter) ([]string, error) {
 	check := s.Check(ctx, id, items)
 	if !check.Ready {
-		return fmt.Errorf("发布预检失败: %s", checkSummary(check))
+		return nil, fmt.Errorf("发布预检失败: %s", checkSummary(check))
 	}
 	order, err := modular.Order(c.Deployment.Modules)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	cfg, socket, _, err := s.centers.Connection(id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	remote, fp, err := sshx.NewDocker(cfg, socket)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer remote.Close()
 	_ = s.centers.RememberHostKey(c, fp)
+	restarted := []string{}
 	for _, m := range order {
 		sub := check.Modules[m.ID]
 		selected := []Item{}
-		targets := []string{}
 		for _, item := range items {
 			if names := sub.ServiceMappings[item.SourceID]; len(names) > 0 {
 				selected = append(selected, item)
-				targets = append(targets, names...)
 			}
 		}
 		if len(selected) == 0 {
@@ -118,40 +117,43 @@ func (s *Service) runModules(ctx context.Context, id string, c domain.Center, it
 		for _, depID := range m.DependsOn {
 			dep, e := modular.Find(c, depID)
 			if e != nil {
-				return e
+				return nil, e
 			}
 			raw, e := modular.Run(ctx, remote.SSH, modular.Command(dep)+" config", "")
 			if e != nil {
-				return e
+				return nil, e
 			}
 			parsed, e := modular.Parse(raw)
 			if e != nil {
-				return e
+				return nil, e
 			}
 			if e = modular.Inspect(ctx, remote, dep, modular.ServiceNames(parsed)); e != nil {
-				return fmt.Errorf("先初始化依赖 %s: %w", depID, e)
+				return nil, fmt.Errorf("先初始化依赖 %s: %w", depID, e)
 			}
 		}
-		r.Logf("只更新模块 %s 的服务：%s", m.Name, strings.Join(targets, ", "))
-		if err = New(moduleResolver{s.centers, m}).runLocked(ctx, id, selected, r); err != nil {
-			_ = s.recordModuleResult(id, m.ID, "failed", err.Error())
-			return err
+		targets := sub.BaseServices
+		r.Logf("整体发布模块 %s，服务：%s", m.Name, strings.Join(targets, ", "))
+		moduleServices, e := New(moduleResolver{s.centers, m}).runLocked(ctx, id, selected, r)
+		if e != nil {
+			_ = s.recordModuleResult(id, m.ID, "failed", e.Error())
+			return nil, e
 		}
+		restarted = append(restarted, moduleServices...)
 		if err = modular.Wait(ctx, remote, m, uniqueSorted(targets), modular.ReadyURLsForServices(m, targets)); err != nil {
 			_ = s.recordModuleResult(id, m.ID, "failed", err.Error())
-			return err
+			return nil, err
 		}
 		status := "healthy"
 		if cfg, e := modular.Parse(sub.ComposeConfig); e != nil {
-			return e
+			return nil, e
 		} else if e = modular.Inspect(ctx, remote, m, modular.ServiceNames(cfg)); e != nil {
 			status = "partial"
 		}
 		if err = s.recordModuleResult(id, m.ID, status, ""); err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return uniqueSorted(restarted), nil
 }
 
 func (s *Service) recordModuleResult(id, moduleID, status, message string) error {
@@ -168,6 +170,10 @@ func (s *Service) recordModuleResult(id, moduleID, status, message string) error
 	for i := range c.Deployment.Modules {
 		if c.Deployment.Modules[i].ID == moduleID {
 			c.Deployment.Modules[i].Status = status
+			if status == "healthy" {
+				c.Deployment.Modules[i].AppliedRevision = c.Deployment.Modules[i].Revision
+				c.Deployment.Modules[i].ConfigChanged = false
+			}
 			c.Deployment.Modules[i].Error = message
 			c.Deployment.Modules[i].UpdatedAt = time.Now()
 		}

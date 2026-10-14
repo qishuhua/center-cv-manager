@@ -94,6 +94,9 @@ func TestEnsureCheckoutPinsCommitAndReusesCache(t *testing.T) {
 	stored := &checkoutRepository{}
 	service := New(t.TempDir(), stored, nil)
 	src := domain.Source{ID: "source-1", Name: "service", Repository: repositoryPath, CreatedAt: time.Now()}
+	if err := service.VerifySelection(context.Background(), src, "main", "branch", commit); err != nil {
+		t.Fatal(err)
+	}
 	checkout, err := service.EnsureCheckout(context.Background(), src, "main", commit, silentReporter{})
 	if err != nil {
 		t.Fatal(err)
@@ -112,6 +115,12 @@ func TestEnsureCheckoutPinsCommitAndReusesCache(t *testing.T) {
 	}
 	runGit("add", "README.md")
 	runGit("commit", "-m", "move branch")
+	if err := service.VerifySelection(context.Background(), src, "main", "branch", commit); err == nil {
+		t.Fatal("accepted stale cached selection after remote moved")
+	}
+	if err := service.VerifySelection(context.Background(), src, "main", "branch", runGit("rev-parse", "HEAD")); err != nil {
+		t.Fatal(err)
+	}
 	reused, err := service.EnsureCheckout(context.Background(), src, "main", commit, silentReporter{})
 	if err != nil {
 		t.Fatal(err)

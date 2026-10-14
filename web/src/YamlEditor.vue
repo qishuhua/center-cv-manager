@@ -41,9 +41,9 @@ onBeforeUnmount(()=>editor?.destroy())
 <template><div ref="host" class="yaml-editor"/></template>
 
 <style scoped>
-.yaml-editor{overflow:hidden;border:1px solid #26364b;border-radius:10px;background:#111827}
-.yaml-editor:focus-within{border-color:#4f8cff;box-shadow:0 0 0 2px rgba(79,140,255,.18)}
+.yaml-editor{overflow:hidden;border:1px solid #2c3235;border-radius:10px;background:#111827}
+.yaml-editor:focus-within{border-color:#ff780a;box-shadow:0 0 0 2px rgba(255,120,10,.2)}
 .yaml-editor :deep(.cm-editor){height:min(68vh,760px);min-height:500px;font:13px/1.6 Consolas,"Cascadia Code","Courier New",monospace}
 .yaml-editor :deep(.cm-scroller){overflow:auto}
-.yaml-editor :deep(.cm-gutters){border-right-color:#26364b}
+.yaml-editor :deep(.cm-gutters){border-right-color:#2c3235}
 </style>

@@ -35,7 +35,7 @@ func NewDeployment(composeFile string, workers int) *domain.Deployment {
 				m.ModelServices = append(m.ModelServices, fmt.Sprintf("center-cv-service-%d", i))
 				m.ReadyURLs = append(m.ReadyURLs, fmt.Sprintf("http://127.0.0.1:%d/api/readyz", 8181+i))
 			}
-			m.ReadyURLs = append(m.ReadyURLs, "http://127.0.0.1:8090/readyz", "http://127.0.0.1:8091/readyz", "http://127.0.0.1:8092/readyz")
+			m.ReadyURLs = append(m.ReadyURLs, "http://127.0.0.1:8090/readyz", "http://127.0.0.1:8092/readyz")
 		case "gateway":
 			m.DependsOn = []string{"business"}
 		case "monitoring":
@@ -202,7 +202,6 @@ type Config struct {
 		Image         string `yaml:"image"`
 		ContainerName string `yaml:"container_name"`
 		Restart       string `yaml:"restart"`
-		Labels        any    `yaml:"labels"`
 	} `yaml:"services"`
 }
 

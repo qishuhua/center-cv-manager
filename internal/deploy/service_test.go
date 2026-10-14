@@ -1,7 +1,7 @@
 package deploy
 
 import (
-	"sort"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -105,39 +105,18 @@ services:
 	}
 }
 
-func TestParseComposeServicesAndImageRepository(t *testing.T) {
-	const composeConfig = `name: center
-services:
-  center-cv-service-0:
-    image: center-cv-service:release-1.2.0
-  center-cv-service-1:
-    image: center-cv-service:release-1.2.0
-  rabbitmq:
-    image: rabbitmq:4.3.5-management
-  builder:
-    build:
-      context: .
-`
-	services, err := parseComposeServices(composeConfig)
-	if err != nil {
-		t.Fatal(err)
+func TestReleaseTargetsOnlyMappedServices(t *testing.T) {
+	check := CheckResult{ServiceMappings: map[string][]string{
+		"source-a": {"center-cv-service-1", "center-cv-service-0"},
+		"source-b": {"center-cv-ingress"},
+	}}
+	items := []Item{{SourceID: "source-a"}, {SourceID: "source-b"}}
+	want := []string{"center-cv-ingress", "center-cv-service-0", "center-cv-service-1"}
+	if got := releaseTargets(check, items); !reflect.DeepEqual(got, want) {
+		t.Fatalf("releaseTargets() = %#v, want %#v", got, want)
 	}
-	if len(services) != 3 {
-		t.Fatalf("services = %#v", services)
-	}
-	repository := imageRepository("center-cv-service:release-1.2.0")
-	matched := []string{}
-	for name, serviceImage := range services {
-		if imageRepository(serviceImage) == repository {
-			matched = append(matched, name)
-		}
-	}
-	sort.Strings(matched)
-	if len(matched) != 2 || matched[0] != "center-cv-service-0" || matched[1] != "center-cv-service-1" {
-		t.Fatalf("matched = %#v", matched)
-	}
-	if _, ok := services["builder"]; ok {
-		t.Fatalf("build-only service should be skipped: %#v", services)
+	if got := releaseTargets(check, []Item{{SourceID: "source-c"}}); len(got) != 0 {
+		t.Fatalf("item without mapping must yield no targets, got %#v", got)
 	}
 }
 
@@ -161,23 +140,6 @@ func TestCheckSummaryIncludesEveryFailure(t *testing.T) {
 	for _, expected := range []string{"SSH 失败", "缺少镜像 api:v1", "Compose 未引用镜像 api"} {
 		if !strings.Contains(got, expected) {
 			t.Fatalf("summary %q does not contain %q", got, expected)
-		}
-	}
-}
-
-func TestCombineSSHOutput(t *testing.T) {
-	cases := []struct {
-		stdout string
-		stderr string
-		want   string
-	}{
-		{stdout: "compose config\n", want: "compose config\n"},
-		{stderr: "warning\n", want: "warning\n"},
-		{stdout: "compose config\r\n", stderr: "warning\n", want: "compose config\nwarning\n"},
-	}
-	for _, test := range cases {
-		if got := combineSSHOutput(test.stdout, test.stderr); got != test.want {
-			t.Fatalf("combineSSHOutput(%q, %q) = %q, want %q", test.stdout, test.stderr, got, test.want)
 		}
 	}
 }
