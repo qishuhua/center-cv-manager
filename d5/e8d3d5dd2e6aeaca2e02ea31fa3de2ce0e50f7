@@ -1,0 +1,72 @@
+web/src/types.ts
+  s_782d10ea6f6d7a::t_52fdadc59dcda5 11
+internal/api/server.go
+  s_782d10ea6f6d7a::t_4b7d0760e0cf2c 157
+  s_782d10ea6f6d7a::t_e61a5ae049fd71 158
+  s_782d10ea6f6d7a::t_1f4c8955a5bc0c 95
+  s_782d10ea6f6d7a::t_02613c5976d106 1117-1120
+  s_782d10ea6f6d7a::t_dcaaa4bb6e5ecd 1145-1151
+internal/api/software_build.go
+  s_782d10ea6f6d7a::t_b511ed0ebcbcfa 34-42
+  s_782d10ea6f6d7a::t_63063d5b425f67 76
+  s_782d10ea6f6d7a::t_fb680af4c15a71 1-14,16-33,43-75,77-101,103-109,111-113,116-127,130-133,143-159,161-167,169-172,222
+  s_782d10ea6f6d7a::t_be0a154a62ff4c 15
+  s_782d10ea6f6d7a::t_02eea9c68c2425 134,206
+  s_782d10ea6f6d7a::t_c66abaa00380dc 102,110,114-115,128-129,135-142,160,168,173-205,207-221
+web/src/App.vue
+  s_782d10ea6f6d7a::t_ad47d2f051d137 396
+  s_782d10ea6f6d7a::t_febca656497b4c 23-24
+  s_782d10ea6f6d7a::t_705275a99090a6 683
+  s_782d10ea6f6d7a::t_2a4ddf8cb8c8e1 692-693,702-703
+  s_782d10ea6f6d7a::t_669b447e269585 164,168
+  s_782d10ea6f6d7a::t_9666c25849e6e0 455
+  s_782d10ea6f6d7a::t_7c2192d95e121a 674-677,679,681-682,684-685,687-689
+  s_782d10ea6f6d7a::t_d104593d8ac3c9 65
+  s_782d10ea6f6d7a::t_4a8e3e070dcc22 644,646
+  s_782d10ea6f6d7a::t_98c240ae94976d 62
+  s_782d10ea6f6d7a::t_b5c1afa1f52931 425,427-428
+  s_782d10ea6f6d7a::t_c26f29e5fee9c4 678,680,690
+  s_782d10ea6f6d7a::t_f2564b06ac9ed7 141
+  s_782d10ea6f6d7a::t_0f2a8d9a6bef15 4
+  s_782d10ea6f6d7a::t_a2296af9f2c194 412-424
+  s_782d10ea6f6d7a::t_4c4e335e64f13b 350-351,354,356,359-360,363,372-388,390,393-395,397-409,426,429-435
+  s_782d10ea6f6d7a::t_f0e53203ffe581 15
+  s_782d10ea6f6d7a::t_d5ca1c55f319f8 22,436-437
+  s_782d10ea6f6d7a::t_790d3789131c86 25
+  s_782d10ea6f6d7a::t_d00e4bf8ad1ee1 691,694-701
+  s_782d10ea6f6d7a::t_317df6f6eb0faa 63-64
+  s_782d10ea6f6d7a::t_af9961d78194b3 410-411
+  s_782d10ea6f6d7a::t_c29f889c1dbb4a 686
+  s_782d10ea6f6d7a::t_e44f55a6fad415 389,391-392
+  s_782d10ea6f6d7a::t_d7cc9ea38a9098 193
+  s_782d10ea6f6d7a::t_4215e9a1b729e3 184
+  s_782d10ea6f6d7a::t_1f45ff143f3be8 642
+  s_782d10ea6f6d7a::t_9c309a895f2c2c 660
+  s_782d10ea6f6d7a::t_98e3ac8e297433 159
+web/src/api.ts
+  s_782d10ea6f6d7a::t_6c3e7031fb3f3b 12
+internal/api/software_build_test.go
+  s_782d10ea6f6d7a::t_622a2535997ca6 1-38,61
+  s_782d10ea6f6d7a::t_6d86e9b2265624 39-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "d5e8d3d5dd2e6aeaca2e02ea31fa3de2ce0e50f7",
+  "prompts": {},
+  "humans": {
+    "h_4ba6e213f37271": {
+      "author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  },
+  "sessions": {
+    "s_782d10ea6f6d7a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1d32c12f-3b1b-47e0-8df7-98cfa4551af3",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
