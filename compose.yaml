@@ -1,8 +1,8 @@
 services:
   # 后端 API：registry sidecar 挂在本服务网络命名空间上，API 进程（manifest
   # 查询/反向隧道目标）与本机 Docker 引擎（本地构建 push）统一经 127.0.0.1:5000
-  # 访问；本服务使用宿主 Docker 引擎（Docker Desktop 的 sock 对容器内非 root
-  # 用户可读写；原生 Linux 宿主需自行调整 sock 的组权限）。
+  # 访问；本服务使用宿主 Docker 引擎——sock 常见为 root:root 0660，非 root 的
+  # manager 用户通过 group_add 0 取得组读写权限。
   center-cv-manager-api:
     build:
       context: .
@@ -11,6 +11,7 @@ services:
     image: center-cv-manager-api:local
     container_name: center-cv-manager-api
     restart: unless-stopped
+    group_add: ["0"]
     environment:
       TZ: Asia/Shanghai
       GIN_MODE: release
