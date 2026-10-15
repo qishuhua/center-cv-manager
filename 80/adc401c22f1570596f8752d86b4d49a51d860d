@@ -1,0 +1,21 @@
+compose.yaml
+  s_a6df3de9deccd1::t_1d67fd6157c4dc 4-5,14
+CLAUDE.md
+  s_a6df3de9deccd1::t_363bc3b89be771 9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "80adc401c22f1570596f8752d86b4d49a51d860d",
+  "prompts": {},
+  "sessions": {
+    "s_a6df3de9deccd1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f338f9b0-c54d-46f9-82e1-a7ba0dabe12b",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
