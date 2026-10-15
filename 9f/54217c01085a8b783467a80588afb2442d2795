@@ -1,0 +1,32 @@
+internal/api/server.go
+  s_a6df3de9deccd1::t_28040042e1dedc 196-197,200-201
+compose.yaml
+  s_a6df3de9deccd1::t_a3bdd8c54591d7 2-5,10,29-50,52-54
+.dockerignore
+  s_a6df3de9deccd1::t_20d2f1445e8694 10-11,13
+web/nginx.conf
+  s_a6df3de9deccd1::t_85a8ee63447149 1-52
+cmd/server/main.go
+  s_a6df3de9deccd1::t_8f504f86698808 6
+  s_a6df3de9deccd1::t_2b87ed418d6ef4 72-79
+CLAUDE.md
+  s_a6df3de9deccd1::t_82b0cb682a99c3 9
+Dockerfile
+  s_a6df3de9deccd1::t_9f0a85f2e6291b 1,9-14,19-20,23,40-42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "9f54217c01085a8b783467a80588afb2442d2795",
+  "prompts": {},
+  "sessions": {
+    "s_a6df3de9deccd1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f338f9b0-c54d-46f9-82e1-a7ba0dabe12b",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
