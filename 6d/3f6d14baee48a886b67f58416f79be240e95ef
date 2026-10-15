@@ -1,0 +1,24 @@
+compose.yaml
+  s_a6df3de9deccd1::t_2bd4a45d0f6393 6,11-12,40,59
+CLAUDE.md
+  s_a6df3de9deccd1::t_fecf335e2999d3 9
+web/nginx.conf
+  s_a6df3de9deccd1::t_cf086b35852046 1
+  s_a6df3de9deccd1::t_ffb500dd03e110 33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "6d3f6d14baee48a886b67f58416f79be240e95ef",
+  "prompts": {},
+  "sessions": {
+    "s_a6df3de9deccd1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f338f9b0-c54d-46f9-82e1-a7ba0dabe12b",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
