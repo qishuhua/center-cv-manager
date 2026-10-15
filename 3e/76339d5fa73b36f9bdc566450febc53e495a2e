@@ -1,0 +1,33 @@
+internal/api/server.go
+  s_a6df3de9deccd1::t_a7a65f5ce6c2f9 1241-1242
+  s_a6df3de9deccd1::t_0dad54ae6826b3 1315
+internal/build/service_test.go
+  s_a6df3de9deccd1::t_819345b8f5569d 42
+  s_a6df3de9deccd1::t_12e92f6fc498ed 30-31
+  s_a6df3de9deccd1::t_7fe449e5a3bf92 28-29,32,35,41,43
+internal/api/software_publish.go
+  s_a6df3de9deccd1::t_547d68d2a6bf73 100,107-108
+internal/api/release_registry.go
+  s_a6df3de9deccd1::t_8e8dc257d43c7c 75
+internal/build/service.go
+  s_a6df3de9deccd1::t_5bcf3c137bf228 113-116,118,120,122
+  s_a6df3de9deccd1::t_e3084df193bba3 117
+internal/registry/versions.go
+  s_a6df3de9deccd1::t_859fb10601c611 258-260,262
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "3e76339d5fa73b36f9bdc566450febc53e495a2e",
+  "prompts": {},
+  "sessions": {
+    "s_a6df3de9deccd1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f338f9b0-c54d-46f9-82e1-a7ba0dabe12b",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
