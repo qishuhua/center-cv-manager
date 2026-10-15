@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Center CV Manager：运行在开发机上的中心服务器集中管理服务。Go (Gin) 后端 + Vue 3 (Element Plus) 前端。核心链路：登记中心服务器 SSH 信息 → 在开发机本地缓存 Git 源码（`data/sources`）→ 通过 SSH Unix Socket 转发直连远端 Docker Engine API 完成构建/部署。远端不装 Agent、不落源码副本。
 
-生产形态为 compose 三容器（不生成 EXE）：`web`（nginx：SPA 静态 + `/api` 反代到 `center-cv-manager:8099`，入口 `0.0.0.0:8099`）+ `center-cv-manager`（Go API，非 root 用户，挂载宿主 `/var/run/docker.sock` 供本地构建；模板运行时从文件系统读取，不再 go:embed）+ `registry` sidecar（`network_mode: service:center-cv-manager`，统一经 `127.0.0.1:5000` 访问，OSS S3 兼容层存储、本地无状态）。单 Dockerfile 双 target（`web`/`api`），go-builder 只 `COPY cmd/ internal/`——前端改动不触发 Go 重编，反之亦然；前端发布只重建 web 容器，不打断后端运行中的任务。nginx 反代四个必须维持的配置（`web/nginx.conf`）：WebSocket 升级头（SSH 终端）、SSE 不缓冲（任务事件流）、`client_max_body_size 0`（模型上传代理回退）、24h 读写超时（长会话）。`make dev` 直跑时后端仍直接服务 `web/dist`（目录缺失则仅提供 API）。
+生产形态为 compose 三容器（不生成 EXE）：`center-cv-manager-web`（nginx：SPA 静态 + `/api` 反代到 `center-cv-manager-api:8099`，入口 `0.0.0.0:8099`）+ `center-cv-manager-api`（Go API，非 root 用户，挂载宿主 `/var/run/docker.sock` 供本地构建；模板运行时从文件系统读取，不再 go:embed）+ `center-cv-registry` sidecar（`network_mode: service:center-cv-manager-api`，统一经 `127.0.0.1:5000` 访问，OSS S3 兼容层存储、本地无状态）。单 Dockerfile 双 target（`web`/`api`），go-builder 只 `COPY cmd/ internal/`——前端改动不触发 Go 重编，反之亦然；前端发布只重建 web 容器，不打断后端运行中的任务。nginx 反代四个必须维持的配置（`web/nginx.conf`）：WebSocket 升级头（SSH 终端）、SSE 不缓冲（任务事件流）、`client_max_body_size 0`（模型上传代理回退）、24h 读写超时（长会话）。`make dev` 直跑时后端仍直接服务 `web/dist`（目录缺失则仅提供 API）。
 
 ## 常用命令
 

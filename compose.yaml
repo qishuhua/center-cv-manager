@@ -3,13 +3,13 @@ services:
   # 查询/反向隧道目标）与本机 Docker 引擎（本地构建 push）统一经 127.0.0.1:5000
   # 访问；本服务使用宿主 Docker 引擎（Docker Desktop 的 sock 对容器内非 root
   # 用户可读写；原生 Linux 宿主需自行调整 sock 的组权限）。
-  center-cv-manager:
+  center-cv-manager-api:
     build:
       context: .
       dockerfile: Dockerfile
       target: api
-    image: center-cv-manager:local
-    container_name: center-cv-manager
+    image: center-cv-manager-api:local
+    container_name: center-cv-manager-api
     restart: unless-stopped
     environment:
       TZ: Asia/Shanghai
@@ -37,7 +37,7 @@ services:
     container_name: center-cv-manager-web
     restart: unless-stopped
     depends_on:
-      center-cv-manager:
+      center-cv-manager-api:
         condition: service_healthy
     ports:
       - "0.0.0.0:${CENTER_MANAGER_PORT:-8099}:80"
@@ -56,7 +56,7 @@ services:
     image: registry:3.1.2
     container_name: center-cv-registry
     restart: unless-stopped
-    network_mode: "service:center-cv-manager"
+    network_mode: "service:center-cv-manager-api"
     command: ["serve", "/app/data/registry/config.yml"]
     volumes:
       - center-manager-data:/app/data
