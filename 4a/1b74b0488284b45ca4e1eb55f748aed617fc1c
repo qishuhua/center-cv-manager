@@ -1,0 +1,36 @@
+internal/modelasset/release.go
+  s_7e3f876969148a::t_a033fd81785977 614-616,619,624,628,635,638,642,645,647,651,658,664,666
+internal/api/server.go
+  s_7e3f876969148a::t_be99032751bddf 657,665-666,672-677,680-689
+  s_7e3f876969148a::t_58ef235df6cb65 12
+  s_7e3f876969148a::t_a0e0a60ccdaa5e 646-650,653-656,659,663-664,667-668,678-679
+  s_7e3f876969148a::t_9ad2063ff7166c 690
+internal/api/reset.go
+  s_7e3f876969148a::t_fcc92dbe41d686 37
+internal/api/center_notify.go
+  s_7e3f876969148a::t_4fb60cc68a0d8e 8-34
+internal/api/center_notify_test.go
+  s_7e3f876969148a::t_b949248e6aa82d 31-33,36-48
+  s_7e3f876969148a::t_7e545b56fbfc48 34-35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "4a1b74b0488284b45ca4e1eb55f748aed617fc1c",
+  "prompts": {},
+  "humans": {
+    "h_4ba6e213f37271": {
+      "author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  },
+  "sessions": {
+    "s_7e3f876969148a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7abc5147-5822-44c7-bbc6-75c2b31be202",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
