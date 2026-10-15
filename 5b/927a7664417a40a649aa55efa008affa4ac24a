@@ -1,0 +1,23 @@
+internal/api/software_publish.go
+  s_a6df3de9deccd1::t_c138bf379170bb 214-215,219-221
+CLAUDE.md
+  s_a6df3de9deccd1::t_9b35a44dad5e3c 54
+internal/api/server.go
+  s_a6df3de9deccd1::t_73b1f70de81432 1056-1064,1077-1083,1085-1087,1089,1091-1093
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "5b927a7664417a40a649aa55efa008affa4ac24a",
+  "prompts": {},
+  "sessions": {
+    "s_a6df3de9deccd1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f338f9b0-c54d-46f9-82e1-a7ba0dabe12b",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
