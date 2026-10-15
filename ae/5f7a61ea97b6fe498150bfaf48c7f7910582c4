@@ -1,0 +1,21 @@
+internal/store/sqlite.go
+  s_a6df3de9deccd1::t_1d18cd25c8ef60 48-50
+internal/store/sqlite_test.go
+  s_a6df3de9deccd1::t_ad40ee1a7c3bc1 224-251
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "ae5f7a61ea97b6fe498150bfaf48c7f7910582c4",
+  "prompts": {},
+  "sessions": {
+    "s_a6df3de9deccd1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f338f9b0-c54d-46f9-82e1-a7ba0dabe12b",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
