@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -642,14 +643,49 @@ func (s *Server) setCenterModelPin(c *gin.Context) {
 		fail(c, http.StatusBadRequest, err)
 		return
 	}
+	center, err := s.centers.GetPublic(c.Param("id"))
+	if err != nil {
+		s.storeError(c, err)
+		return
+	}
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 45*time.Second)
 	defer cancel()
-	current, err := s.models.SetModelSetPinned(ctx, c.Param("id"), in.Pinned)
+	icon, action := "🔓", "解绑模型版本组"
+	if in.Pinned {
+		icon, action = "🔒", "固定模型版本组"
+	}
+	current, versions, err := s.models.SetModelSetPinned(ctx, center.ID, in.Pinned)
 	if err != nil {
+		notifyCenterResult(s.alerts, icon, action, releaseOperator(c), center.Name, "", err)
 		fail(c, http.StatusConflict, err)
 		return
 	}
+	successDetail := "解绑后可新增、删除或切换该中心的模型版本。"
+	if in.Pinned {
+		successDetail = "已固定 " + strconv.Itoa(len(versions)) + " 个模型版本：\n" + pinnedModelSummary(versions) +
+			"\n固定后仅允许相同 Manifest 的幂等发布，调整任一模型前需整体解绑。"
+	}
+	notifyCenterResult(s.alerts, icon, action, releaseOperator(c), center.Name, successDetail, nil)
 	ok(c, current)
+}
+
+// pinnedModelSummary 把固定快照压成与初始化完成通知同款的
+// "- 模型:版本[平台]@digest前12位" 多行清单。
+func pinnedModelSummary(versions []modelasset.CurrentVersion) string {
+	entries := make([]string, 0, len(versions))
+	for _, current := range versions {
+		entries = append(entries, "- "+current.Model+":"+current.Version+"["+modelVariant(current)+"]@"+current.ManifestDigest[:12])
+	}
+	sort.Strings(entries)
+	return strings.Join(entries, "\n")
+}
+
+// modelVariant 拼出模型格式标签：平台，或平台-硬件配置（NVIDIA plan）。
+func modelVariant(current modelasset.CurrentVersion) string {
+	if current.HardwareProfile != "" {
+		return current.Platform + "-" + current.HardwareProfile
+	}
+	return current.Platform
 }
 
 func cleanContainerNames(names []string) []string {

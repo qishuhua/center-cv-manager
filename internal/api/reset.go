@@ -34,7 +34,7 @@ func (s *Server) runCenterReset(ctx context.Context, id string, h *task.Handle) 
 		if err := s.provisioning.ResetCenter(ctx, id, h); err != nil {
 			return err
 		}
-		if _, err := s.models.SetModelSetPinned(ctx, id, false); err != nil {
+		if _, _, err := s.models.SetModelSetPinned(ctx, id, false); err != nil {
 			return fmt.Errorf("中心已重置，但模型版本组解绑失败，请重试重置: %w", err)
 		}
 		return nil

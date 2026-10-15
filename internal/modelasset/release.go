@@ -611,56 +611,59 @@ func validateCurrentVersion(current CurrentVersion) error {
 }
 
 // SetModelSetPinned atomically fixes or unbinds the center's complete model
-// version snapshot. It shares the center mutation lock with releases.
-func (s *Service) SetModelSetPinned(ctx context.Context, centerID string, pinned bool) (ModelSetPin, error) {
+// version snapshot. It shares the center mutation lock with releases. When
+// pinning, the captured version list is returned for notification display.
+func (s *Service) SetModelSetPinned(ctx context.Context, centerID string, pinned bool) (ModelSetPin, []CurrentVersion, error) {
 	release, err := centerlock.AcquireContext(ctx, centerID)
 	if err != nil {
-		return ModelSetPin{}, err
+		return ModelSetPin{}, nil, err
 	}
 	defer release()
 	cfg, _, stored, err := s.centers.Connection(centerID)
 	if err != nil {
-		return ModelSetPin{}, err
+		return ModelSetPin{}, nil, err
 	}
 	client, fingerprint, err := sshx.Dial(cfg)
 	if err != nil {
-		return ModelSetPin{}, err
+		return ModelSetPin{}, nil, err
 	}
 	defer client.Close()
 	_ = s.centers.RememberHostKey(stored, fingerprint)
 	targetRoot := modular.ModelsRoot(stored)
 	files, err := prepareRemoteFiles(ctx, client, cfg.Password, targetRoot, discardReporter{})
 	if err != nil {
-		return ModelSetPin{}, err
+		return ModelSetPin{}, nil, err
 	}
 	pin := ModelSetPin{Pinned: pinned, ManifestDigests: map[string]string{}}
+	var snapshot []CurrentVersion
 	if pinned {
 		versions, versionErr := CurrentVersionsOnClient(ctx, client, targetRoot)
 		if versionErr != nil {
-			return ModelSetPin{}, versionErr
+			return ModelSetPin{}, nil, versionErr
 		}
 		if len(versions) == 0 {
-			return ModelSetPin{}, fmt.Errorf("中心尚未发布任何受管模型，无法固定模型版本组")
+			return ModelSetPin{}, nil, fmt.Errorf("中心尚未发布任何受管模型，无法固定模型版本组")
 		}
+		snapshot = versions
 		pin.PinnedAt = time.Now().UTC().Format(time.RFC3339)
 		for _, current := range versions {
 			if !sha256Pattern.MatchString(current.ManifestDigest) {
-				return ModelSetPin{}, fmt.Errorf("中心模型 %s 的版本状态无效", current.Model)
+				return ModelSetPin{}, nil, fmt.Errorf("中心模型 %s 的版本状态无效", current.Model)
 			}
 			pin.ManifestDigests[current.Model] = current.ManifestDigest
 		}
 	}
 	statePath := modelSetPinPath(targetRoot)
 	if _, err = files.run(ctx, releasePathGuard(targetRoot, statePath, statePath+".tmp")); err != nil {
-		return ModelSetPin{}, fmt.Errorf("模型版本组固定状态路径包含不安全符号链接: %w", err)
+		return ModelSetPin{}, nil, fmt.Errorf("模型版本组固定状态路径包含不安全符号链接: %w", err)
 	}
 	stateJSON, _ := json.Marshal(pin)
 	tempPath := statePath + ".tmp"
 	command := "umask 022; printf %s " + shellQuote(string(stateJSON)) + " > " + shellQuote(tempPath) + "; mv -Tf " + shellQuote(tempPath) + " " + shellQuote(statePath)
 	if _, err = files.run(ctx, command); err != nil {
-		return ModelSetPin{}, fmt.Errorf("更新模型版本组固定状态: %w", err)
+		return ModelSetPin{}, nil, fmt.Errorf("更新模型版本组固定状态: %w", err)
 	}
-	return pin, nil
+	return pin, snapshot, nil
 }
 
 type discardReporter struct{}
