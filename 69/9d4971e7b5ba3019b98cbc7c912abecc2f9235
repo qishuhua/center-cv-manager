@@ -1,0 +1,52 @@
+web/src/types.ts
+  s_a6df3de9deccd1::t_37331727162fe3 18-20
+internal/registry/versions_test.go
+  s_a6df3de9deccd1::t_c2561f3c2b28d6 91-92
+  s_a6df3de9deccd1::t_84794058f84c34 1-90,93-111
+internal/registry/client.go
+  s_a6df3de9deccd1::t_3bdf91cd7ab9eb 8,13-14,18-19
+internal/api/software_publish.go
+  s_a6df3de9deccd1::t_8605fb87774eeb 1-219
+CLAUDE.md
+  s_a6df3de9deccd1::t_b0983582639f0f 67
+  s_a6df3de9deccd1::t_01336e93ffe326 101
+internal/build/service.go
+  s_a6df3de9deccd1::t_edfdf264050b24 282-284,286,289-297,300,305,310,315,319-320,323,332,334,338-345,348-353,363,375,377,381-400
+  s_a6df3de9deccd1::t_a176b0456f0413 506-507
+  s_a6df3de9deccd1::t_d070e7b37dbc77 241-243,250-251
+  s_a6df3de9deccd1::t_df2b90d17ed06c 479-483
+  s_a6df3de9deccd1::t_6403449c4fc690 401
+internal/api/server.go
+  s_a6df3de9deccd1::t_1358c59c8e5756 99
+  s_a6df3de9deccd1::t_5c40ba9adb7565 167,169
+web/src/App.vue
+  s_a6df3de9deccd1::t_30374f3cbab04d 564
+  s_a6df3de9deccd1::t_7dd1cb23ff278c 220-221
+  s_a6df3de9deccd1::t_c9725472c6220f 672-673,675,677-683
+  s_a6df3de9deccd1::t_15d79e276f5245 425-429,431-436
+  s_a6df3de9deccd1::t_2bdde057e3897e 23
+  s_a6df3de9deccd1::t_770ddb9018438a 169-171
+  s_a6df3de9deccd1::t_54067c1924e3db 66-68
+  s_a6df3de9deccd1::t_6a981d91920799 190-217
+  s_a6df3de9deccd1::t_d3503a8dadd87d 711-714,716
+  s_a6df3de9deccd1::t_420cf5aa6573fc 15
+internal/registry/versions.go
+  s_a6df3de9deccd1::t_a2c31068f73576 293-298
+  s_a6df3de9deccd1::t_38cac0abe6a71a 1-292
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "699d4971e7b5ba3019b98cbc7c912abecc2f9235",
+  "prompts": {},
+  "sessions": {
+    "s_a6df3de9deccd1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f338f9b0-c54d-46f9-82e1-a7ba0dabe12b",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
