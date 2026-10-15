@@ -305,11 +305,11 @@ func (s *Server) submitCenterInitialization(v domain.Center, items []deploy.Item
 			if finished.Deployment != nil && finished.Deployment.Status != "ready" {
 				return fmt.Errorf("初始化未完成，当前状态: %s", finished.Deployment.Status)
 			}
-			// 汇总本次实际发布的业务代码与模型版本，随完成通知发送到飞书。
+			// 汇总本次实际发布的业务镜像与模型版本，随完成通知发送到飞书。
 			lines := make([]string, 0, len(items)+len(plan.ModelPlan.Targets)+2)
-			lines = append(lines, "业务代码：")
+			lines = append(lines, "业务镜像：")
 			for _, item := range items {
-				lines = append(lines, fmt.Sprintf("- %s:%s@%s", item.SourceName, item.Ref, shortCommit(item.Commit)))
+				lines = append(lines, "- "+softwareVersionText(item.SourceName, item.Ref, item.Commit))
 			}
 			lines = append(lines, "模型：")
 			for _, item := range plan.ModelPlan.Targets {
@@ -1220,7 +1220,7 @@ func (s *Server) prepareDeploymentItems(ctx context.Context, selections []deploy
 			return nil, err
 		}
 		if !registry.TagsHaveVersion(tags, expected) {
-			return nil, fmt.Errorf("%s 的版本 %s（%s）尚未构建发布到镜像仓库，请先在「软件仓库」页构建发布", src.Name, selection.Ref, shortCommit(commit))
+			return nil, fmt.Errorf("%s 的镜像版本 %s 尚未构建发布到镜像仓库，请先在「软件仓库」页构建发布", src.Name, build.ReleaseVersionBody(selection.Ref, commit))
 		}
 		items = append(items, deploy.Item{
 			SourceID:      src.ID,
@@ -1299,7 +1299,7 @@ func (s *Server) checkUnifiedRelease(ctx context.Context, centerID string, softw
 					errors = append(errors, digestErr.Error())
 				} else if digest == "" {
 					softwareReady = false
-					errors = append(errors, fmt.Sprintf("%s 的版本 %s 未发布 %s 平台镜像（%s:%s），请先在「软件仓库」页构建发布", item.SourceName, item.Ref, build.AcceleratorName(platform), repository, tag))
+					errors = append(errors, fmt.Sprintf("%s 的镜像版本 %s 缺少 %s 平台镜像，请先在「软件仓库」页构建发布", item.SourceName, build.ReleaseVersionBody(item.Ref, item.Commit), build.AcceleratorName(platform)))
 				}
 			}
 		}
@@ -1456,7 +1456,7 @@ func (s *Server) release(c *gin.Context) {
 	}
 	versions := make([]string, 0, len(items))
 	for _, item := range items {
-		versions = append(versions, fmt.Sprintf("%s:%s@%s", item.SourceName, item.Ref, shortCommit(item.Commit)))
+		versions = append(versions, softwareVersionText(item.SourceName, item.Ref, item.Commit))
 	}
 	encodedItems, _ := json.Marshal(items)
 	releaseCenters := make([]domain.Center, 0, len(in.CenterIDs))
@@ -1711,6 +1711,12 @@ func shortCommit(commit string) string {
 		return commit[:12]
 	}
 	return commit
+}
+
+// softwareVersionText 以镜像版本口径展示软件版本（名称:ref-commit12），
+// 与中心侧显示一致——Git ref/commit 不单独出现在面向中心的界面。
+func softwareVersionText(name, ref, commit string) string {
+	return name + ":" + build.ReleaseVersionBody(ref, commit)
 }
 
 func uniqueStrings(values []string) []string {

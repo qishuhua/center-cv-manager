@@ -92,6 +92,24 @@ func ReleaseImageTag(src domain.Source, ref, commit string) string {
 	return DefaultImageRepository(src) + ":" + version + "-" + commit
 }
 
+// ReleaseVersionBody 返回镜像版本主体（sanitize(ref)-commit12）。对中心与
+// 发布界面而言这就是"镜像版本"本身——Git ref 与 commit 只是构建输入，只在
+// 软件仓库页（构建发布）出现。
+func ReleaseVersionBody(ref, commit string) string {
+	version := sanitizeImagePart(ref)
+	if version == "" {
+		version = "latest"
+	}
+	commit = sanitizeImagePart(commit)
+	if len(commit) > 12 {
+		commit = commit[:12]
+	}
+	if commit == "" {
+		return version
+	}
+	return version + "-" + commit
+}
+
 // ReleaseRegistryTag 是镜像仓库内的标签：在 ReleaseImageTag 基础上追加加速卡
 // 平台后缀。同一 commit 的 nvidia/denglin 构建产物不同，共享仓库内必须隔离，
 // 否则后推的平台会覆盖先推的同名标签。中心上的本地标签仍用 ReleaseImageTag

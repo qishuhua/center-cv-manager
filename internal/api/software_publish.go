@@ -77,7 +77,7 @@ func (s *Server) publishSourceImage(c *gin.Context) {
 	sourceID, sourceName, ref := src.ID, src.Name, in.Ref
 	ok(c, s.tasks.Submit("PUBLISH_IMAGE", map[string]string{
 		"source_id": sourceID, "source_name": sourceName, "ref": ref, "commit": commit,
-		"versions": fmt.Sprintf("%s:%s@%s", sourceName, ref, shortCommit(commit)),
+		"versions": softwareVersionText(sourceName, ref, commit),
 	}, func(ctx context.Context, h *task.Handle) error {
 		h.Message(fmt.Sprintf("阶段 1/3：准备 %s 源码（%s@%s）", sourceName, ref, shortCommit(commit)))
 		checkout, err := s.sources.EnsureCheckout(ctx, src, ref, commit, h)
@@ -210,7 +210,7 @@ func (s *Server) releaseCenterSoftware(c *gin.Context) {
 	}
 	item := deploy.Item{SourceID: src.ID, SourceName: src.Name, Ref: ref, Commit: commit, ExpectedImage: build.ReleaseImageTag(src, ref, commit)}
 	centerID, centerName := center.ID, center.Name
-	versions := fmt.Sprintf("%s:%s@%s", src.Name, ref, shortCommit(commit))
+	versions := softwareVersionText(src.Name, ref, commit)
 	ok(c, s.tasks.Submit("RELEASE_SOFTWARE", map[string]string{
 		"center_id": centerID, "center_name": centerName, "repository": in.Repository, "tag": in.Tag, "versions": versions,
 	}, func(ctx context.Context, h *task.Handle) error {

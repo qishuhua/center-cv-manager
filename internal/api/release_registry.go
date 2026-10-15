@@ -78,7 +78,7 @@ func (s *Server) prepareRegistrySoftwareRelease(ctx context.Context, centerID st
 			return err
 		}
 		if digest == "" {
-			return fmt.Errorf("软件 %s 的版本 %s（%s）未发布 %s 平台镜像（%s:%s），请先在「软件仓库」页构建发布", item.SourceName, item.Ref, shortCommit(item.Commit), build.AcceleratorName(platform), repository, tag)
+			return fmt.Errorf("软件 %s 的镜像版本 %s 未发布 %s 平台镜像，请先在「软件仓库」页构建发布", item.SourceName, build.ReleaseVersionBody(item.Ref, item.Commit), build.AcceleratorName(platform))
 		}
 		r.Logf("%s 命中仓库镜像 %s:%s（%s）", item.SourceName, repository, tag, digest)
 		pulls = append(pulls, registry.PullItem{Repository: repository, Digest: digest, LocalTag: item.ExpectedImage})
