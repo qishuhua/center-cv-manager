@@ -102,6 +102,7 @@ func (s *Server) Router() *gin.Engine {
 	api.GET("/sources/:id/checkouts", s.checkouts)
 	api.GET("/base-images", s.baseImageCatalog)
 	api.GET("/models", s.modelCatalog)
+	api.GET("/models/empty-folders", s.emptyModelFolders)
 	api.GET("/tasks", s.listTasks)
 	api.GET("/tasks/:id", s.getTask)
 	api.GET("/tasks/:id/logs", s.taskLogs)
@@ -873,6 +874,19 @@ func (s *Server) modelCatalog(c *gin.Context) {
 		return
 	}
 	ok(c, objects)
+}
+
+func (s *Server) emptyModelFolders(c *gin.Context) {
+	folders, err := s.models.EmptyModelFolders()
+	if err != nil {
+		status := http.StatusBadRequest
+		if !errors.Is(err, modelasset.ErrNotConfigured) {
+			status = http.StatusBadGateway
+		}
+		fail(c, status, err)
+		return
+	}
+	ok(c, folders)
 }
 
 func (s *Server) deleteModel(c *gin.Context) {

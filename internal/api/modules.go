@@ -102,16 +102,16 @@ func (s *Server) moduleAction(c *gin.Context) {
 		return
 	}
 	// Params retain the exact authorized scope for retry.
-	params := moduleTaskParams(id, moduleID, in.Action, in.Services)
+	params := moduleTaskParams(id, v.Name, moduleID, in.Action, in.Services)
 	params["revision"] = in.Revision
 	ok(c, s.tasks.Submit("MODULE_OPERATION", params, func(ctx context.Context, h *task.Handle) error {
 		return s.provisioning.ModuleAction(ctx, id, moduleID, in.Action, in.Services, in.Revision, h)
 	}))
 }
 
-func moduleTaskParams(id, moduleID, action string, services []string) map[string]string {
+func moduleTaskParams(id, centerName, moduleID, action string, services []string) map[string]string {
 	data, _ := json.Marshal(services)
-	return map[string]string{"center_id": id, "module_id": moduleID, "action": action, "services": string(data)}
+	return map[string]string{"center_id": id, "center_name": centerName, "module_id": moduleID, "action": action, "services": string(data)}
 }
 
 func (s *Server) migrationPlan(c *gin.Context) {
@@ -135,11 +135,16 @@ func (s *Server) migrateCenter(c *gin.Context) {
 		return
 	}
 	id := c.Param("id")
+	center, err := s.centers.GetPublic(id)
+	if err != nil {
+		s.storeError(c, err)
+		return
+	}
 	action := "migrate"
 	if in.Rollback {
 		action = "rollback"
 	}
-	ok(c, s.tasks.Submit("MODULE_MIGRATION", map[string]string{"center_id": id, "revision": in.Revision, "action": action}, func(ctx context.Context, h *task.Handle) error {
+	ok(c, s.tasks.Submit("MODULE_MIGRATION", map[string]string{"center_id": id, "center_name": center.Name, "revision": in.Revision, "action": action}, func(ctx context.Context, h *task.Handle) error {
 		if in.Rollback {
 			return s.provisioning.RollbackMigration(ctx, id, h)
 		}
@@ -195,7 +200,12 @@ func (s *Server) prepareModuleFiles(c *gin.Context) {
 		return
 	}
 	id := c.Param("id")
-	ok(c, s.tasks.Submit("PREPARE_MODULES", map[string]string{"center_id": id}, func(ctx context.Context, h *task.Handle) error {
+	center, err := s.centers.GetPublic(id)
+	if err != nil {
+		s.storeError(c, err)
+		return
+	}
+	ok(c, s.tasks.Submit("PREPARE_MODULES", map[string]string{"center_id": id, "center_name": center.Name}, func(ctx context.Context, h *task.Handle) error {
 		return centerlock.Within(ctx, id, func(ctx context.Context) error { return s.provisioning.PrepareModuleFiles(ctx, id, in, h) })
 	}))
 }
@@ -220,7 +230,12 @@ func (s *Server) publishCompose(c *gin.Context) {
 		return
 	}
 	id, file := c.Param("id"), c.Param("module")
-	params := map[string]string{"center_id": id, "module_id": file, "action": "publish"}
+	center, err := s.centers.GetPublic(id)
+	if err != nil {
+		s.storeError(c, err)
+		return
+	}
+	params := map[string]string{"center_id": id, "center_name": center.Name, "module_id": file, "action": "publish"}
 	ok(c, s.tasks.Submit("COMPOSE_PUBLISH", params, func(ctx context.Context, h *task.Handle) error {
 		return s.provisioning.PublishCompose(ctx, id, file, in.Revision, in.ConfirmUnchanged, h)
 	}))

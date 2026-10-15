@@ -1,17 +1,22 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Delete, FolderOpened, Plus, Refresh } from '@element-plus/icons-vue'
-import type { ModelFormat, ModelVersion } from './types'
+import type { EmptyModelFolder, ModelFormat, ModelVersion } from './types'
 import { groupModels } from './modelGroups'
 
-const props = withDefaults(defineProps<{models: ModelVersion[]; modelValue?: string[]; loading: boolean; selectable?: boolean}>(), {modelValue:()=>[],selectable:true})
+const props = withDefaults(defineProps<{models: ModelVersion[]; modelValue?: string[]; loading: boolean; selectable?: boolean; emptyFolders?: EmptyModelFolder[]}>(), {modelValue:()=>[],selectable:true,emptyFolders:()=>[]})
 const emit = defineEmits<{
   'update:modelValue': [keys: string[]]
   refresh: []
   uploadVersion: [model: string]
   deleteModel: [model: string]
 }>()
-const groups = computed(() => groupModels(props.models))
+const groups = computed(() => {
+  const grouped = groupModels(props.models)
+  // 空文件夹（有残留对象但没有可用版本）以 0 版本分组展示，只在这些分组上提供删除入口。
+  const empty = props.emptyFolders.filter(folder => !grouped.some(group => group.model === folder.model)).map(folder => ({model: folder.model, versions: [] as ModelVersion[]}))
+  return [...grouped, ...empty].sort((left, right) => left.model.localeCompare(right.model))
+})
 const expanded = ref<string[]>([])
 const selected = computed(() => new Set(props.modelValue))
 watch(groups, value => {
@@ -21,6 +26,11 @@ watch(groups, value => {
 const versionFiles = (item: ModelVersion) => item.formats.flatMap(format=>format.artifacts)
 const versionSize = (item: ModelVersion) => versionFiles(item).reduce((size, file) => size + file.size, 0)
 const groupSize = (items: ModelVersion[]) => items.reduce((size, item) => size + versionSize(item), 0)
+function folderSubtitle(group: {model:string;versions:ModelVersion[]}) {
+  if (group.versions.length) return `${group.versions.length} 个版本 · ${sizeLabel(groupSize(group.versions))}`
+  const folder = props.emptyFolders.find(item => item.model === group.model)
+  return folder ? `空文件夹 · ${folder.files} 个残留文件 · ${sizeLabel(folder.size)}` : '空文件夹'
+}
 const formatName = (format: ModelFormat) => format.platform==='onnx'?'ONNX':format.platform==='denglin'?'登临 engine':`NVIDIA plan · ${format.hardware_profile}`
 const formatType = (format: ModelFormat) => format.platform==='onnx'?'info':format.platform==='denglin'?'warning':'success'
 const formatSummary = (item: ModelVersion) => item.formats.map(format=>format.hardware_profile?`${format.platform}-${format.hardware_profile}`:format.platform).join(' / ')
@@ -78,11 +88,11 @@ function sizeLabel(value: number) {
         <template #title>
           <div class="model-folder-title">
             <el-icon class="folder-icon"><FolderOpened/></el-icon>
-            <div class="folder-name"><strong>{{group.model}}</strong><span>{{group.versions.length}} 个版本 · {{sizeLabel(groupSize(group.versions))}}</span></div>
+            <div class="folder-name"><strong>{{group.model}}</strong><span>{{folderSubtitle(group)}}</span></div>
             <el-tag v-if="selectable&&selectedVersion(group.versions)" type="primary" effect="plain">已选 v{{selectedVersion(group.versions)?.version}}</el-tag>
             <el-tag v-else-if="selectable" type="info" effect="plain">未选版本</el-tag>
             <el-button class="folder-upload" type="primary" plain size="small" :icon="Plus" :disabled="loading" @click.stop="emit('uploadVersion', group.model)">上传新版本</el-button>
-            <el-button v-if="!selectable" type="danger" plain size="small" :icon="Delete" :disabled="loading" @click.stop="emit('deleteModel', group.model)">删除文件夹</el-button>
+            <el-button v-if="!selectable && !group.versions.length" type="danger" plain size="small" :icon="Delete" :disabled="loading" @click.stop="emit('deleteModel', group.model)">删除文件夹</el-button>
           </div>
         </template>
 
@@ -90,7 +100,7 @@ function sizeLabel(value: number) {
           <div><strong>版本列表</strong><span v-if="selectable">同一模型只能选择一个版本发布</span></div>
           <el-button v-if="selectable" link :disabled="loading" @click="selectLatest(group.versions)">选择最新版本</el-button>
         </div>
-        <el-table :data="group.versions" row-key="manifest_key" class="version-table">
+        <el-table :data="group.versions" row-key="manifest_key" class="version-table" empty-text="该文件夹没有可用版本，只包含残留文件，可整体删除">
           <el-table-column type="expand">
             <template #default="{row}">
               <div class="version-formats">

@@ -18,6 +18,7 @@ export interface ModelArtifact {path:string;target_path:string;size:number;sha25
 export type ModelPlatform='onnx'|'nvidia'|'denglin'
 export interface ModelFormat {id:string;platform:ModelPlatform;hardware_profile?:string;repository_path:string;artifacts:ModelArtifact[]}
 export interface ModelVersion {schema_version:1;formats:ModelFormat[];manifest_key:string;manifest_digest:string;model:string;version:string;created_at:string}
+export interface EmptyModelFolder {model:string;files:number;size:number}
 export interface ModelUploadFile {path:string;size:number;upload_url?:string}
 export interface ModelUploadFormat {id:string;platform:ModelPlatform;hardware_profile?:string;files:ModelUploadFile[]}
 export interface ModelUpload {upload_id?:string;model:string;version:string;formats:ModelUploadFormat[]}

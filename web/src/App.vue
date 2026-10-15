@@ -12,7 +12,7 @@ const initializationDialog=ref<InstanceType<typeof InitializeCenterDialog>>()
 const initializationTask=(c:Center)=>tasks.value.find(t=>t.type==='INITIALIZE_CENTER'&&t.params?.center_id===c.id&&['PENDING','RUNNING'].includes(t.status))
 async function initializationSubmitted(task:Task){tasks.value.unshift(task);await openTask(task);await loadAll()}
 import UserManagement from './UserManagement.vue'
-import type {AlertCredential,BaseImageArchive,Center,CenterOverview,Checkout,ComposeDocument,CurrentModelVersion,GitCredential,HardwareInfo,ModelVersion,OSSCredential,OverviewContainer,OverviewVersion,SoftwareImage,Source,Task,UserRole,Version} from './types'
+import type {AlertCredential,BaseImageArchive,Center,CenterOverview,Checkout,ComposeDocument,CurrentModelVersion,EmptyModelFolder,GitCredential,HardwareInfo,ModelVersion,OSSCredential,OverviewContainer,OverviewVersion,SoftwareImage,Source,Task,UserRole,Version} from './types'
 
 const YamlEditor=defineAsyncComponent(()=>import('./YamlEditor.vue'))
 
@@ -56,7 +56,7 @@ const baseImages=ref<BaseImageArchive[]>([]),baseImagesLoading=ref(false),baseIm
 const baseImageForm=reactive<{center_ids:string[];restart_stack:boolean}>({center_ids:[],restart_stack:false})
 const baseImageFailuresNotified=new Set<string>()
 let baseImagePollTimer:number|undefined
-const models=ref<ModelVersion[]>([]),modelsLoading=ref(false)
+const models=ref<ModelVersion[]>([]),modelsLoading=ref(false),emptyModelFolders=ref<EmptyModelFolder[]>([])
 const overview=ref<CenterOverview[]>([]),overviewLoading=ref(false)
 const activeCenterOverview=ref<CenterOverview|null>(null),centerOverviewLoading=ref(false)
 const centerModelSelections=reactive<Record<string,string>>({})
@@ -138,19 +138,12 @@ const activeComposeCenter=computed(()=>centers.value.find(item=>item.id===compos
 const statusType=(s:string)=>s==='SUCCESS'?'success':s==='FAILED'?'danger':s==='RUNNING'?'primary':'info'
 const centerReleaseStatus=computed(()=>centerReleaseError.value?'FAILED':centerReleaseTask.value?.status||(centerReleaseProgress.value>=100?'SUCCESS':'RUNNING'))
 const centerActionName=(value?:string)=>value==='restart_container'?'重启容器':value==='restart_compose'?'重启 Compose':value==='redeploy_compose'?'重新部署 Compose':value==='stop_compose'?'停止 Compose':value==='remove_all_containers'?'删除全部容器':value||'-'
-const taskTypeName=(value:string)=>value==='RESET_CENTER'?'重置中心':value==='PAUSE_CENTER'?'暂停中心':value==='RESUME_CENTER'?'恢复中心':value==='COMPOSE_PUBLISH'?'Compose 发布':value==='DETECT_CENTER'?'硬件检测':value==='INITIALIZE_CENTER'?'中心初始化':value==='BASE_IMAGE_UPDATE'?'基础镜像更新':value==='MODEL_RELEASE'?'模型发布':value==='MODEL_SYNC'?'模型同步（历史）':value==='DOWNLOAD_SOURCE'?'源码下载':value==='RELEASE_VERSION'?'版本发布':value==='BUILD_IMAGE'?'镜像构建':value==='DEPLOY_STACK'?'服务部署（历史）':value==='CENTER_OPERATION'?'中心操作':value
-const taskTarget=(task:Task)=>task.type==='COMPOSE_PUBLISH'?`${task.params?.module_id} · ${task.params?.center_id}`:task.type==='RELEASE_VERSION'||task.type==='DEPLOY_STACK'?`${task.params?.versions} → ${task.params?.center_name||task.params?.center_id}`:task.type==='BUILD_IMAGE'?`${task.params?.source_name||task.params?.source_id} → ${task.params?.center_name||task.params?.center_id}`:task.type==='BASE_IMAGE_UPDATE'?task.params?.center_name||task.params?.center_id:task.type==='MODEL_RELEASE'?`${task.params?.versions} → ${task.params?.center_name||task.params?.center_id}`:task.type==='MODEL_SYNC'?`${task.params?.model_count||0} 个模型 → ${task.params?.center_name||task.params?.center_id}`:task.type==='DETECT_CENTER'||task.type==='INITIALIZE_CENTER'||task.type==='RESET_CENTER'||task.type==='PAUSE_CENTER'||task.type==='RESUME_CENTER'?task.params?.center_name||task.params?.center_id:task.type==='CENTER_OPERATION'?`${centerActionName(task.params?.action)} · ${task.params?.center_name||task.params?.center_id}`:task.params?.ref||'-'
-const taskVersions=(task:Task)=>(task.params?.versions||'').split('、').filter(Boolean)
-const taskTargetSummary=(task:Task)=>{
-  if(task.type!=='MODEL_RELEASE'&&task.type!=='RELEASE_VERSION'&&task.type!=='DEPLOY_STACK')return taskTarget(task)
-  const versions=taskVersions(task),center=task.params?.center_name||task.params?.center_id||'-'
-  if(versions.length<=1)return `${versions[0]||'-'} → ${center}`
-  return `${task.type==='MODEL_RELEASE'?`${task.params?.model_count||versions.length} 个模型`:`${versions.length} 个版本`} → ${center}`
-}
-const taskTargetDetail=(task:Task)=>{
-  const versions=taskVersions(task)
-  return versions.length>1?versions.map(item=>item.split(':')[0]).join('、'):''
-}
+const taskTypeName=(value:string)=>value==='RESET_CENTER'?'重置中心':value==='PAUSE_CENTER'?'暂停中心':value==='RESUME_CENTER'?'恢复中心':value==='COMPOSE_PUBLISH'?'Compose 发布':value==='DETECT_CENTER'?'硬件检测':value==='INITIALIZE_CENTER'?'中心初始化':value==='BASE_IMAGE_UPDATE'?'基础镜像更新':value==='MODEL_RELEASE'?'模型发布':value==='MODEL_SYNC'?'模型同步（历史）':value==='DOWNLOAD_SOURCE'?'源码下载':value==='RELEASE_VERSION'?'版本发布':value==='BUILD_IMAGE'?'镜像构建':value==='DEPLOY_STACK'?'服务部署（历史）':value==='CENTER_OPERATION'?'中心操作':value==='MODULE_OPERATION'?'模块操作':value==='MODULE_MIGRATION'?'模块迁移':value==='PREPARE_MODULES'?'准备模块文件':value
+const taskTarget=(task:Task)=>task.type==='COMPOSE_PUBLISH'||task.type==='MODULE_OPERATION'?`${task.params?.module_id} · ${task.params?.center_name||task.params?.center_id}`:task.type==='MODULE_MIGRATION'?`${task.params?.action==='rollback'?'迁移回退':'模块迁移'} · ${task.params?.center_name||task.params?.center_id}`:task.type==='RELEASE_VERSION'||task.type==='DEPLOY_STACK'||task.type==='MODEL_RELEASE'?`${task.params?.center_name||task.params?.center_id}${task.params?.versions?`：${task.params?.versions}`:''}`:task.type==='BUILD_IMAGE'?`${task.params?.source_name||task.params?.source_id} → ${task.params?.center_name||task.params?.center_id}`:task.type==='BASE_IMAGE_UPDATE'?task.params?.center_name||task.params?.center_id:task.type==='MODEL_SYNC'?`${task.params?.model_count||0} 个模型 → ${task.params?.center_name||task.params?.center_id}`:task.type==='DETECT_CENTER'||task.type==='INITIALIZE_CENTER'||task.type==='RESET_CENTER'||task.type==='PAUSE_CENTER'||task.type==='RESUME_CENTER'||task.type==='PREPARE_MODULES'?task.params?.center_name||task.params?.center_id:task.type==='CENTER_OPERATION'?`${centerActionName(task.params?.action)} · ${task.params?.center_name||task.params?.center_id}`:task.params?.ref||'-'
+// 任务目标统一显示中心名称；没有中心名称的任务（Compose 发布、源码下载）沿用原文，版本等明细放悬浮提示。
+const taskTargetSummary=(task:Task)=>task.params?.center_name||taskTarget(task)
+const taskLogLine=(task:Task)=>task.error||task.message||'暂无日志'
+const taskLogTooltip=(task:Task)=>taskLogLine(task)+(task.log_count?`（共 ${task.log_count} 条日志，点击行查看完整日志）`:'')
 const fmt=(v?:string)=>v?new Date(v).toLocaleString():'-'
 const formatBytes=(value:number)=>{const units=['B','KiB','MiB','GiB','TiB'];let size=value,index=0;while(size>=1024&&index<units.length-1){size/=1024;index++}return `${size.toFixed(1)} ${units[index]}`}
 
@@ -323,11 +316,16 @@ async function loadModels(){modelsLoading.value=true;try{const data=await http.g
 async function deleteModelFolder(model:string){if(!guardAdminAction())return;
   if(modelsLoading.value)return
   const count=models.value.filter(item=>item.model===model).length
-  try{await ElMessageBox.confirm(`确定删除模型文件夹“${model}”及其中全部 ${count} 个版本和文件？此操作不可恢复。已部署到中心的文件会保留，但仓库版本将无法再次发布。`,'删除模型文件夹',{type:'warning',confirmButtonText:'确认删除',cancelButtonText:'取消'})}catch{return}
+  if(count){ElMessage.warning('该文件夹包含可用版本，不支持在管理端删除');return}
+  const folder=emptyModelFolders.value.find(item=>item.model===model)
+  const detail=folder?`其中仅含 ${folder.files} 个残留文件（${formatBytes(folder.size)}）`:'其中没有可用版本'
+  try{await ElMessageBox.confirm(`确定删除模型文件夹“${model}”？${detail}，删除仅清理残留文件。此操作不可恢复。`,'删除空模型文件夹',{type:'warning',confirmButtonText:'确认删除',cancelButtonText:'取消'})}catch{return}
   modelsLoading.value=true
-  try{await http.delete(`/models/${encodeURIComponent(model)}`);invalidateDeploymentPlan();ElMessage.success('模型文件夹已删除')}catch(e:any){ElMessage.error(e.message)}finally{await loadModels()}
+  try{await http.delete(`/models/${encodeURIComponent(model)}`);ElMessage.success('空模型文件夹已删除')}catch(e:any){ElMessage.error(e.message)}finally{await refreshModelsPage()}
 }
-async function openModels(){section.value='models';if(ossCredential.configured)await loadModels()}
+async function loadEmptyModelFolders(){try{const data=await http.get('/models/empty-folders');emptyModelFolders.value=Array.isArray(data)?data:[]}catch{emptyModelFolders.value=[]}}
+async function refreshModelsPage(){await Promise.all([loadModels(),loadEmptyModelFolders()])}
+async function openModels(){section.value='models';if(ossCredential.configured)await refreshModelsPage()}
 function openModelUpload(model=''){if(!guardAdminAction())return;modelUploadTarget.value=model;modelUploadDialog.value=true}
 function modelSelections(){return models.value.filter(item=>deployForm.model_keys.includes(item.manifest_key)).map(item=>({manifest_key:item.manifest_key,manifest_digest:item.manifest_digest}))}
 function beginCenterRelease(title:string,stage:string){centerReleaseWorkflowID++;centerReleaseTitle.value=title;centerReleaseStage.value=stage;centerReleaseProgress.value=0;centerReleaseMessage.value='正在准备发布…';centerReleaseError.value='';centerReleaseTask.value=null;centerReleaseLogs.value=[];centerReleaseDialog.value=true;return centerReleaseWorkflowID}
@@ -514,7 +512,7 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
             </div>
             <div class="panel recent-task-panel">
               <div class="panel-title"><div><h2>最近任务</h2><p>只保留运行动态摘要，点击任务查看日志。</p></div><el-button type="primary" link @click="selectSection('tasks')">查看全部任务</el-button></div>
-              <el-table :data="recentTasks" @row-click="openTask" empty-text="暂无任务" size="small"><el-table-column label="类型" width="130"><template #default="{row}">{{taskTypeName(row.type)}}</template></el-table-column><el-table-column label="目标" min-width="190"><template #default="{row}"><span class="task-target">{{taskTarget(row)}}</span></template></el-table-column><el-table-column label="状态" width="100"><template #default="{row}"><el-tag :type="statusType(row.status)" size="small">{{row.status}}</el-tag></template></el-table-column><el-table-column label="时间" width="170"><template #default="{row}">{{fmt(row.created_at)}}</template></el-table-column></el-table>
+              <el-table :data="recentTasks" @row-click="openTask" empty-text="暂无任务" size="small"><el-table-column label="类型" width="130"><template #default="{row}">{{taskTypeName(row.type)}}</template></el-table-column><el-table-column label="目标" min-width="190"><template #default="{row}"><el-tooltip :content="taskTarget(row)" placement="top" :show-after="400"><span class="task-target">{{taskTargetSummary(row)}}</span></el-tooltip></template></el-table-column><el-table-column label="状态" width="100"><template #default="{row}"><el-tag :type="statusType(row.status)" size="small">{{row.status}}</el-tag></template></el-table-column><el-table-column label="时间" width="170"><template #default="{row}">{{fmt(row.created_at)}}</template></el-table-column></el-table>
             </div>
           </div>
         </div>
@@ -543,7 +541,7 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
           <div><el-button :icon="Lock" @click="editOSSCredential">配置 OSS</el-button><el-button type="primary" :icon="UploadFilled" :disabled="!ossCredential.configured" @click="openModelUpload()">新建模型</el-button></div>
         </div>
         <el-alert v-if="!ossCredential.configured" title="请先配置 OSS Endpoint、Bucket、访问凭据和模型前缀。" type="warning" :closable="false" show-icon/>
-        <template v-else><ModelCatalog :models="models" :loading="modelsLoading" :selectable="false" @delete-model="deleteModelFolder" @refresh="loadModels" @upload-version="openModelUpload"/></template>
+        <template v-else><ModelCatalog :models="models" :loading="modelsLoading" :selectable="false" :empty-folders="emptyModelFolders" @delete-model="deleteModelFolder" @refresh="refreshModelsPage" @upload-version="openModelUpload"/></template>
       </template>
       <template v-else-if="section==='sources'">
         <div class="toolbar"><div><p>所有同一 Git 服务下的软件仓库共用一套加密访问令牌。</p><el-tag :type="gitCredential.configured?'success':'warning'" effect="plain">{{gitCredential.configured?(gitCredential.base_url?`已配置：${gitCredential.base_url}`:'已配置访问令牌'):'尚未配置访问令牌'}}</el-tag></div><div><el-button :icon="Lock" @click="editGitCredential">配置 Git 令牌</el-button><el-button type="primary" :icon="Plus" @click="editSource()">添加软件仓库</el-button></div></div>
@@ -571,7 +569,7 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
       </template>
 
       <template v-else>
-        <div class="toolbar task-toolbar"><p>已选 {{selectedTasks.length}} 项：{{selectedActiveTasks.length}} 个可停止，{{selectedFinishedTasks.length}} 条记录可删除。</p><div><el-button type="warning" :disabled="!selectedActiveTasks.length||taskActionBusy" @click="stopTasks(selectedActiveTasks)">停止选中任务</el-button><el-button type="danger" :disabled="taskActionBusy" @click="stopTasks([],true)">停止所有任务</el-button><el-button :disabled="!isSuperAdmin||!selectedFinishedTasks.length||taskActionBusy" @click="deleteTasks(selectedFinishedTasks)">删除记录</el-button></div></div><div class="panel"><el-table :data="tasks" row-key="id" @row-click="(row:Task,column:any)=>{if(column?.type!=='selection'&&column?.label!=='操作')openTask(row)}" @selection-change="(rows:Task[])=>selectedTasks=rows" empty-text="暂无任务"><el-table-column type="selection" width="48" :reserve-selection="true"/><el-table-column label="类型" width="190"><template #default="{row}">{{taskTypeName(row.type)}}</template></el-table-column><el-table-column label="目标" min-width="340"><template #default="{row}"><el-tooltip :content="taskTarget(row)" placement="top" :show-after="400"><div class="task-list-target"><span>{{taskTargetSummary(row)}}</span><small v-if="taskTargetDetail(row)">{{taskTargetDetail(row)}}</small></div></el-tooltip></template></el-table-column><el-table-column label="进度" width="180"><template #default="{row}"><el-progress :percentage="Math.round(row.progress||0)"/></template></el-table-column><el-table-column label="状态" width="120"><template #default="{row}"><el-tag :type="statusType(row.status)">{{row.status}}</el-tag></template></el-table-column><el-table-column label="日志" width="100"><template #default="{row}"><el-tag v-if="row.log_count===0" type="info">无日志</el-tag><span v-else>{{row.log_count}} 条</span></template></el-table-column><el-table-column label="创建时间" width="190"><template #default="{row}">{{fmt(row.created_at)}}</template></el-table-column><el-table-column label="操作" width="130" fixed="right"><template #default="{row}"><el-button v-if="isActiveTask(row)" type="warning" link :disabled="taskActionBusy" @click.stop="stopTasks([row])">停止</el-button><el-button v-if="row.status==='FAILED' && row.type!=='COMPOSE_PUBLISH'" type="primary" link :disabled="taskActionBusy" @click.stop="retryTask(row)">重试</el-button><span v-if="!isActiveTask(row)&&row.status!=='FAILED'" class="muted">-</span></template></el-table-column></el-table></div>
+        <div class="toolbar task-toolbar"><p>已选 {{selectedTasks.length}} 项：{{selectedActiveTasks.length}} 个可停止，{{selectedFinishedTasks.length}} 条记录可删除。</p><div><el-button type="warning" :disabled="!selectedActiveTasks.length||taskActionBusy" @click="stopTasks(selectedActiveTasks)">停止选中任务</el-button><el-button type="danger" :disabled="taskActionBusy" @click="stopTasks([],true)">停止所有任务</el-button><el-button :disabled="!isSuperAdmin||!selectedFinishedTasks.length||taskActionBusy" @click="deleteTasks(selectedFinishedTasks)">删除记录</el-button></div></div><div class="panel"><el-table :data="tasks" row-key="id" @row-click="(row:Task,column:any)=>{if(column?.type!=='selection'&&column?.label!=='操作')openTask(row)}" @selection-change="(rows:Task[])=>selectedTasks=rows" empty-text="暂无任务"><el-table-column type="selection" width="48" :reserve-selection="true"/><el-table-column label="类型" width="190"><template #default="{row}">{{taskTypeName(row.type)}}</template></el-table-column><el-table-column label="目标" min-width="150"><template #default="{row}"><el-tooltip :content="taskTarget(row)" placement="top" :show-after="400"><div class="task-list-target"><span>{{taskTargetSummary(row)}}</span></div></el-tooltip></template></el-table-column><el-table-column label="日志" min-width="300"><template #default="{row}"><el-tooltip :content="taskLogTooltip(row)" placement="top" :show-after="400"><span class="task-log-line" :class="{'deploy-error':row.status==='FAILED'}">{{taskLogLine(row)}}</span></el-tooltip></template></el-table-column><el-table-column label="进度" width="180"><template #default="{row}"><el-progress :percentage="Math.round(row.progress||0)"/></template></el-table-column><el-table-column label="状态" width="120"><template #default="{row}"><el-tag :type="statusType(row.status)">{{row.status}}</el-tag></template></el-table-column><el-table-column label="创建时间" width="190"><template #default="{row}">{{fmt(row.created_at)}}</template></el-table-column><el-table-column label="操作" width="130"><template #default="{row}"><el-button v-if="isActiveTask(row)" type="warning" link :disabled="taskActionBusy" @click.stop="stopTasks([row])">停止</el-button><el-button v-if="row.status==='FAILED' && row.type!=='COMPOSE_PUBLISH'" type="primary" link :disabled="taskActionBusy" @click.stop="retryTask(row)">重试</el-button><span v-if="!isActiveTask(row)&&row.status!=='FAILED'" class="muted">-</span></template></el-table-column></el-table></div>
       </template>
     </el-main>
   </el-container>
