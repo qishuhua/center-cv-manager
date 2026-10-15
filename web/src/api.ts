@@ -9,7 +9,7 @@ const http={
   post:<T=any>(url:string,data?:any):Promise<T>=>raw.post(url,data) as any,
   postLong:<T=any>(url:string,data?:any):Promise<T>=>raw.post(url,data,{timeout:0}) as any,
   put:<T=any>(url:string,data?:any):Promise<T>=>raw.put(url,data) as any,
-  delete:<T=any>(url:string):Promise<T>=>raw.delete(url) as any,
+  delete:<T=any>(url:string,data?:any):Promise<T>=>raw.delete(url,data!==undefined?{data}:undefined) as any,
 }
 export default http
 export const eventURL=(id:string)=>`/api/v1/tasks/${id}/events`

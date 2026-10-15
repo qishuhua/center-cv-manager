@@ -8,6 +8,7 @@ export interface Checkout {source_id:string;ref:string;commit:string;path:string
 export interface Task {id:string;type:string;status:string;progress:number;message:string;error?:string;params:Record<string,string>;log_count:number;created_at:string}
 export interface OverviewContainer {id:string;names:string[];image:string;state:string;status:string;source_id?:string;source_name?:string;version?:string;commit?:string}
 export interface OverviewVersion {source_id?:string;source_name:string;version:string;commit?:string;container_count:number}
+export interface SoftwareImage {id:string;source_id:string;source_name:string;ref:string;commit:string;image:string;created_at:number;size:number;in_use:boolean}
 export interface CurrentModelVersion {schema_version:1;model:string;version:string;format_id:string;platform:'onnx'|'nvidia'|'denglin';hardware_profile?:string;manifest_digest:string;target_path:string;artifact_size?:number;pinned:boolean;activated_at:string;healthy:boolean;health_error?:string}
 export interface CenterOverview {center:Center;online:boolean;error?:string;accelerator?:string;accelerator_error?:string;containers:OverviewContainer[];versions:OverviewVersion[];models:CurrentModelVersion[];models_error?:string}
 export interface OSSCredential {endpoint:string;bucket:string;access_key_id:string;access_key_secret?:string;images_prefix:string;models_prefix:string;configured:boolean;updated_at?:string}

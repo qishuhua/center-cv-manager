@@ -92,6 +92,7 @@ func (s *Server) Router() *gin.Engine {
 	api.GET("/centers/:id/modules/:module/compose", s.readModule)
 	api.GET("/centers/:id/compose", s.getCenterCompose)
 	api.GET("/centers/:id/images", s.centerImages)
+	api.GET("/centers/:id/software/images", s.centerSoftwareImages)
 	api.GET("/centers/:id/overview", s.centerOverview)
 	api.GET("/centers/:id/models", s.centerModels)
 	api.GET("/overview", s.overview)
@@ -153,6 +154,8 @@ func (s *Server) Router() *gin.Engine {
 	admin.PUT("/sources/:id", s.saveSource)
 	admin.DELETE("/sources/:id", s.deleteSource)
 	admin.POST("/sources/:id/download", s.download)
+	admin.POST("/centers/:id/software/build", s.buildCenterSoftware)
+	admin.DELETE("/centers/:id/software/images", s.deleteCenterSoftwareImage)
 	admin.POST("/releases/plan", s.releasePlan)
 	admin.POST("/releases", s.release)
 	admin.POST("/tasks/:id/cancel", s.cancelTask)
@@ -1111,6 +1114,10 @@ type deploymentSelection struct {
 	Ref      string `json:"ref"`
 	Commit   string `json:"commit"`
 	Kind     string `json:"kind"`
+	// BuiltImage 表示该选择来自中心上已构建的镜像：跳过"远端 ref 仍指向该
+	// commit"的实时复核（分支前进后旧镜像仍应可发布），镜像存在性由部署
+	// 预检（deploy.Check 按来源标签匹配）把关。
+	BuiltImage bool `json:"built_image"`
 }
 
 func (s *Server) prepareDeploymentItems(ctx context.Context, selections []deploymentSelection) ([]deploy.Item, error) {
@@ -1135,11 +1142,13 @@ func (s *Server) prepareDeploymentItems(ctx context.Context, selections []deploy
 		if err = source.ValidateCommit(commit); err != nil {
 			return nil, fmt.Errorf("%s 的 commit 无效，请刷新版本", src.Name)
 		}
-		verifyCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		err = s.sources.VerifySelection(verifyCtx, src, selection.Ref, selection.Kind, commit)
-		cancel()
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", src.Name, err)
+		if !selection.BuiltImage {
+			verifyCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			err = s.sources.VerifySelection(verifyCtx, src, selection.Ref, selection.Kind, commit)
+			cancel()
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", src.Name, err)
+			}
 		}
 		items = append(items, deploy.Item{
 			SourceID:      src.ID,
