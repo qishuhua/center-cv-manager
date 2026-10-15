@@ -1053,6 +1053,15 @@ func (s *Server) releaseModels(c *gin.Context) {
 		resolvedByCenter[center.ID] = plan.Targets
 	}
 	created := make([]*domain.Task, 0, len(centers))
+	centerLines := make([]string, 0, len(centers))
+	type modelReleaseJob struct {
+		centerID     string
+		centerName   string
+		items        []modelasset.ReleaseItem
+		encoded      string
+		versionsText string
+	}
+	jobs := make([]modelReleaseJob, 0, len(centers))
 	for _, center := range centers {
 		centerID := center.ID
 		resolvedItems := resolvedByCenter[centerID]
@@ -1065,13 +1074,23 @@ func (s *Server) releaseModels(c *gin.Context) {
 			versions = append(versions, item.Model+":"+item.Version+"["+variant+"]@"+item.ManifestDigest[:12])
 		}
 		encodedItems, _ := json.Marshal(resolvedItems)
+		versionsText := strings.Join(versions, "、")
+		jobs = append(jobs, modelReleaseJob{centerID: centerID, centerName: center.Name, items: resolvedItems, encoded: string(encodedItems), versionsText: versionsText})
+		centerLines = append(centerLines, center.Name+"："+versionsText)
+	}
+	// 与统一发布一致：开始/结束向飞书群发送通知（尽力而为，不影响任务）。
+	notifier := newReleaseNotifier(s.alerts, releaseOperator(c), centerLines)
+	for _, job := range jobs {
 		params := map[string]string{
-			"center_id": centerID, "center_name": center.Name,
-			"model_count": strconv.Itoa(len(resolvedItems)), "versions": strings.Join(versions, "、"),
-			"items": string(encodedItems), "restart_stack": strconv.FormatBool(in.RestartStack),
+			"center_id": job.centerID, "center_name": job.centerName,
+			"model_count": strconv.Itoa(len(job.items)), "versions": job.versionsText,
+			"items": job.encoded, "restart_stack": strconv.FormatBool(in.RestartStack),
 		}
+		job := job
 		created = append(created, s.tasks.Submit("MODEL_RELEASE", params, func(ctx context.Context, h *task.Handle) error {
-			return s.runModelRelease(ctx, centerID, resolvedItems, in.RestartStack, h)
+			err := s.runModelRelease(ctx, job.centerID, job.items, in.RestartStack, h)
+			notifier.record(job.centerName, err)
+			return err
 		}))
 	}
 	ok(c, created)
