@@ -1,0 +1,90 @@
+internal/registry/storage.go
+  s_a6df3de9deccd1::t_c155fa4faa1158 1-145
+internal/build/service.go
+  s_a6df3de9deccd1::t_e84872171c9897 320,328-329
+  s_a6df3de9deccd1::t_7b189945a5009e 181
+  s_a6df3de9deccd1::t_812d439a840cb8 13,18-19
+  s_a6df3de9deccd1::t_d09232993d17f4 108-119
+  s_a6df3de9deccd1::t_44ffc1a83d7faa 191-193,209,211,214,226,229
+  s_a6df3de9deccd1::t_987c16c61b1ed2 182-190,194,204-206,208,212-213,215-216,230-308,314-319,321-327,330-336,338-346,350-369
+  s_a6df3de9deccd1::t_6f94aea96945ba 309-313
+internal/sshx/forward_test.go
+  s_a6df3de9deccd1::t_afa76284000368 1-80,82-88,95-126
+  s_a6df3de9deccd1::t_a275d5fd89501a 81
+  s_a6df3de9deccd1::t_3e9b9cb62a21d8 89-94
+internal/registry/pull.go
+  s_a6df3de9deccd1::t_00504add406496 1-10,12-107
+  s_a6df3de9deccd1::t_c2a9bb33469bc1 11
+internal/api/registry.go
+  s_a6df3de9deccd1::t_29a1b95b130099 1-81
+web/src/App.vue
+  s_a6df3de9deccd1::t_f3e260d9aab5bc 50-53
+  s_a6df3de9deccd1::t_54e15c40352e70 243-244
+  s_a6df3de9deccd1::t_0b2e8953e08265 315
+  s_a6df3de9deccd1::t_0c375ea10711bd 554
+  s_a6df3de9deccd1::t_a7a125a024437b 610-625
+  s_a6df3de9deccd1::t_0759e5e8c26a78 316-317
+  s_a6df3de9deccd1::t_241622c5ad9bf6 15
+internal/api/release_registry.go
+  s_a6df3de9deccd1::t_4a418f05d14f8b 1-145
+internal/sshx/forward.go
+  s_a6df3de9deccd1::t_1182157a1d1a50 1-76
+CLAUDE.md
+  s_a6df3de9deccd1::t_a446fd197cba73 100
+  s_a6df3de9deccd1::t_eafbc593b79978 61
+  s_a6df3de9deccd1::t_0d13f1c036e7fc 67
+  s_a6df3de9deccd1::t_6ffa6ba0927975 68
+  s_a6df3de9deccd1::t_31c2318f465e91 9
+internal/domain/models.go
+  s_a6df3de9deccd1::t_61310987ecf4f1 90-109
+compose.yaml
+  s_a6df3de9deccd1::t_48c7ae47195da6 14-16,19-21,29-44
+  s_a6df3de9deccd1::t_657b3a2b02116d 45-47
+  s_a6df3de9deccd1::t_a6223c408c35cb 48
+internal/store/sqlite.go
+  s_a6df3de9deccd1::t_2e09f8dd6dbe0b 363-381
+  s_a6df3de9deccd1::t_57c969abb82bc5 92
+internal/api/server.go
+  s_a6df3de9deccd1::t_69ac941e7d725b 53
+  s_a6df3de9deccd1::t_9d6c67197a8c60 60-61
+  s_a6df3de9deccd1::t_95c1b0c1fc379a 30
+  s_a6df3de9deccd1::t_3cbcd608d897bc 766,776-777
+  s_a6df3de9deccd1::t_24370924ba2fb4 1629-1630
+  s_a6df3de9deccd1::t_ed7ad31c12777b 147-151
+  s_a6df3de9deccd1::t_23cacfaef4f705 778
+cmd/server/main.go
+  s_a6df3de9deccd1::t_c9becbea9883a3 20
+  s_a6df3de9deccd1::t_e63866b03a805f 70,72
+internal/registry/naming.go
+  s_a6df3de9deccd1::t_855adeb6204f50 1-30
+internal/registry/service_test.go
+  s_a6df3de9deccd1::t_e95a521b9d5f8d 60-61,63-65
+  s_a6df3de9deccd1::t_30202e8bcecff0 122
+  s_a6df3de9deccd1::t_400acc8a2a9bd9 1-59,62,66-121,123-125
+internal/registry/service.go
+  s_a6df3de9deccd1::t_6f9a9b00686acb 1-82
+internal/registry/storage_test.go
+  s_a6df3de9deccd1::t_80f8cc330e2498 1-75
+internal/build/service_test.go
+  s_a6df3de9deccd1::t_a8ff0ee41c4d95 26-46
+internal/registry/client.go
+  s_a6df3de9deccd1::t_0b738b80d927bf 1-83
+web/src/types.ts
+  s_a6df3de9deccd1::t_f36ed751cfe79c 16-17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "74811accd157d47c58564cbe6abec20dbed20706",
+  "prompts": {},
+  "sessions": {
+    "s_a6df3de9deccd1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f338f9b0-c54d-46f9-82e1-a7ba0dabe12b",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
