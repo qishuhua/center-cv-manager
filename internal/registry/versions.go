@@ -255,11 +255,11 @@ func VersionsForPlatform(list []SourceVersions, platform string) []SourceVersion
 
 var platformSuffixes = []string{"nvidia", "denglin", "cpu"}
 
-// TagsHaveVersion 判断标签列表是否包含指定本地版本（ref-commit 主体，不区分
-// 平台后缀）：软件发布只认已构建发布到仓库的版本。
-func TagsHaveVersion(tags []string, localTag string) bool {
+// TagsHaveVersion 判断标签列表是否包含指定版本主体（ref-commit12，不含仓库
+// 名与平台后缀）：软件发布只认已构建发布到仓库的版本。
+func TagsHaveVersion(tags []string, version string) bool {
 	for _, tag := range tags {
-		if version, _ := splitTag(tag); version == localTag {
+		if body, _ := splitTag(tag); body == version {
 			return true
 		}
 	}

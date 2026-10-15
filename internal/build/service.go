@@ -110,16 +110,16 @@ func ReleaseVersionBody(ref, commit string) string {
 	return version + "-" + commit
 }
 
-// ReleaseRegistryTag 是镜像仓库内的标签：在 ReleaseImageTag 基础上追加加速卡
-// 平台后缀。同一 commit 的 nvidia/denglin 构建产物不同，共享仓库内必须隔离，
-// 否则后推的平台会覆盖先推的同名标签。中心上的本地标签仍用 ReleaseImageTag
-// （不带平台后缀），与既有发布校验和 Compose 引用保持一致。
-func ReleaseRegistryTag(src domain.Source, ref, commit, accelerator string) string {
-	tag := ReleaseImageTag(src, ref, commit)
+// ReleaseRegistryTag 返回镜像仓库内的标签部分（版本主体 + 平台后缀，如
+// master-2b6d1a220210-nvidia）：不含仓库名与主机名，拼完整引用用
+// registry.Reference(host, repository, tag)。同一 commit 的 nvidia/denglin
+// 构建产物不同，共享仓库内必须以后缀隔离，否则互相覆盖。
+func ReleaseRegistryTag(ref, commit, accelerator string) string {
+	body := ReleaseVersionBody(ref, commit)
 	if accelerator == "" || accelerator == "auto" {
-		return tag
+		return body
 	}
-	return tag + "-" + sanitizeImagePart(accelerator)
+	return body + "-" + sanitizeImagePart(accelerator)
 }
 
 func sanitizeImagePart(value string) string {

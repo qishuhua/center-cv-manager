@@ -1238,7 +1238,8 @@ func (s *Server) prepareDeploymentItems(ctx context.Context, selections []deploy
 		if err != nil {
 			return nil, err
 		}
-		if !registry.TagsHaveVersion(tags, expected) {
+		// TagsHaveVersion 比较的是版本主体（ref-commit12，不带仓库名）。
+		if !registry.TagsHaveVersion(tags, build.ReleaseVersionBody(selection.Ref, commit)) {
 			return nil, fmt.Errorf("%s 的镜像版本 %s 尚未构建发布到镜像仓库，请先在「软件仓库」页构建发布", src.Name, build.ReleaseVersionBody(selection.Ref, commit))
 		}
 		items = append(items, deploy.Item{
@@ -1311,7 +1312,7 @@ func (s *Server) checkUnifiedRelease(ctx context.Context, centerID string, softw
 					continue
 				}
 				repository := registry.RepoPath(src)
-				tag := build.ReleaseRegistryTag(src, item.Ref, item.Commit, platform)
+				tag := build.ReleaseRegistryTag(item.Ref, item.Commit, platform)
 				digest, digestErr := client.ManifestDigest(ctx, repository, tag)
 				if digestErr != nil {
 					softwareReady = false

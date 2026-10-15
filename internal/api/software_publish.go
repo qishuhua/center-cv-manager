@@ -97,15 +97,15 @@ func (s *Server) publishSourceImage(c *gin.Context) {
 		// 仓库里的版本要么完整覆盖所有平台，要么不存在。
 		planned := make([]string, 0, 3)
 		for _, variant := range variants {
-			tag := build.ReleaseRegistryTag(src, ref, commit, variantName(variant))
+			tag := build.ReleaseRegistryTag(ref, commit, variantName(variant))
 			options := build.LocalOptions{
 				ContextDir: checkout.Path, Dockerfile: "auto", RegistryRef: registry.Reference(host, repository, tag),
 				SourceID: sourceID, SourceName: sourceName, SourceRef: ref, Commit: commit, Accelerator: variant,
 			}
 			if variant == "universal" {
 				options.ExtraTags = []string{
-					registry.Reference(host, repository, build.ReleaseRegistryTag(src, ref, commit, "nvidia")),
-					registry.Reference(host, repository, build.ReleaseRegistryTag(src, ref, commit, "denglin")),
+					registry.Reference(host, repository, build.ReleaseRegistryTag(ref, commit, "nvidia")),
+					registry.Reference(host, repository, build.ReleaseRegistryTag(ref, commit, "denglin")),
 				}
 			}
 			h.Message(fmt.Sprintf("阶段 2/3：构建 %s 镜像", build.AcceleratorName(variant)))

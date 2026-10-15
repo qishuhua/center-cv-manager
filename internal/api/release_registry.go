@@ -72,7 +72,7 @@ func (s *Server) prepareRegistrySoftwareRelease(ctx context.Context, centerID st
 			return err
 		}
 		repository := registry.RepoPath(src)
-		tag := build.ReleaseRegistryTag(src, item.Ref, item.Commit, platform)
+		tag := build.ReleaseRegistryTag(item.Ref, item.Commit, platform)
 		digest, err := client.ManifestDigest(ctx, repository, tag)
 		if err != nil {
 			return err
