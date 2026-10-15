@@ -5,14 +5,18 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
 // Client 是 registry v2 HTTP API 的最小客户端。registry 无认证（只绑管理端
-// 回环地址，唯一入口是管理端自己的 SSH 隧道），只需探活与 manifest 查询。
+// 回环地址，唯一入口是管理端自己的 SSH 隧道），只需探活、manifest 查询与
+// 版本清单。
 type Client struct {
 	baseURL string
 	http    *http.Client
+	mu      sync.Mutex
+	cache   map[string]ImageInfo
 }
 
 func NewClient(endpoint string) (*Client, error) {

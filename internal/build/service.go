@@ -238,12 +238,17 @@ type LocalOptions struct {
 	ContextDir  string            `json:"-"`
 	Dockerfile  string            `json:"dockerfile"`
 	RegistryRef string            `json:"registry_ref"`
+	// ExtraTags 是同一次构建额外打的仓库标签：平台无关（universal）变体一次
+	// 构建、nvidia/denglin/cpu 三标签指向同一镜像。
+	ExtraTags   []string          `json:"extra_tags"`
 	NoCache     bool              `json:"no_cache"`
 	BuildArgs   map[string]string `json:"build_args"`
 	SourceID    string            `json:"source_id"`
 	SourceName  string            `json:"source_name"`
 	SourceRef   string            `json:"source_ref"`
 	Commit      string            `json:"commit"`
+	// Accelerator 取 nvidia/denglin/cpu/universal：决定 Dockerfile 变体与
+	// 来源标签；universal 表示平台无关构建。
 	Accelerator string            `json:"accelerator"`
 }
 
@@ -274,36 +279,48 @@ func LocalDockerAvailable() bool {
 	return true
 }
 
-// RunLocal 本地构建镜像、推送镜像仓库，返回推送后的 manifest digest。
+// RunLocal 本地构建镜像、推送镜像仓库，返回推送后的 manifest digest。发布
+// 回退路径使用；多平台原子发布用 BuildLocal + PushRef 组合（全部变体构建
+// 成功后才开始推送）。
 func (s *Service) RunLocal(ctx context.Context, o LocalOptions, r Reporter) (string, error) {
-	if err := ValidateImageTag(o.RegistryRef); err != nil {
+	if err := s.BuildLocal(ctx, o, r); err != nil {
 		return "", err
+	}
+	r.Message("正在推送到镜像仓库")
+	return s.PushRef(ctx, o.RegistryRef, r)
+}
+
+// BuildLocal 在本地 Docker 引擎构建镜像并打上仓库标签，不推送。
+func (s *Service) BuildLocal(ctx context.Context, o LocalOptions, r Reporter) error {
+	if err := ValidateImageTag(o.RegistryRef); err != nil {
+		return err
 	}
 	base, err := filepath.Abs(o.ContextDir)
 	if err != nil {
-		return "", err
+		return err
 	}
 	r.Message("正在连接本地 Docker 引擎")
 	docker, err := LocalDocker(ctx)
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer docker.Close()
 	dockerfileName, err := resolveDockerfile(base, o.Dockerfile, o.Accelerator)
 	if err != nil {
-		return "", err
+		return err
 	}
 	dockerfile := filepath.Clean(filepath.Join(base, dockerfileName))
 	rel, err := filepath.Rel(base, dockerfile)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return "", fmt.Errorf("Dockerfile 必须位于源码目录内")
+		return fmt.Errorf("Dockerfile 必须位于源码目录内")
 	}
 	r.Message("正在本地构建镜像")
 	r.Logf("加速卡类型: %s，使用 %s", AcceleratorName(o.Accelerator), filepath.ToSlash(rel))
-	r.Log("开始构建镜像 " + o.RegistryRef)
+	tags := append([]string{o.RegistryRef}, o.ExtraTags...)
+	r.Log("开始构建镜像 " + strings.Join(tags, "、"))
 	stream, err := archive.TarWithOptions(base, &archive.TarOptions{})
 	if err != nil {
-		return "", fmt.Errorf("创建构建上下文: %w", err)
+		return fmt.Errorf("创建构建上下文: %w", err)
 	}
 	defer stream.Close()
 	args := map[string]*string{}
@@ -312,16 +329,28 @@ func (s *Service) RunLocal(ctx context.Context, o LocalOptions, r Reporter) (str
 		args[k] = &value
 	}
 	labels := map[string]string{LabelSourceID: o.SourceID, LabelSourceName: o.SourceName, LabelSourceRef: o.SourceRef, LabelCommit: o.Commit, "com.center-manager.accelerator": o.Accelerator}
-	resp, err := docker.ImageBuild(ctx, stream, types.ImageBuildOptions{Dockerfile: filepath.ToSlash(rel), Tags: []string{o.RegistryRef}, Remove: true, NoCache: o.NoCache, BuildArgs: args, Labels: labels})
+	resp, err := docker.ImageBuild(ctx, stream, types.ImageBuildOptions{Dockerfile: filepath.ToSlash(rel), Tags: tags, Remove: true, NoCache: o.NoCache, BuildArgs: args, Labels: labels})
 	if err != nil {
-		return "", fmt.Errorf("本地 docker build: %w", err)
+		return fmt.Errorf("本地 docker build: %w", err)
 	}
 	defer resp.Body.Close()
 	if _, err = streamDockerMessages(resp.Body, r); err != nil {
+		return err
+	}
+	return nil
+}
+
+// PushRef 推送本地已有的仓库标签，返回 manifest digest。
+func (s *Service) PushRef(ctx context.Context, ref string, r Reporter) (string, error) {
+	if err := ValidateImageTag(ref); err != nil {
 		return "", err
 	}
-	r.Message("正在推送到镜像仓库")
-	push, err := docker.ImagePush(ctx, o.RegistryRef, image.PushOptions{})
+	docker, err := LocalDocker(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer docker.Close()
+	push, err := docker.ImagePush(ctx, ref, image.PushOptions{})
 	if err != nil {
 		return "", fmt.Errorf("推送镜像仓库: %w", err)
 	}
@@ -331,7 +360,7 @@ func (s *Service) RunLocal(ctx context.Context, o LocalOptions, r Reporter) (str
 	}
 	if digest == "" {
 		// 推送流未携带 aux digest 时回查镜像详情。
-		inspect, _, inspectErr := docker.ImageInspectWithRaw(ctx, o.RegistryRef)
+		inspect, _, inspectErr := docker.ImageInspectWithRaw(ctx, ref)
 		if inspectErr != nil {
 			return "", fmt.Errorf("读取推送结果失败: %w", inspectErr)
 		}
@@ -343,12 +372,31 @@ func (s *Service) RunLocal(ctx context.Context, o LocalOptions, r Reporter) (str
 		}
 	}
 	if digest == "" {
-		return "", fmt.Errorf("镜像 %s 推送后未获得 digest", o.RegistryRef)
+		return "", fmt.Errorf("镜像 %s 推送后未获得 digest", ref)
 	}
-	r.Progress(100)
-	r.Message("构建完成")
-	r.Logf("镜像已推送到仓库: %s（%s）", o.RegistryRef, digest)
+	r.Logf("镜像已推送到仓库: %s（%s）", ref, digest)
 	return digest, nil
+}
+
+// DetectBuildVariants 返回源码需要构建的平台变体：存在 Dockerfile.nvidia /
+// Dockerfile.denglin 时各自成变体（全部构建成功才允许推送，保证版本完整）；
+// 只有通用 Dockerfile 时构建一次（universal），以 nvidia/denglin/cpu 三个
+// 标签发布同一镜像，两类显卡中心都能拉取。
+func DetectBuildVariants(dir string) ([]string, error) {
+	variants := []string{}
+	if existsRegularFile(filepath.Join(dir, "Dockerfile.nvidia")) {
+		variants = append(variants, "nvidia")
+	}
+	if existsRegularFile(filepath.Join(dir, "Dockerfile.denglin")) {
+		variants = append(variants, "denglin")
+	}
+	if len(variants) > 0 {
+		return variants, nil
+	}
+	if existsRegularFile(filepath.Join(dir, "Dockerfile")) {
+		return []string{"universal"}, nil
+	}
+	return nil, fmt.Errorf("源码中没有 Dockerfile、Dockerfile.nvidia 或 Dockerfile.denglin")
 }
 
 // DetectCenterAccelerator 打开到中心的临时连接探测加速卡类型，供镜像仓库
@@ -428,9 +476,11 @@ func resolveDockerfile(base, requested, accelerator string) (string, error) {
 		return "", fmt.Errorf("指定的 Dockerfile 不存在: %s", requested)
 	}
 	candidates := map[string][]string{
-		"nvidia":  {"Dockerfile.nvidia", "Dockerfile"},
-		"denglin": {"Dockerfile.denglin", "Dockerfile"},
-		"cpu":     {"Dockerfile", "Dockerfile.cpu"},
+		"nvidia":     {"Dockerfile.nvidia", "Dockerfile"},
+		"denglin":    {"Dockerfile.denglin", "Dockerfile"},
+		"cpu":        {"Dockerfile", "Dockerfile.cpu"},
+		// universal：源码只有通用 Dockerfile，构建一次、三平台标签发布。
+		"universal": {"Dockerfile", "Dockerfile.cpu"},
 	}[accelerator]
 	for _, candidate := range candidates {
 		if existsRegularFile(filepath.Join(base, candidate)) {
@@ -453,6 +503,8 @@ func AcceleratorName(value string) string {
 		return "登临"
 	case "cpu":
 		return "CPU"
+	case "universal":
+		return "平台无关"
 	default:
 		return "自动"
 	}

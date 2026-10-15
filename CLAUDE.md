@@ -64,7 +64,7 @@ main.go 是唯一装配点：打开 SQLite（`data/manager.db`）→ 加载/创�
   - `centeraction` — 容器/compose 的启停、重启、清理等运维动作。
   - `baseimage` — 阿里云 OSS 基础镜像包目录与中心升级（签名 URL 下载、ETag 缓存判断）。
   - `modelasset` — 模型版本管理：OSS 上传（签名 URL 直传 + 流式代理回退、逐文件 SHA-256）、不可变 Manifest 发布（`schema_version: 1`，按 ONNX/登临/NVIDIA 多格式）与中心工作区 `data/models` 增量同步（签名 URL、ETag、断点续传、扁平符号链接入口）。
-  - `registry` — 共享镜像仓库（registry:3 + OSS S3 兼容后端）：接入地址存 `registry_settings` 表（清空即关闭），`StorageConfig` 把 OSS 凭据渲染成数据卷内 `registry/config.yml`（AK 需七项 oss 权限、`forcepathstyle: false`，registry:2 与 OSS 不兼容勿降级）；发布时按平台本地构建一次推送（manifest digest 查询命中即跳过构建），再经 `sshx.RemoteForward` 反向隧道让中心按 digest 拉取并 retag 成与远端构建同名的本地标签——层流量由 registry 307 到 OSS 签名 URL 直下，不经过管理端。仓库内标签用 `build.ReleaseRegistryTag`（含平台后缀，防 nvidia/denglin 同 tag 互相覆盖）。
+  - `registry` — 共享镜像仓库（registry:3 + OSS S3 兼容后端）：接入地址存 `registry_settings` 表（清空即关闭），`StorageConfig` 把 OSS 凭据渲染成数据卷内 `registry/config.yml`（AK 需七项 oss 权限、`forcepathstyle: false`，registry:2 与 OSS 不兼容勿降级）；`ListVersions` 经 catalog/tags/config blob（307 到 OSS）聚合版本与平台标签、按 digest 缓存。发布时分发经 `sshx.RemoteForward` 反向隧道让中心按 digest 拉取并 retag 成与远端构建同名的本地标签——层流量由 registry 307 到 OSS 签名 URL 直下，不经过管理端。仓库内标签用 `build.ReleaseRegistryTag`（含平台后缀，防 nvidia/denglin 同 tag 互相覆盖）。
 - `internal/sshx` — SSH 连接与 `DockerClient`：核心是把 `http.Transport` 的 DialContext 换成 `sshClient.Dial("unix", socket)`，从而让 Docker SDK 走 SSH 隧道访问远端 docker.sock；`RequestRemoteForward` 基于既有连接申请远端回环端口转发（镜像分发隧道）。改动 Docker/SSH 相关逻辑先看这里。
 - `internal/task` — 异步任务管理器：`Submit(kind, params, executor)` 持久化任务、内存广播事件，API 层通过 SSE（`GET /tasks/:id/events`）推给前端。所有长操作（下载/构建/部署/初始化/升级/迁移/模块操作）都包装成 task，executor 内用 `Handle` 写日志和进度。
 - `internal/store` — modernc.org/sqlite（纯 Go、无 CGO）。
@@ -98,3 +98,4 @@ Vue 3 + TypeScript + Vite + Element Plus。UI 对标 Grafana 暗色风格：`ind
 
 - 配置更新只走 SSH/编辑器修改后重新发布，或重置后重新初始化。已登记中心初始化不更新内置模板；配置文件指纹包括模块目录及只读配置挂载，排除运行数据与发布记录。重置只删除受管 Compose 容器，并要求重新选择软件与模型。
 - 镜像仓库模式（`api/release_registry.go`）是发布准备的优先路径，但不是硬依赖：仓库未配置、探活失败或本地 Docker 引擎不可用时自动回退中心远端构建，任务日志说明原因。中心侧本地镜像名保持 `ReleaseImageTag`（不带平台后缀）不变——分发时 pull-by-digest 后 retag，`deploy.Check` 的标签校验对两条来源通用；共享仓库内的引用必须用带平台后缀的 `ReleaseRegistryTag`。
+- 软件发布两段式：**构建发布**在代码仓库页（`POST /sources/:id/publish`）——本地构建全部平台变体（Dockerfile.nvidia/Dockerfile.denglin 都成功才推送；只有通用 Dockerfile 时一次构建打 nvidia/denglin/cpu 三标签），与中心无关；**切换版本**在中心详情页（`GET /centers/:id/software/registry-versions` 按中心显卡平台过滤、`POST /centers/:id/software/release` 读镜像来源标签重建 deploy.Item 后复用统一发布编排）。中心详情页不再展示 Git 分支；`POST /centers/:id/software/build`（中心远端构建）保留作回退。

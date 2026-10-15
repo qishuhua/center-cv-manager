@@ -12,7 +12,7 @@ const initializationDialog=ref<InstanceType<typeof InitializeCenterDialog>>()
 const initializationTask=(c:Center)=>tasks.value.find(t=>t.type==='INITIALIZE_CENTER'&&t.params?.center_id===c.id&&['PENDING','RUNNING'].includes(t.status))
 async function initializationSubmitted(task:Task){tasks.value.unshift(task);await openTask(task);await loadAll()}
 import UserManagement from './UserManagement.vue'
-import type {AlertCredential,BaseImageArchive,Center,CenterOverview,Checkout,ComposeDocument,CurrentModelVersion,EmptyModelFolder,GitCredential,HardwareInfo,ModelVersion,OSSCredential,OverviewContainer,OverviewVersion,RegistrySettings,RegistryStorage,SoftwareImage,Source,Task,UserRole,Version} from './types'
+import type {AlertCredential,BaseImageArchive,Center,CenterOverview,Checkout,ComposeDocument,CurrentModelVersion,EmptyModelFolder,GitCredential,HardwareInfo,ModelVersion,OSSCredential,OverviewContainer,OverviewVersion,RegistrySettings,RegistrySoftwareVersion,RegistrySourceVersions,RegistryStorage,SoftwareImage,Source,Task,UserRole,Version} from './types'
 
 const YamlEditor=defineAsyncComponent(()=>import('./YamlEditor.vue'))
 
@@ -20,8 +20,7 @@ interface DeployItem {source_id:string;ref:string;commit:string;kind:'branch'|'t
 interface ModelReleasePlan {ready:boolean;error?:string;action:'blocked'|'skip'|'download_and_activate'|'keep_current';download_bytes:number;current:Record<string,{version:string;platform:string;manifest_digest:string}>;targets:ModelVersion[]}
 interface DeploymentPlan {service_mappings?:Record<string,string[]>;center:Center;ready:boolean;build_required:boolean;error?:string;images:Record<string,string>;missing_images:string[];missing_services:string[];model_plan:ModelReleasePlan}
 interface CenterSoftwareRow {key:string;source?:Source;current:OverviewVersion[];gitError?:string}
-interface SoftwareBuildDialog {visible:boolean;row:CenterSoftwareRow|null;selectedKey:string;publishAfter:boolean;loading:boolean}
-interface SoftwarePublishDialog {visible:boolean;row:CenterSoftwareRow|null;images:SoftwareImage[];selectedKey:string;loading:boolean}
+interface SourcePublishDialog {visible:boolean;source:Source|null;selectedKey:string;loading:boolean}
 interface ImageManageDialog {visible:boolean;loading:boolean;images:SoftwareImage[];deleting:string}
 interface CenterModelRow {model:string;current?:CurrentModelVersion;options:ModelVersion[]}
 
@@ -64,8 +63,9 @@ const models=ref<ModelVersion[]>([]),modelsLoading=ref(false),emptyModelFolders=
 const overview=ref<CenterOverview[]>([]),overviewLoading=ref(false)
 const activeCenterOverview=ref<CenterOverview|null>(null),centerOverviewLoading=ref(false)
 const centerModelSelections=reactive<Record<string,string>>({})
-const softwareBuildDialog=reactive<SoftwareBuildDialog>({visible:false,row:null,selectedKey:'',publishAfter:false,loading:false})
-const softwarePublishDialog=reactive<SoftwarePublishDialog>({visible:false,row:null,images:[],selectedKey:'',loading:false})
+const sourcePublishDialog=reactive<SourcePublishDialog>({visible:false,source:null,selectedKey:'',loading:false})
+const centerRegistryVersions=ref<RegistrySourceVersions[]>([]),centerRegistryError=ref('')
+const centerSoftwareSelections=reactive<Record<string,string>>({})
 const imageManageDialog=reactive<ImageManageDialog>({visible:false,loading:false,images:[],deleting:''})
 const centerVersionApplying=ref(''),centerPinBusy=ref('')
 const centerReleaseTask=ref<Task|null>(null),centerReleaseLogs=ref<string[]>([]),centerReleaseTitle=ref(''),centerReleaseStage=ref(''),centerReleaseProgress=ref(0),centerReleaseMessage=ref(''),centerReleaseError=ref('')
@@ -166,6 +166,9 @@ const centerSoftwareRows=computed<CenterSoftwareRow[]>(()=>{
   return rows
 })
 const deployedCenterModels=computed(()=>(activeCenterOverview.value?.models||[]))
+// 镜像仓库版本按 source_id 建索引，中心详情页软件区据此提供可切换版本。
+const centerRegistryBySource=computed(()=>{const map:Record<string,RegistrySourceVersions>={};for(const item of centerRegistryVersions.value)if(item.source_id)map[item.source_id]=item;return map})
+const centerSoftwarePlatform=computed(()=>{const overview=activeCenterOverview.value;const accelerator=overview?.accelerator||overview?.center.detected_accelerator||overview?.center.accelerator||'';return accelerator==='auto'?'':accelerator})
 const centerModelRows=computed<CenterModelRow[]>(()=>{
   const byModel=new Map<string,CenterModelRow>()
   for(const current of deployedCenterModels.value)byModel.set(current.model,{model:current.model,current,options:[]})
@@ -184,10 +187,38 @@ function syncCenterVersionSelections(){
   for(const row of centerModelRows.value){const currentMatch=row.current?row.options.find(item=>item.manifest_digest===row.current!.manifest_digest):undefined;const selected=row.options.find(item=>item.manifest_key===centerModelSelections[row.model]&&centerModelCompatible(item));centerModelSelections[row.model]=currentMatch?.manifest_key||selected?.manifest_key||''}
 }
 async function loadGitVersions(sourceID:string){try{const data=await http.get(`/sources/${sourceID}/versions`);gitVersions[sourceID]=Array.isArray(data)?data:[];delete gitVersionErrors[sourceID]}catch(e:any){gitVersions[sourceID]=[];gitVersionErrors[sourceID]=e.message||'读取 Git 版本失败'}}
+async function loadCenterRegistryVersions(){const centerID=activeCenterOverview.value?.center.id;if(!centerID)return;centerRegistryError.value='';try{const data=await http.get(`/centers/${centerID}/software/registry-versions`);centerRegistryVersions.value=Array.isArray(data)?data:[];syncCenterSoftwareSelections()}catch(e:any){centerRegistryVersions.value=[];centerRegistryError.value=e.message||'读取镜像仓库版本失败'}}
+function syncCenterSoftwareSelections(){
+  for(const row of centerSoftwareRows.value){
+    const available=centerRegistryBySource.value[row.source?.id||'']?.versions||[]
+    const current=row.current[0]
+    const match=current?available.find(item=>item.ref===current.version&&(!current.commit||!item.commit||item.commit===current.commit)):undefined
+    centerSoftwareSelections[row.key]=match?.version||available[0]?.version||''
+  }
+}
+function registryVersionLabel(item:RegistrySoftwareVersion){return `${item.version} · ${item.platforms.map(tag=>tag.platform).join('/')} · ${fmt(item.created_at)}`}
+async function submitCenterSoftwareRelease(row:CenterSoftwareRow){
+  if(!guardAdminAction()||!row.source?.id)return
+  const centerID=activeCenterOverview.value?.center.id
+  const entry=centerRegistryBySource.value[row.source.id]
+  const selected=entry?.versions.find(item=>item.version===centerSoftwareSelections[row.key])
+  const platformTag=selected?.platforms.find(tag=>tag.platform===centerSoftwarePlatform.value||tag.platform==='shared')
+  if(!centerID||!entry||!selected||!platformTag)return
+  const running=row.current.some(item=>item.version===selected.ref&&(!item.commit||item.commit===selected.commit))
+  try{
+    await ElMessageBox.confirm(`将把 ${row.source.name} 切换到 ${selected.version}${running?'（与当前运行版本相同，仍会重建服务）':''}，中心经反向隧道拉取镜像并重建对应服务，服务会短暂中断。是否继续？`,'确认切换版本',{type:'warning',confirmButtonText:'确认切换',cancelButtonText:'取消',closeOnClickModal:false})
+    centerVersionApplying.value='publish'
+    const workflowID=beginCenterRelease(`切换 ${row.source.name}:${selected.version}`,'创建发布任务')
+    const task:Task=await http.post(`/centers/${centerID}/software/release`,{repository:entry.repository,tag:platformTag.tag})
+    const released=await followCenterReleaseTask(task,'切换版本',0,100,workflowID);requireReleaseSuccess(released)
+    centerReleaseProgress.value=100;centerReleaseMessage.value=`${row.source.name} 已切换到 ${selected.version}`;ElMessage.success(centerReleaseMessage.value)
+    await Promise.all([refreshActiveCenterOverview(),loadCenterRegistryVersions()])
+  }catch(e:any){if(e!=='cancel'&&e!=='close'){centerReleaseError.value=e.message||String(e);centerReleaseMessage.value=centerReleaseError.value;ElMessage.error(centerReleaseError.value)}}finally{centerVersionApplying.value=''}
+}
 async function loadCenterVersionOptions(){await Promise.all(sources.value.filter(item=>item.id).map(item=>Promise.all([loadBuildCheckouts(item.id!,true),loadGitVersions(item.id!)])));if(ossCredential.configured)await loadModels();else models.value=[];syncCenterVersionSelections()}
 async function refreshActiveCenterOverview(){if(!activeCenterOverview.value?.center.id)return;centerOverviewLoading.value=true;try{activeCenterOverview.value=await http.get(`/centers/${activeCenterOverview.value.center.id}/overview`);syncCenterVersionSelections()}catch(e:any){ElMessage.error(e.message)}finally{centerOverviewLoading.value=false}}
-async function refreshCenterManagement(){await Promise.all([refreshActiveCenterOverview(),loadCenterVersionOptions()]);syncCenterVersionSelections()}
-async function openCenterOverview(item:CenterOverview){for(const key of Object.keys(centerModelSelections))delete centerModelSelections[key];activeCenterOverview.value=item;centerOverviewDrawer.value=true;await Promise.all([refreshActiveCenterOverview(),loadCenterVersionOptions()]);syncCenterVersionSelections()}
+async function refreshCenterManagement(){await Promise.all([refreshActiveCenterOverview(),loadCenterVersionOptions(),registrySettings.configured?loadCenterRegistryVersions():Promise.resolve()]);syncCenterVersionSelections();syncCenterSoftwareSelections()}
+async function openCenterOverview(item:CenterOverview){for(const key of Object.keys(centerModelSelections))delete centerModelSelections[key];activeCenterOverview.value=item;centerOverviewDrawer.value=true;await Promise.all([refreshActiveCenterOverview(),loadCenterVersionOptions(),registrySettings.configured?loadCenterRegistryVersions():Promise.resolve()]);syncCenterVersionSelections();syncCenterSoftwareSelections()}
 async function openCenterFromCard(center:Center){await openCenterOverview({center,online:false,containers:[],versions:[],models:[]})}
 // 中心网关 Nginx 在中心本机监听 8080，公网端口由防火墙映射，各中心可能不同（console_port）；
 // Grafana 监控与 Kibana 日志页面均经它对外提供。
@@ -391,28 +422,19 @@ async function publishSoftwareToCenter(item:DeployItem,workflowID:number){
   centerReleaseProgress.value=100;centerReleaseMessage.value=`${title}已发布到该中心`;ElMessage.success(centerReleaseMessage.value)
   await Promise.all([refreshActiveCenterOverview(),refreshTasks()])
 }
-async function openSoftwareBuild(row:CenterSoftwareRow){if(!row.source?.id)return;softwareBuildDialog.row=row;softwareBuildDialog.selectedKey='';softwareBuildDialog.publishAfter=false;softwareBuildDialog.visible=true;softwareBuildDialog.loading=true;try{await loadGitVersions(row.source.id)}finally{softwareBuildDialog.loading=false}}
-async function submitSoftwareBuild(){
-  const row=softwareBuildDialog.row,centerID=activeCenterOverview.value?.center.id
-  const selected=(gitVersions[row?.source?.id||'']||[]).find(item=>softwareOptionKey(item)===softwareBuildDialog.selectedKey)
-  if(!row?.source?.id||!selected||!centerID)return
-  const publishAfter=softwareBuildDialog.publishAfter
+async function openSourcePublish(source:Source){if(!guardAdminAction()||!source.id)return;sourcePublishDialog.source=source;sourcePublishDialog.selectedKey='';sourcePublishDialog.visible=true;sourcePublishDialog.loading=true;try{await loadGitVersions(source.id)}finally{sourcePublishDialog.loading=false}}
+async function submitSourcePublish(){
+  const source=sourcePublishDialog.source
+  const selected=(gitVersions[source?.id||'']||[]).find(item=>softwareOptionKey(item)===sourcePublishDialog.selectedKey)
+  if(!source?.id||!selected)return
   try{
-    await ElMessageBox.confirm(`将在中心 ${activeCenterOverview.value!.center.name} 上构建 ${row.source.name} 的${selected.kind==='tag'?'标签':'分支'} ${selected.ref}（${selected.commit.slice(0,8)}）镜像。是否继续？`,'确认构建镜像',{type:'primary',confirmButtonText:'确认构建',cancelButtonText:'取消',closeOnClickModal:false})
-    softwareBuildDialog.visible=false
-    centerVersionApplying.value='build'
-    const workflowID=beginCenterRelease(`构建 ${row.source.name}:${selected.ref}`,'创建构建任务')
-    const task:Task=await http.post(`/centers/${centerID}/software/build`,{source_id:row.source.id,ref:selected.ref,commit:selected.commit,kind:selected.kind})
-    const built=await followCenterReleaseTask(task,'构建镜像',0,publishAfter?55:100,workflowID);requireReleaseSuccess(built)
-    if(publishAfter){
-      await publishSoftwareToCenter({source_id:row.source.id,ref:selected.ref,commit:selected.commit,kind:selected.kind},workflowID)
-    }else{
-      centerReleaseProgress.value=100;centerReleaseMessage.value=`镜像构建完成：${row.source.name}:${selected.ref}`;ElMessage.success(centerReleaseMessage.value)
-      await refreshActiveCenterOverview()
-    }
-  }catch(e:any){if(e!=='cancel'&&e!=='close'){centerReleaseError.value=e.message||String(e);centerReleaseMessage.value=centerReleaseError.value;ElMessage.error(centerReleaseError.value)}}finally{centerVersionApplying.value=''}
+    await ElMessageBox.confirm(`将在管理端本地构建 ${source.name} 的${selected.kind==='tag'?'标签':'分支'} ${selected.ref}（${selected.commit.slice(0,8)}）全部平台镜像并发布到镜像仓库。存在 Dockerfile.nvidia / Dockerfile.denglin 时两个变体都构建成功才入库；只有通用 Dockerfile 时一次构建、各平台中心通用。是否继续？`,'确认构建发布',{type:'primary',confirmButtonText:'开始构建',cancelButtonText:'取消',closeOnClickModal:false})
+    sourcePublishDialog.visible=false
+    const task:Task=await http.post(`/sources/${source.id}/publish`,{ref:selected.ref,commit:selected.commit,kind:selected.kind})
+    ElMessage.success('构建发布任务已创建')
+    await openTask(task)
+  }catch(e:any){if(e!=='cancel'&&e!=='close')ElMessage.error(e.message)}
 }
-async function loadSoftwareImages(){const centerID=activeCenterOverview.value?.center.id;if(!centerID||!softwarePublishDialog.row?.source?.id)return;softwarePublishDialog.loading=true;try{const data=await http.get(`/centers/${centerID}/software/images`);const list=Array.isArray(data)?data:[];softwarePublishDialog.images=list.filter((item:SoftwareImage)=>item.source_id===softwarePublishDialog.row?.source?.id).sort((a:SoftwareImage,b:SoftwareImage)=>(b.created_at||0)-(a.created_at||0))}catch(e:any){softwarePublishDialog.images=[];ElMessage.error(e.message)}finally{softwarePublishDialog.loading=false}}
 const fmtImageTime=(ts:number)=>ts?new Date(ts*1000).toLocaleString():'-'
 async function loadCenterSoftwareImages(){const centerID=activeCenterOverview.value?.center.id;if(!centerID)return;imageManageDialog.loading=true;try{const data=await http.get(`/centers/${centerID}/software/images`);imageManageDialog.images=Array.isArray(data)?data:[]}catch(e:any){imageManageDialog.images=[];ElMessage.error(e.message)}finally{imageManageDialog.loading=false}}
 function openImageManage(){imageManageDialog.images=[];imageManageDialog.visible=true;loadCenterSoftwareImages()}
@@ -426,19 +448,6 @@ async function removeCenterSoftwareImage(img:SoftwareImage){
     ElMessage.success('镜像已删除')
     await loadCenterSoftwareImages()
   }catch(e:any){if(e!=='cancel'&&e!=='close')ElMessage.error(e.message)}finally{imageManageDialog.deleting=''}
-}
-async function openSoftwarePublish(row:CenterSoftwareRow){if(!row.source?.id)return;softwarePublishDialog.row=row;softwarePublishDialog.selectedKey='';softwarePublishDialog.images=[];softwarePublishDialog.visible=true;await loadSoftwareImages()}
-async function submitSoftwarePublish(){
-  const row=softwarePublishDialog.row
-  const selected=softwarePublishDialog.images.find(item=>softwareImageKey(item)===softwarePublishDialog.selectedKey)
-  if(!row?.source?.id||!selected)return
-  try{
-    await ElMessageBox.confirm(`将把 ${row.source.name} 发布为 ${selected.ref}（${selected.commit?.slice(0,8)||'-'}），随后更新 Compose 并重建对应服务，服务会短暂中断。是否继续？`,'确认发布版本',{type:'warning',confirmButtonText:'确认发布',cancelButtonText:'取消',closeOnClickModal:false})
-    softwarePublishDialog.visible=false
-    centerVersionApplying.value='publish'
-    const workflowID=beginCenterRelease(`发布 ${row.source.name}:${selected.ref}`,'统一发布预检')
-    await publishSoftwareToCenter({source_id:row.source.id,ref:selected.ref,commit:selected.commit,kind:'branch'},workflowID)
-  }catch(e:any){if(e!=='cancel'&&e!=='close'){centerReleaseError.value=e.message||String(e);centerReleaseMessage.value=centerReleaseError.value;ElMessage.error(centerReleaseError.value)}}finally{centerVersionApplying.value=''}
 }
 async function toggleCenterModelPin(){if(!guardAdminAction())return;const centerID=activeCenterOverview.value?.center.id,pinned=centerModelSetPinned.value;if(!centerID)return;try{if(pinned)await ElMessageBox.confirm('解绑后才能新增、删除或切换任一模型版本，确定整体解绑？','解绑模型版本组',{type:'warning',confirmButtonText:'确认解绑',cancelButtonText:'取消'});else await ElMessageBox.confirm(`将固定当前 ${deployedCenterModels.value.length} 个模型组成的版本快照。固定后任何模型调整都必须先整体解绑，是否继续？`,'固定模型版本组',{type:'warning',confirmButtonText:'固定当前版本组',cancelButtonText:'取消'});centerPinBusy.value='model-set';await http.put(`/centers/${centerID}/models/pin`,{pinned:!pinned});ElMessage.success(pinned?'模型版本组已解绑':'当前模型版本组已固定');await refreshActiveCenterOverview()}catch(e:any){if(e!=='cancel'&&e!=='close')ElMessage.error(e.message)}finally{centerPinBusy.value=''}}
 async function loadBuildCheckouts(sourceID:string,silent=false){try{const data=await http.get(`/sources/${sourceID}/checkouts`);buildCheckouts[sourceID]=Array.isArray(data)?data:[]}catch(e:any){buildCheckouts[sourceID]=[];if(!silent)ElMessage.error(e.message)}}
@@ -552,7 +561,7 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
       </template>
       <template v-else-if="section==='sources'">
         <div class="toolbar"><div><p>所有同一 Git 服务下的软件仓库共用一套加密访问令牌。</p><el-tag :type="gitCredential.configured?'success':'warning'" effect="plain">{{gitCredential.configured?(gitCredential.base_url?`已配置：${gitCredential.base_url}`:'已配置访问令牌'):'尚未配置访问令牌'}}</el-tag>&nbsp;<el-tag :type="registrySettings.configured?'success':'info'" effect="plain">{{registrySettings.configured?(registrySettings.endpoint||'镜像仓库已配置'):'镜像仓库未启用'}}</el-tag></div><div><el-button :icon="Lock" @click="editRegistry">配置镜像仓库</el-button><el-button :icon="Lock" @click="editGitCredential">配置 Git 令牌</el-button><el-button type="primary" :icon="Plus" @click="editSource()">添加软件仓库</el-button></div></div>
-        <div class="panel"><el-table :data="sources" empty-text="暂无软件仓库"><el-table-column prop="name" label="软件" width="180"/><el-table-column prop="repository" label="Git 仓库" min-width="260"><template #default="{row}"><code>{{row.repository}}</code></template></el-table-column><el-table-column prop="description" label="说明"/><el-table-column label="操作" width="160"><template #default="{row}"><el-button @click="editSource(row)">编辑</el-button><el-button type="danger" link @click="removeSource(row)">删除</el-button></template></el-table-column></el-table></div>
+        <div class="panel"><el-table :data="sources" empty-text="暂无软件仓库"><el-table-column prop="name" label="软件" width="180"/><el-table-column prop="repository" label="Git 仓库" min-width="260"><template #default="{row}"><code>{{row.repository}}</code></template></el-table-column><el-table-column prop="description" label="说明"/><el-table-column label="操作" width="230"><template #default="{row}"><el-button @click="editSource(row)">编辑</el-button><el-button v-if="isAdmin" type="primary" link @click="openSourcePublish(row)">构建发布</el-button><el-button type="danger" link @click="removeSource(row)">删除</el-button></template></el-table-column></el-table></div>
       </template>
 
       <template v-else-if="section==='releases'">
@@ -660,11 +669,18 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
         </template>
         <ModuleManager v-if="activeCenterOverview.center.deployment?.status!=='reset'" :key="activeCenterOverview.center.id" :center="activeCenterOverview.center" :active="centerOverviewDrawer" :admin="isAdmin" @task="openTask" @changed="refreshCenterManagement" @legacy-edit="(file:string)=>openCompose(activeCenterOverview!.center,file)"/>
         <section class="detail-section">
-          <div class="detail-section-title"><div><h3>软件版本</h3><p>同时显示该中心当前运行版本；构建从 Git 远端版本创建镜像，发布从中心已构建镜像中选择。</p></div><el-button v-if="isAdmin" :icon="Delete" @click="openImageManage">管理镜像</el-button></div>
+          <div class="detail-section-title"><div><h3>软件版本</h3><p>可切换版本来自镜像仓库并按本机显卡平台（{{acceleratorName(centerSoftwarePlatform||'auto')}}）过滤；切换后中心经反向隧道拉取镜像并重建服务。新版本在「软件仓库」页构建发布。</p></div><el-button v-if="isAdmin" :icon="Delete" @click="openImageManage">管理镜像</el-button></div>
+          <el-alert v-if="centerRegistryError" :title="centerRegistryError" type="warning" :closable="false" show-icon/>
           <el-table :data="centerSoftwareRows" class="center-version-table" empty-text="尚未配置软件仓库，且中心没有可识别的已部署软件">
-            <el-table-column label="软件" min-width="170"><template #default="{row}"><strong>{{row.source?.name||row.current[0]?.source_name}}</strong><small v-if="row.gitError" class="table-subtitle deploy-error">Git：{{row.gitError}}</small><small v-else-if="row.source" class="table-subtitle">Git {{(gitVersions[row.source.id!]||[]).length}} 个版本</small><small v-else class="table-subtitle">仅在中心检测到，软件仓库已被移除或未配置</small></template></el-table-column>
+            <el-table-column label="软件" min-width="170"><template #default="{row}"><strong>{{row.source?.name||row.current[0]?.source_name}}</strong><small v-if="row.source&&centerRegistryBySource[row.source.id!]?.versions.length" class="table-subtitle">镜像仓库 {{centerRegistryBySource[row.source.id!].versions.length}} 个版本</small><small v-else-if="row.source" class="table-subtitle">镜像仓库暂无该软件版本</small><small v-else class="table-subtitle">仅在中心检测到，软件仓库已被移除或未配置</small></template></el-table-column>
             <el-table-column label="中心已部署" min-width="210"><template #default="{row}"><template v-if="row.current.length"><div v-for="item in row.current" :key="`${item.version}-${item.commit}`" class="deployed-version"><el-tag size="small" type="success">已部署</el-tag><span>{{item.version}}</span><small>{{item.commit?.slice(0,8)||'-'}} · {{item.container_count}} 个容器</small></div></template><span v-else class="muted">尚未部署</span></template></el-table-column>
-            <el-table-column v-if="isAdmin" label="操作" width="150" fixed="right"><template #default="{row}"><template v-if="row.source"><el-button type="primary" link @click="openSoftwareBuild(row)">构建</el-button><el-button type="warning" link @click="openSoftwarePublish(row)">发布</el-button></template><span v-else class="muted">-</span></template></el-table-column>
+            <el-table-column label="镜像仓库可切换版本" min-width="360"><template #default="{row}">
+              <el-select v-if="row.source&&centerRegistryBySource[row.source.id!]?.versions.length" v-model="centerSoftwareSelections[row.key]" filterable placeholder="选择镜像仓库版本" style="width:100%">
+                <el-option v-for="item in centerRegistryBySource[row.source!.id!].versions" :key="item.version" :label="registryVersionLabel(item)" :value="item.version"/>
+              </el-select>
+              <span v-else class="muted">-</span>
+            </template></el-table-column>
+            <el-table-column v-if="isAdmin" label="操作" width="120" fixed="right"><template #default="{row}"><el-button v-if="row.source&&centerRegistryBySource[row.source.id!]?.versions.length" type="primary" link :loading="centerVersionApplying==='publish'" @click="submitCenterSoftwareRelease(row)">切换并运行</el-button><span v-else class="muted">-</span></template></el-table-column>
           </el-table>
         </section>
         <section class="detail-section">
@@ -692,22 +708,12 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
     </div>
     <template #footer><el-button @click="centerReleaseDialog=false">{{centerReleaseStatus==='RUNNING'?'转到后台':'关闭'}}</el-button></template>
   </el-dialog>
-  <el-dialog v-model="softwareBuildDialog.visible" :title="`构建 ${softwareBuildDialog.row?.source?.name||''} 镜像`" width="min(620px,94vw)" append-to-body :close-on-click-modal="false">
-    <el-select v-model="softwareBuildDialog.selectedKey" :loading="softwareBuildDialog.loading" filterable placeholder="选择远端分支或标签" style="width:100%">
-      <el-option v-for="item in gitVersions[softwareBuildDialog.row?.source?.id||'']||[]" :key="softwareOptionKey(item)" :label="`${item.kind==='tag'?'标签':'分支'} · ${item.ref} · ${item.commit.slice(0,8)}`" :value="softwareOptionKey(item)"/>
+  <el-dialog v-model="sourcePublishDialog.visible" :title="`构建发布 ${sourcePublishDialog.source?.name||''}`" width="min(660px,94vw)" append-to-body :close-on-click-modal="false">
+    <el-alert title="在管理端本地构建全部平台镜像并推送到镜像仓库：存在 Dockerfile.nvidia / Dockerfile.denglin 时两个变体都构建成功才入库；只有通用 Dockerfile 时一次构建、各平台中心通用。构建与中心无关，完成后各中心在详情页选择版本拉取运行。" type="info" :closable="false" style="margin-bottom:18px"/>
+    <el-select v-model="sourcePublishDialog.selectedKey" :loading="sourcePublishDialog.loading" filterable placeholder="选择远端分支或标签" style="width:100%">
+      <el-option v-for="item in gitVersions[sourcePublishDialog.source?.id||'']||[]" :key="softwareOptionKey(item)" :label="`${item.kind==='tag'?'标签':'分支'} · ${item.ref} · ${item.commit.slice(0,8)}`" :value="softwareOptionKey(item)"/>
     </el-select>
-    <div class="deploy-plan-action"><el-checkbox v-model="softwareBuildDialog.publishAfter">构建完成后立即发布到该中心</el-checkbox><span>发布会更新 Compose 并重建对应服务，服务短暂中断。</span></div>
-    <template #footer><el-button @click="softwareBuildDialog.visible=false">取消</el-button><el-button type="primary" :disabled="!softwareBuildDialog.selectedKey" :loading="centerVersionApplying==='build'" @click="submitSoftwareBuild">开始构建</el-button></template>
-  </el-dialog>
-  <el-dialog v-model="softwarePublishDialog.visible" :title="`发布 ${softwarePublishDialog.row?.source?.name||''} 版本`" width="min(680px,94vw)" append-to-body :close-on-click-modal="false">
-    <div class="deploy-plan-action" style="margin-top:0;margin-bottom:14px"><el-select v-model="softwarePublishDialog.selectedKey" :loading="softwarePublishDialog.loading" filterable placeholder="选择该中心已构建的镜像版本" style="flex:1" @visible-change="(visible:boolean)=>visible&&loadSoftwareImages()">
-        <el-option v-for="item in softwarePublishDialog.images" :key="softwareImageKey(item)" :label="`${item.ref} · ${item.commit?.slice(0,8)||'-'} · 构建 ${fmtImageTime(item.created_at)}`" :value="softwareImageKey(item)"/>
-      </el-select><el-button :icon="Refresh" :disabled="softwarePublishDialog.loading" @click="loadSoftwareImages">刷新</el-button></div>
-    <template v-for="item in softwarePublishDialog.images.filter(img=>softwareImageKey(img)===softwarePublishDialog.selectedKey)" :key="softwareImageKey(item)">
-      <div class="form-tip">镜像：<code>{{item.image}}</code> · 构建于 {{fmtImageTime(item.created_at)}} · 大小 {{formatBytes(item.size)}}<template v-if="softwarePublishDialog.row?.current.some(current=>current.version===item.ref&&(!current.commit||!item.commit||current.commit===item.commit))"> · <b>当前运行版本</b></template></div>
-    </template>
-    <el-alert v-if="!softwarePublishDialog.loading&&!softwarePublishDialog.images.length" title="该中心尚无此软件的构建镜像，请先构建。" type="info" :closable="false" show-icon/>
-    <template #footer><el-button @click="softwarePublishDialog.visible=false">取消</el-button><el-button type="primary" :disabled="!softwarePublishDialog.selectedKey" :loading="centerVersionApplying==='publish'" @click="submitSoftwarePublish">发布</el-button></template>
+    <template #footer><el-button @click="sourcePublishDialog.visible=false">取消</el-button><el-button type="primary" :disabled="!sourcePublishDialog.selectedKey" @click="submitSourcePublish">开始构建发布</el-button></template>
   </el-dialog>
   <el-dialog v-model="imageManageDialog.visible" title="管理业务镜像" width="min(1120px,96vw)" append-to-body :close-on-click-modal="false">
     <div class="panel-title"><div><h3>中心已构建镜像</h3><p>仅显示本管理端构建的业务镜像，按构建时间倒序；被容器使用的镜像不可删除。</p></div><el-button :icon="Refresh" :disabled="imageManageDialog.loading" @click="loadCenterSoftwareImages">刷新</el-button></div>
