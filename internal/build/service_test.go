@@ -23,6 +23,27 @@ func TestReleaseImageTagLocksCommit(t *testing.T) {
 	}
 }
 
+func TestReleaseRegistryTagIsolatesPlatform(t *testing.T) {
+	source := domain.Source{Name: "Center CV Service"}
+	commit := "a1b2c3d4e5f678901234"
+	// 同一 commit 不同平台必须得到不同标签，防止共享仓库内互相覆盖。
+	nvidia := ReleaseRegistryTag(source, "release/1.2.0", commit, "nvidia")
+	denglin := ReleaseRegistryTag(source, "release/1.2.0", commit, "denglin")
+	if nvidia != "center-cv-service:release-1.2.0-a1b2c3d4e5f6-nvidia" {
+		t.Fatalf("unexpected nvidia registry tag: %q", nvidia)
+	}
+	if denglin != "center-cv-service:release-1.2.0-a1b2c3d4e5f6-denglin" {
+		t.Fatalf("unexpected denglin registry tag: %q", denglin)
+	}
+	if nvidia == denglin {
+		t.Fatal("不同平台的仓库标签必须不同")
+	}
+	// 平台未解析时不追加后缀（等价于本地标签，仅用于兼容旧数据）。
+	if got := ReleaseRegistryTag(source, "release/1.2.0", commit, ""); got != ReleaseImageTag(source, "release/1.2.0", commit) {
+		t.Fatalf("无平台后缀的标签应与本地标签一致: %q", got)
+	}
+}
+
 func TestResolveDockerfileByAccelerator(t *testing.T) {
 	dir := t.TempDir()
 	for _, name := range []string{"Dockerfile.nvidia", "Dockerfile.denglin"} {

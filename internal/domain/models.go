@@ -87,6 +87,26 @@ type OSSCredential struct {
 	UpdatedAt       time.Time `json:"updated_at,omitempty"`
 }
 
+// RegistrySettings 是共享镜像仓库（registry:3 + OSS S3 兼容后端）的接入地址。
+// 访问凭据不入库：registry 容器自身的 config.yml 由管理端渲染到数据目录。
+type RegistrySettings struct {
+	Endpoint   string    `json:"endpoint"`
+	Configured bool      `json:"configured"`
+	UpdatedAt  time.Time `json:"updated_at,omitempty"`
+}
+
+// RegistryStorage 是渲染 registry config.yml（OSS S3 存储后端）所需的字段。
+type RegistryStorage struct {
+	Region          string    `json:"region"`
+	RegionEndpoint  string    `json:"region_endpoint"`
+	Bucket          string    `json:"bucket"`
+	AccessKeyID     string    `json:"access_key_id"`
+	AccessKeySecret string    `json:"access_key_secret,omitempty"`
+	RootDirectory   string    `json:"root_directory"`
+	Exists          bool      `json:"exists"`
+	UpdatedAt       time.Time `json:"updated_at,omitempty"`
+}
+
 type Source struct {
 	ID          string    `json:"id"`
 	Name        string    `json:"name"`

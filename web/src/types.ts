@@ -13,6 +13,8 @@ export interface CurrentModelVersion {schema_version:1;model:string;version:stri
 export interface CenterOverview {center:Center;online:boolean;error?:string;accelerator?:string;accelerator_error?:string;containers:OverviewContainer[];versions:OverviewVersion[];models:CurrentModelVersion[];models_error?:string}
 export interface OSSCredential {endpoint:string;bucket:string;access_key_id:string;access_key_secret?:string;images_prefix:string;models_prefix:string;configured:boolean;updated_at?:string}
 export interface AlertCredential {feishu_webhook?:string;configured:boolean;updated_at?:string}
+export interface RegistrySettings {endpoint:string;configured:boolean;updated_at?:string}
+export interface RegistryStorage {region:string;region_endpoint:string;bucket:string;access_key_id:string;access_key_secret?:string;root_directory:string;exists:boolean;updated_at?:string}
 export interface BaseImageArchive {key:string;name:string;platform:'common'|'nvidia'|'denglin';size:number;etag:string;last_modified:string}
 export interface ModelArtifact {path:string;target_path:string;size:number;sha256:string}
 export type ModelPlatform='onnx'|'nvidia'|'denglin'

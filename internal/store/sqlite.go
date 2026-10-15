@@ -89,6 +89,7 @@ func Open(path string) (*Store, error) {
 		`CREATE TABLE IF NOT EXISTS git_credentials (id INTEGER PRIMARY KEY CHECK(id=1),base_url TEXT NOT NULL,username TEXT NOT NULL,token TEXT NOT NULL,updated_at TEXT NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS oss_credentials (id INTEGER PRIMARY KEY CHECK(id=1),endpoint TEXT NOT NULL,bucket TEXT NOT NULL,access_key_id TEXT NOT NULL,access_key_secret TEXT NOT NULL,images_prefix TEXT NOT NULL DEFAULT 'center-images/',models_prefix TEXT NOT NULL DEFAULT 'center-models/',updated_at TEXT NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS alert_credentials (id INTEGER PRIMARY KEY CHECK(id=1),feishu_webhook TEXT NOT NULL,updated_at TEXT NOT NULL)`,
+		`CREATE TABLE IF NOT EXISTS registry_settings (id INTEGER PRIMARY KEY CHECK(id=1),endpoint TEXT NOT NULL DEFAULT '',updated_at TEXT NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY,applied_at TEXT NOT NULL)`,
 		`CREATE TABLE IF NOT EXISTS checkouts (source_id TEXT NOT NULL,ref TEXT NOT NULL,commit_hash TEXT NOT NULL,path TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(source_id,ref),FOREIGN KEY(source_id) REFERENCES sources(id) ON DELETE CASCADE)`,
 		`CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY,type TEXT NOT NULL,status TEXT NOT NULL,progress REAL NOT NULL,message TEXT NOT NULL DEFAULT '',error TEXT NOT NULL DEFAULT '',params TEXT NOT NULL DEFAULT '{}',created_at TEXT NOT NULL,started_at TEXT,finished_at TEXT)`,
@@ -356,6 +357,25 @@ func (s *Store) GetAlertCredential() (domain.AlertCredential, error) {
 
 func (s *Store) SaveAlertCredential(value domain.AlertCredential) error {
 	_, err := s.db.Exec(`INSERT INTO alert_credentials(id,feishu_webhook,updated_at) VALUES(1,?,?) ON CONFLICT(id) DO UPDATE SET feishu_webhook=excluded.feishu_webhook,updated_at=excluded.updated_at`, value.FeishuWebhook, value.UpdatedAt)
+	return err
+}
+
+func (s *Store) GetRegistrySettings() (domain.RegistrySettings, error) {
+	var v domain.RegistrySettings
+	var updatedAt sqliteTime
+	err := s.db.QueryRow(`SELECT endpoint,updated_at FROM registry_settings WHERE id=1`).Scan(&v.Endpoint, &updatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.RegistrySettings{Endpoint: "http://127.0.0.1:5000"}, nil
+	}
+	if err == nil {
+		v.Configured = v.Endpoint != ""
+		v.UpdatedAt = updatedAt.Time
+	}
+	return v, err
+}
+
+func (s *Store) SaveRegistrySettings(v domain.RegistrySettings) error {
+	_, err := s.db.Exec(`INSERT INTO registry_settings(id,endpoint,updated_at) VALUES(1,?,?) ON CONFLICT(id) DO UPDATE SET endpoint=excluded.endpoint,updated_at=excluded.updated_at`, v.Endpoint, v.UpdatedAt)
 	return err
 }
 

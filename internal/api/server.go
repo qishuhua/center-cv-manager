@@ -27,6 +27,7 @@ import (
 	"center-cv-manager/internal/modelasset"
 	"center-cv-manager/internal/modular"
 	"center-cv-manager/internal/provision"
+	"center-cv-manager/internal/registry"
 	"center-cv-manager/internal/source"
 	"center-cv-manager/internal/sshx"
 	"center-cv-manager/internal/store"
@@ -49,14 +50,15 @@ type Server struct {
 	baseImages       *baseimage.Service
 	models           *modelasset.Service
 	alerts           *alerting.Service
+	registries       *registry.Service
 	store            *store.Store
 	tasks            *task.Manager
 	sourceRoot       string
 	static           fs.FS
 }
 
-func New(authManager *auth.Manager, centers *center.Service, centerActions *centeraction.Service, sources *source.Service, builds *build.Service, deployments *deploy.Service, provisioning *provision.Service, baseImages *baseimage.Service, models *modelasset.Service, alerts *alerting.Service, st *store.Store, tasks *task.Manager, sourceRoot string, static fs.FS) *Server {
-	return &Server{auth: authManager, centers: centers, centerActions: centerActions, sources: sources, builds: builds, deployments: deployments, provisioning: provisioning, baseImages: baseImages, models: models, alerts: alerts, store: st, tasks: tasks, sourceRoot: sourceRoot, static: static}
+func New(authManager *auth.Manager, centers *center.Service, centerActions *centeraction.Service, sources *source.Service, builds *build.Service, deployments *deploy.Service, provisioning *provision.Service, baseImages *baseimage.Service, models *modelasset.Service, alerts *alerting.Service, registries *registry.Service, st *store.Store, tasks *task.Manager, sourceRoot string, static fs.FS) *Server {
+	return &Server{auth: authManager, centers: centers, centerActions: centerActions, sources: sources, builds: builds, deployments: deployments, provisioning: provisioning, baseImages: baseImages, models: models, alerts: alerts, registries: registries, store: st, tasks: tasks, sourceRoot: sourceRoot, static: static}
 }
 
 type envelope struct {
@@ -142,6 +144,11 @@ func (s *Server) Router() *gin.Engine {
 	admin.PUT("/git-credential", s.saveGitCredential)
 	admin.GET("/oss-credential", s.getOSSCredential)
 	admin.PUT("/oss-credential", s.saveOSSCredential)
+	admin.GET("/registry", s.getRegistrySettings)
+	admin.PUT("/registry", s.saveRegistrySettings)
+	admin.GET("/registry/storage", s.getRegistryStorage)
+	admin.PUT("/registry/storage", s.saveRegistryStorage)
+	admin.POST("/registry/test", s.testRegistry)
 	admin.GET("/alert-credential", s.getAlertCredential)
 	admin.PUT("/alert-credential", s.saveAlertCredential)
 	admin.POST("/base-images/upgrade", s.upgradeBaseImages)
@@ -756,7 +763,7 @@ func (s *Server) saveGitCredential(c *gin.Context) {
 
 // settingsStatus 返回各凭据的配置状态布尔值，供查看用户渲染页面提示，不暴露凭据内容。
 func (s *Server) settingsStatus(c *gin.Context) {
-	out := map[string]bool{"git_configured": false, "oss_configured": false, "alert_configured": false}
+	out := map[string]bool{"git_configured": false, "oss_configured": false, "alert_configured": false, "registry_configured": false}
 	if v, err := s.sources.Credential(); err == nil {
 		out["git_configured"] = v.Configured
 	}
@@ -765,6 +772,9 @@ func (s *Server) settingsStatus(c *gin.Context) {
 	}
 	if v, err := s.alerts.Credential(); err == nil {
 		out["alert_configured"] = v.Configured
+	}
+	if v, err := s.registries.Settings(); err == nil {
+		out["registry_configured"] = v.Configured
 	}
 	ok(c, out)
 }
@@ -1616,6 +1626,8 @@ func (s *Server) prepareSoftwareRelease(ctx context.Context, centerID string, it
 		r.Log("阶段 2/4：目标中心已存在全部精确版本镜像，无需准备源码")
 		r.Log("阶段 3/4：跳过镜像构建")
 		r.Progress(65)
+	} else if s.registryReleaseEnabled(ctx, r) {
+		return s.prepareRegistrySoftwareRelease(ctx, centerID, missing, r)
 	} else {
 		for index, item := range missing {
 			src, err := s.sources.Get(item.SourceID)

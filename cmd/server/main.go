@@ -17,6 +17,7 @@ import (
 	"center-cv-manager/internal/deploy"
 	"center-cv-manager/internal/modelasset"
 	"center-cv-manager/internal/provision"
+	"center-cv-manager/internal/registry"
 	"center-cv-manager/internal/secret"
 	"center-cv-manager/internal/source"
 	"center-cv-manager/internal/store"
@@ -66,8 +67,9 @@ func main() {
 	provisioning := provision.New(centers, alerts)
 	baseImages := baseimage.New(st, cipher, centers)
 	models := modelasset.New(st, cipher, centers)
+	registries := registry.New(st, filepath.Join(abs, "registry", "config.yml"))
 	static := os.DirFS(*webDir)
-	server := api.New(authManager, centers, centerActions, sources, builds, deployments, provisioning, baseImages, models, alerts, st, tasks, filepath.Join(abs, "sources"), static)
+	server := api.New(authManager, centers, centerActions, sources, builds, deployments, provisioning, baseImages, models, alerts, registries, st, tasks, filepath.Join(abs, "sources"), static)
 	fmt.Printf("中心数字化管理平台 listening on http://%s\n", *listen)
 	if e = server.Router().Run(*listen); e != nil {
 		log.Fatal(e)

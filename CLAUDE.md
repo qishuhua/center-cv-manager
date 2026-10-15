@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Center CV Manager：运行在开发机上的中心服务器集中管理服务。Go (Gin) 后端 + Vue 3 (Element Plus) 前端。核心链路：登记中心服务器 SSH 信息 → 在开发机本地缓存 Git 源码（`data/sources`）→ 通过 SSH Unix Socket 转发直连远端 Docker Engine API 完成构建/部署。远端不装 Agent、不落源码副本。
 
-生产形态是单一 Docker 镜像（不生成 EXE）：多阶段构建把前端产物、部署模板与 Linux 后端分别放入 `/app/web`、`/app/templates`，运行时从文件系统读取（不再 go:embed），以非 root 用户运行。
+生产形态是单一 Docker 镜像（不生成 EXE）：多阶段构建把前端产物、部署模板与 Linux 后端分别放入 `/app/web`、`/app/templates`，运行时从文件系统读取（不再 go:embed），以非 root 用户运行。compose 另带一个 registry sidecar（`network_mode: service:center-cv-manager`，统一经 127.0.0.1:5000 访问，OSS S3 兼容层存储、本地无状态）并给管理端挂载 `/var/run/docker.sock` 供本地构建使用。
 
 ## 常用命令
 
@@ -58,13 +58,14 @@ main.go 是唯一装配点：打开 SQLite（`data/manager.db`）→ 加载/创�
 - 各业务包（均以 service 为入口）：
   - `center` — 中心服务器 CRUD、SSH/Docker 连通性测试、host key 指纹管理；其他包通过它解析 Center 配置。
   - `source` — Git 仓库登记、ls-remote 查版本；发布选择锁定 commit，仅在需要构建时自动准备 checkout 到本地 `sources/` 目录，并校验分支漂移。
-  - `build` — 用 Docker SDK 调远端 Build API，构建上下文从本地 checkout 生成 tar 流经 SSH 隧道推送。
+  - `build` — 用 Docker SDK 调远端 Build API，构建上下文从本地 checkout 生成 tar 流经 SSH 隧道推送；`RunLocal` 在管理端本地 Docker 引擎构建并推送镜像仓库（`LocalDocker` 经 FromEnv/挂载 sock 获得引擎）。两条路径产物都打 source/commit/accelerator 标签。
   - `deploy` — 部署计划（Check）与执行（Run）：比对远端镜像（要求镜像带匹配 source/commit 的构建标签，防止同名旧镜像蒙混过关），只修改原始 YAML 中匹配服务的镜像及版本标签（不回写 `compose config` 展开结果）。重启范围只限本次发布涉及的服务：legacy 中心 `up -d --force-recreate --no-deps` 只重建映射到的服务（中间件、网关、监控不动——`--force-recreate` 会连带重建依赖，必须配 `--no-deps`）；模块化中心只跑有映射服务的模块、整模块 `up -d --force-recreate --no-deps`。`Run` 返回实际重建的服务名，供发布后核验收窄范围。
   - `provision` — 中心初始化与模块管理：`PrepareModuleFiles`（只写配置不启容器）、按 中间件 → 日志 → 业务 → 网关 → 监控 顺序启动、`ResumeModules`（缺模型/业务镜像时停在等待状态，由初始化任务续跑剩余模块）、模块 Compose/module.env 读取保存（revision 并发控制 + 目标机备份历史 + 保存前捕获已发布基线）、Compose 整体发布与发布状态（`compose_publish.go`，指纹记录在目标机 `.center-manager/published/`）、legacy 同目录多 Compose 文件识别（`compose_files.go`）与迁移（`migration.go`，只读预检 + 执行 + 回退）。
   - `centeraction` — 容器/compose 的启停、重启、清理等运维动作。
   - `baseimage` — 阿里云 OSS 基础镜像包目录与中心升级（签名 URL 下载、ETag 缓存判断）。
   - `modelasset` — 模型版本管理：OSS 上传（签名 URL 直传 + 流式代理回退、逐文件 SHA-256）、不可变 Manifest 发布（`schema_version: 1`，按 ONNX/登临/NVIDIA 多格式）与中心工作区 `data/models` 增量同步（签名 URL、ETag、断点续传、扁平符号链接入口）。
-- `internal/sshx` — SSH 连接与 `DockerClient`：核心是把 `http.Transport` 的 DialContext 换成 `sshClient.Dial("unix", socket)`，从而让 Docker SDK 走 SSH 隧道访问远端 docker.sock。改动 Docker/SSH 相关逻辑先看这里。
+  - `registry` — 共享镜像仓库（registry:3 + OSS S3 兼容后端）：接入地址存 `registry_settings` 表（清空即关闭），`StorageConfig` 把 OSS 凭据渲染成数据卷内 `registry/config.yml`（AK 需七项 oss 权限、`forcepathstyle: false`，registry:2 与 OSS 不兼容勿降级）；发布时按平台本地构建一次推送（manifest digest 查询命中即跳过构建），再经 `sshx.RemoteForward` 反向隧道让中心按 digest 拉取并 retag 成与远端构建同名的本地标签——层流量由 registry 307 到 OSS 签名 URL 直下，不经过管理端。仓库内标签用 `build.ReleaseRegistryTag`（含平台后缀，防 nvidia/denglin 同 tag 互相覆盖）。
+- `internal/sshx` — SSH 连接与 `DockerClient`：核心是把 `http.Transport` 的 DialContext 换成 `sshClient.Dial("unix", socket)`，从而让 Docker SDK 走 SSH 隧道访问远端 docker.sock；`RequestRemoteForward` 基于既有连接申请远端回环端口转发（镜像分发隧道）。改动 Docker/SSH 相关逻辑先看这里。
 - `internal/task` — 异步任务管理器：`Submit(kind, params, executor)` 持久化任务、内存广播事件，API 层通过 SSE（`GET /tasks/:id/events`）推给前端。所有长操作（下载/构建/部署/初始化/升级/迁移/模块操作）都包装成 task，executor 内用 `Handle` 写日志和进度。
 - `internal/store` — modernc.org/sqlite（纯 Go、无 CGO）。
 - `internal/secret` — AES-256-GCM 凭据加密，密钥 `data/master.key`。
@@ -96,3 +97,4 @@ Vue 3 + TypeScript + Vite + Element Plus。UI 对标 Grafana 暗色风格：`ind
 - 首次登录 admin/admin（bcrypt 存储，12 小时 Cookie Session），支持跳过强制改密。仅管理员可授予权限、发布软件/模型、执行重启等变更操作；普通用户只读，新增路由时按 `requireAdmin()` 分组归类。`auth.json` 必须与 `master.key` 一起备份。
 
 - 配置更新只走 SSH/编辑器修改后重新发布，或重置后重新初始化。已登记中心初始化不更新内置模板；配置文件指纹包括模块目录及只读配置挂载，排除运行数据与发布记录。重置只删除受管 Compose 容器，并要求重新选择软件与模型。
+- 镜像仓库模式（`api/release_registry.go`）是发布准备的优先路径，但不是硬依赖：仓库未配置、探活失败或本地 Docker 引擎不可用时自动回退中心远端构建，任务日志说明原因。中心侧本地镜像名保持 `ReleaseImageTag`（不带平台后缀）不变——分发时 pull-by-digest 后 retag，`deploy.Check` 的标签校验对两条来源通用；共享仓库内的引用必须用带平台后缀的 `ReleaseRegistryTag`。
