@@ -221,3 +221,31 @@ func TestIncorrectModelsPrefixIsMigratedOnlyOnce(t *testing.T) {
 		t.Fatalf("completed migration must not overwrite a later explicit setting: %#v", credential)
 	}
 }
+
+func TestRegistrySettingsAcceptsScriptTimestamps(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "registry.db")
+	st, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err = st.SaveRegistrySettings(domain.RegistrySettings{Endpoint: "http://127.0.0.1:5000", Configured: true, UpdatedAt: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	// Simulate script/manual ISO timestamps (T-separated, no zone) - once caused scan errors.
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec(`UPDATE registry_settings SET updated_at='2026-10-15T18:10:44.044570' WHERE id=1`); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	loaded, err := st.GetRegistrySettings()
+	if err != nil {
+		t.Fatalf("�����ű�д���ʱ��ʧ��: %v", err)
+	}
+	if !loaded.Configured || loaded.Endpoint != "http://127.0.0.1:5000" {
+		t.Fatalf("loaded = %+v", loaded)
+	}
+}
