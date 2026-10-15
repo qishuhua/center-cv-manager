@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -68,7 +69,14 @@ func main() {
 	baseImages := baseimage.New(st, cipher, centers)
 	models := modelasset.New(st, cipher, centers)
 	registries := registry.New(st, filepath.Join(abs, "registry", "config.yml"))
-	static := os.DirFS(*webDir)
+	// 前端由 web 容器（nginx）提供时 API 不携带静态文件；目录缺失仅提供 API，
+	// make dev 直跑时仍可直接服务 web/dist。
+	static := fs.FS(nil)
+	if info, statErr := os.Stat(*webDir); statErr == nil && info.IsDir() {
+		static = os.DirFS(*webDir)
+	} else {
+		log.Printf("前端静态目录 %s 不存在，仅提供 API（compose 形态前端由 web 容器提供）", *webDir)
+	}
 	server := api.New(authManager, centers, centerActions, sources, builds, deployments, provisioning, baseImages, models, alerts, registries, st, tasks, filepath.Join(abs, "sources"), static)
 	fmt.Printf("中心数字化管理平台 listening on http://%s\n", *listen)
 	if e = server.Router().Run(*listen); e != nil {

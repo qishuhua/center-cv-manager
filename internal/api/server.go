@@ -193,9 +193,12 @@ func (s *Server) Router() *gin.Engine {
 				c.Status(404)
 				return
 			}
-			// Revalidate the SPA entry after deployments; hashed assets remain versioned.
+			// Revalidate the SPA entry after deployments; hashed assets are
+			// immutable and safe to cache aggressively.
 			if path == "/index.html" || !fs.ValidPath(strings.TrimPrefix(path, "/")) || strings.HasPrefix(strings.TrimSpace(string(data)), "<!doctype html>") {
 				c.Header("Cache-Control", "no-store")
+			} else if strings.HasPrefix(path, "/assets/") {
+				c.Header("Cache-Control", "public, max-age=31536000, immutable")
 			}
 			ctype := http.DetectContentType(data)
 			if filepath.Ext(path) == ".js" {
