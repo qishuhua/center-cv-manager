@@ -61,25 +61,13 @@ func (s *Service) ResetCenter(ctx context.Context, id string, r Reporter) error 
 				projects[m.Project] = true
 			}
 		} else {
-			files, e := s.ListComposeFiles(ctx, id)
-			if e != nil {
-				return e
+			// Compose files (and their env files) may already have been deleted.
+			// Docker keeps the original configuration paths on existing containers.
+			projects, err = legacyResetProjects(root, path.Base(compose), containers)
+			if err != nil {
+				return err
 			}
-			for _, m := range files {
-				raw, e := runSSH(ctx, remote.SSH, modular.Command(m)+" config", "")
-				if e != nil {
-					return e
-				}
-				cfg, e := modular.Parse(raw)
-				if e != nil {
-					return e
-				}
-				project, e := inferComposeProject(cfg, containers)
-				if e != nil {
-					return e
-				}
-				projects[project] = true
-			}
+			r.Logf("根据容器 Compose 路径标签识别到 %d 个受管项目", len(projects))
 		}
 		managed := managedResetContainers(containers, projects)
 		// Protect actual mounted volume storage and any model mount, including
@@ -158,6 +146,40 @@ func (s *Service) ResetCenter(ctx context.Context, id string, r Reporter) error 
 		r.Message("重置完成，等待用户重新初始化；镜像、数据卷及模型文件已保留")
 		return nil
 	})
+}
+
+// Require every container in a selected project to have matching provenance;
+// a project name alone is not evidence that it belongs to this deployment.
+func legacyResetProjects(root, primary string, containers []types.Container) (map[string]bool, error) {
+	projects := map[string]bool{}
+	owned := map[string]bool{}
+	for _, c := range containers {
+		project := c.Labels["com.docker.compose.project"]
+		if project == "" {
+			continue
+		}
+		files := strings.Split(c.Labels["com.docker.compose.project.config_files"], ",")
+		matches := true
+		for _, file := range files {
+			file = strings.TrimSpace(file)
+			if !path.IsAbs(file) || path.Dir(file) != root || (path.Base(file) != primary && !composeFilename.MatchString(path.Base(file))) {
+				matches = false
+			}
+		}
+		if !matches && c.Labels["com.docker.compose.project.working_dir"] == root {
+			return nil, fmt.Errorf("容器 %s 位于部署目录但 Compose 配置路径标签缺失或不匹配，无法安全重置", c.ID)
+		}
+		owned[c.ID] = matches
+		if matches {
+			projects[project] = true
+		}
+	}
+	for _, c := range containers {
+		if projects[c.Labels["com.docker.compose.project"]] && !owned[c.ID] {
+			return nil, fmt.Errorf("Compose 项目 %s 包含部署目录外或来源不明的容器 %s，拒绝重置", c.Labels["com.docker.compose.project"], c.ID)
+		}
+	}
+	return projects, nil
 }
 
 func validateResetRoot(root string) error {
