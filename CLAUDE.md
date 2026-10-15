@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目简介
 
-Center CV Manager：运行在开发机上的中心服务器集中管理服务。Go (Gin) 后端 + Vue 3 (Element Plus) 前端。核心链路：登记中心服务器 SSH 信息 → 在开发机本地缓存 Git 源码（`data/sources`）→ 通过 SSH Unix Socket 转发直连远端 Docker Engine API 完成构建/部署。远端不装 Agent、不落源码副本。
+Center CV Manager：运行在开发机上的中心服务器集中管理服务。Go (Gin) 后端 + Vue 3 (Element Plus) 前端。核心链路：登记中心服务器 SSH 信息 → 在开发机本地缓存 Git 源码（`data/sources`）并本地构建镜像推送到镜像仓库 → 发布时经 SSH 隧道让中心从仓库按 digest 拉取镜像、通过 SSH Unix Socket 转发直连远端 Docker Engine API 完成部署。远端不装 Agent、不落源码副本、不执行构建。
 
 生产形态为 compose 三容器（不生成 EXE）：`center-cv-manager-web`（nginx：SPA 静态 + `/api` 反代到 `center-cv-manager-api:8099`，入口 `0.0.0.0:8099`）+ `center-cv-manager-api`（Go API，非 root 用户，挂载宿主 `/var/run/docker.sock` 供本地构建；模板运行时从文件系统读取，不再 go:embed）+ `center-cv-registry` sidecar（`network_mode: service:center-cv-manager-api`，统一经 `127.0.0.1:5000` 访问，OSS S3 兼容层存储、本地无状态）。单 Dockerfile 双 target（`web`/`api`），go-builder 只 `COPY cmd/ internal/`——前端改动不触发 Go 重编，反之亦然；前端发布只重建 web 容器，不打断后端运行中的任务。nginx 反代四个必须维持的配置（`web/nginx.conf`）：WebSocket 升级头（SSH 终端）、SSE 不缓冲（任务事件流）、`client_max_body_size 0`（模型上传代理回退）、24h 读写超时（长会话）。`make dev` 直跑时后端仍直接服务 `web/dist`（目录缺失则仅提供 API）。
 
@@ -58,7 +58,7 @@ main.go 是唯一装配点：打开 SQLite（`data/manager.db`）→ 加载/创�
 - 各业务包（均以 service 为入口）：
   - `center` — 中心服务器 CRUD、SSH/Docker 连通性测试、host key 指纹管理；其他包通过它解析 Center 配置。
   - `source` — Git 仓库登记、ls-remote 查版本；发布选择锁定 commit，仅在需要构建时自动准备 checkout 到本地 `sources/` 目录，并校验分支漂移。
-  - `build` — 用 Docker SDK 调远端 Build API，构建上下文从本地 checkout 生成 tar 流经 SSH 隧道推送；`RunLocal` 在管理端本地 Docker 引擎构建并推送镜像仓库（`LocalDocker` 经 FromEnv/挂载 sock 获得引擎）。两条路径产物都打 source/commit/accelerator 标签。
+  - `build` — 本地镜像构建与推送（`BuildLocal`/`PushRef`，`LocalDocker` 经 FromEnv/挂载 sock 获得宿主引擎；双平台变体检测 `DetectBuildVariants`）；平台探测 `DetectCenterAccelerator` 经临时 SSH 连接读取中心 GPU 运行时。产物打 source/commit/accelerator 标签。
   - `deploy` — 部署计划（Check）与执行（Run）：比对远端镜像（要求镜像带匹配 source/commit 的构建标签，防止同名旧镜像蒙混过关），只修改原始 YAML 中匹配服务的镜像及版本标签（不回写 `compose config` 展开结果）。重启范围只限本次发布涉及的服务：legacy 中心 `up -d --force-recreate --no-deps` 只重建映射到的服务（中间件、网关、监控不动——`--force-recreate` 会连带重建依赖，必须配 `--no-deps`）；模块化中心只跑有映射服务的模块、整模块 `up -d --force-recreate --no-deps`。`Run` 返回实际重建的服务名，供发布后核验收窄范围。
   - `provision` — 中心初始化与模块管理：`PrepareModuleFiles`（只写配置不启容器）、按 中间件 → 日志 → 业务 → 网关 → 监控 顺序启动、`ResumeModules`（缺模型/业务镜像时停在等待状态，由初始化任务续跑剩余模块）、模块 Compose/module.env 读取保存（revision 并发控制 + 目标机备份历史 + 保存前捕获已发布基线）、Compose 整体发布与发布状态（`compose_publish.go`，指纹记录在目标机 `.center-manager/published/`）、legacy 同目录多 Compose 文件识别（`compose_files.go`）与迁移（`migration.go`，只读预检 + 执行 + 回退）。
   - `centeraction` — 容器/compose 的启停、重启、清理等运维动作。
@@ -97,5 +97,4 @@ Vue 3 + TypeScript + Vite + Element Plus。UI 对标 Grafana 暗色风格：`ind
 - 首次登录 admin/admin（bcrypt 存储，12 小时 Cookie Session），支持跳过强制改密。仅管理员可授予权限、发布软件/模型、执行重启等变更操作；普通用户只读，新增路由时按 `requireAdmin()` 分组归类。`auth.json` 必须与 `master.key` 一起备份。
 
 - 配置更新只走 SSH/编辑器修改后重新发布，或重置后重新初始化。已登记中心初始化不更新内置模板；配置文件指纹包括模块目录及只读配置挂载，排除运行数据与发布记录。重置只删除受管 Compose 容器，并要求重新选择软件与模型。
-- 镜像仓库模式（`api/release_registry.go`）是发布准备的优先路径，但不是硬依赖：仓库未配置、探活失败或本地 Docker 引擎不可用时自动回退中心远端构建，任务日志说明原因。中心侧本地镜像名保持 `ReleaseImageTag`（不带平台后缀）不变——分发时 pull-by-digest 后 retag，`deploy.Check` 的标签校验对两条来源通用；共享仓库内的引用必须用带平台后缀的 `ReleaseRegistryTag`。
-- 软件发布两段式：**构建发布**在代码仓库页（`POST /sources/:id/publish`）——本地构建全部平台变体（Dockerfile.nvidia/Dockerfile.denglin 都成功才推送；只有通用 Dockerfile 时一次构建打 nvidia/denglin/cpu 三标签），与中心无关；**切换版本**在中心详情页（`GET /centers/:id/software/registry-versions` 按中心显卡平台过滤、`POST /centers/:id/software/release` 读镜像来源标签重建 deploy.Item 后复用统一发布编排）。中心详情页不再展示 Git 分支；`POST /centers/:id/software/build`（中心远端构建）保留作回退。
+- 软件发布硬依赖镜像仓库，源码不再发送到中心构建（中心远端构建路径已删除，`build` 包只保留本地构建/推送与平台探测）。两段式：**构建发布**在代码仓库页（`POST /sources/:id/publish`）——本地构建全部平台变体（Dockerfile.nvidia/Dockerfile.denglin 都成功才推送；只有通用 Dockerfile 时一次构建打 nvidia/denglin/cpu 三标签）；**发布**只查仓库已有版本——中心详情页（`GET /centers/:id/software/registry-versions` 按显卡平台过滤、`POST /centers/:id/software/release`）与统一发布页（`GET /registry/versions` 全量清单）都从镜像版本选择，`prepareDeploymentItems` 校验版本已入库、`checkUnifiedRelease` 逐中心校验平台标签存在，发布编排只按 digest 分发不构建。中心侧本地镜像名保持 `ReleaseImageTag`（不带平台后缀）——分发时 pull-by-digest 后 retag，`deploy.Check` 的标签校验口径不变；共享仓库内的引用必须用带平台后缀的 `ReleaseRegistryTag`。

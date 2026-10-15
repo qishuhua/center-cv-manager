@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"center-cv-manager/internal/build"
 	"center-cv-manager/internal/deploy"
 	"center-cv-manager/internal/modelasset"
 	"center-cv-manager/internal/task"
@@ -91,22 +90,9 @@ func (s *Server) retryTask(c *gin.Context) {
 			return s.runModelRelease(ctx, p["center_id"], items, p["restart_stack"] == "true", h)
 		}
 	case "BUILD_IMAGE":
-		checkout, err := s.store.GetCheckout(p["source_id"], p["ref"])
-		if err != nil {
-			s.storeError(c, err)
-			return
-		}
-		var args map[string]string
-		if p["build_args"] == "" {
-			fail(c, 400, fmt.Errorf("旧任务未保存完整构建参数，请在镜像构建中重新提交"))
-			return
-		}
-		if err := json.Unmarshal([]byte(p["build_args"]), &args); err != nil {
-			fail(c, 400, err)
-			return
-		}
-		options := build.Options{CenterID: p["center_id"], ContextDir: checkout.Path, Dockerfile: p["dockerfile"], ImageTag: p["image_tag"], NoCache: p["no_cache"] == "true", BuildArgs: args, SourceID: p["source_id"], SourceName: p["source_name"], SourceRef: p["ref"], Commit: checkout.Commit}
-		run = func(ctx context.Context, h *task.Handle) error { return s.builds.Run(ctx, options, h) }
+		// 中心远端构建已随镜像仓库发布模式下线：源码不再发送到中心。
+		fail(c, 400, fmt.Errorf("中心构建任务已下线，请在「软件仓库」页构建发布到镜像仓库后重新发布"))
+		return
 	case "DEPLOY_STACK":
 		var items []deploy.Item
 		if json.Unmarshal([]byte(p["items"]), &items) != nil || len(items) == 0 {

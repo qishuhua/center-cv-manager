@@ -34,19 +34,6 @@ type Service struct{ centers CenterResolver }
 
 func New(centers CenterResolver) *Service { return &Service{centers: centers} }
 
-type Options struct {
-	CenterID   string            `json:"center_id"`
-	ContextDir string            `json:"-"`
-	Dockerfile string            `json:"dockerfile"`
-	ImageTag   string            `json:"image_tag"`
-	NoCache    bool              `json:"no_cache"`
-	BuildArgs  map[string]string `json:"build_args"`
-	SourceID   string            `json:"source_id"`
-	SourceName string            `json:"source_name"`
-	SourceRef  string            `json:"source_ref"`
-	Commit     string            `json:"commit"`
-}
-
 var tagPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._/:@-]{0,255}$`)
 var invalidImagePart = regexp.MustCompile(`[^a-z0-9._-]+`)
 
@@ -120,71 +107,6 @@ func ReleaseRegistryTag(src domain.Source, ref, commit, accelerator string) stri
 func sanitizeImagePart(value string) string {
 	value = invalidImagePart.ReplaceAllString(strings.ToLower(strings.TrimSpace(value)), "-")
 	return strings.Trim(value, ".-_")
-}
-
-func (s *Service) Run(ctx context.Context, o Options, r Reporter) error {
-	if err := ValidateImageTag(o.ImageTag); err != nil {
-		return err
-	}
-	base, err := filepath.Abs(o.ContextDir)
-	if err != nil {
-		return err
-	}
-	cfg, socket, center, err := s.centers.Connection(o.CenterID)
-	if err != nil {
-		return err
-	}
-	r.Message("正在连接中心服务器")
-	r.Logf("连接中心 %s (%s:%d)", center.Name, center.Host, center.Port)
-	remote, fp, err := sshx.NewDocker(cfg, socket)
-	if err != nil {
-		return err
-	}
-	defer remote.Close()
-	if err = s.centers.RememberHostKey(center, fp); err != nil {
-		return err
-	}
-	accelerator, err := ResolveAccelerator(ctx, remote, center)
-	if err != nil {
-		return err
-	}
-	dockerfileName, err := resolveDockerfile(base, o.Dockerfile, accelerator)
-	if err != nil {
-		return err
-	}
-	dockerfile := filepath.Clean(filepath.Join(base, dockerfileName))
-	rel, err := filepath.Rel(base, dockerfile)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return fmt.Errorf("Dockerfile 必须位于源码目录内")
-	}
-	r.Progress(10)
-	r.Message("正在流式传输源码并构建")
-	r.Log("SSH 主机指纹: " + fp)
-	r.Logf("加速卡类型: %s，使用 %s", AcceleratorName(accelerator), filepath.ToSlash(rel))
-	r.Log("开始构建镜像 " + o.ImageTag)
-	stream, err := archive.TarWithOptions(base, &archive.TarOptions{})
-	if err != nil {
-		return fmt.Errorf("创建构建上下文: %w", err)
-	}
-	defer stream.Close()
-	args := map[string]*string{}
-	for k, v := range o.BuildArgs {
-		value := v
-		args[k] = &value
-	}
-	labels := map[string]string{LabelSourceID: o.SourceID, LabelSourceName: o.SourceName, LabelSourceRef: o.SourceRef, LabelCommit: o.Commit, "com.center-manager.accelerator": accelerator}
-	resp, err := remote.Client.ImageBuild(ctx, stream, types.ImageBuildOptions{Dockerfile: filepath.ToSlash(rel), Tags: []string{o.ImageTag}, Remove: true, NoCache: o.NoCache, BuildArgs: args, Labels: labels})
-	if err != nil {
-		return fmt.Errorf("远端 docker build: %w", err)
-	}
-	defer resp.Body.Close()
-	if _, err = streamDockerMessages(resp.Body, r); err != nil {
-		return err
-	}
-	r.Progress(100)
-	r.Message("构建完成")
-	r.Log("镜像构建完成: " + o.ImageTag)
-	return nil
 }
 
 // streamDockerMessages 消费 dockerd 的 JSON 输出流（构建/推送通用），逐行转写

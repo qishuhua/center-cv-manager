@@ -57,6 +57,21 @@ func (s *Server) testRegistry(c *gin.Context) {
 	ok(c, gin.H{"reachable": true, "endpoint": settings.Endpoint})
 }
 
+// listRegistryVersions 列出镜像仓库全部软件版本（不按中心平台过滤），供
+// 统一发布页选择；选择器仍按各中心平台在预检时校验可用性。
+func (s *Server) listRegistryVersions(c *gin.Context) {
+	list, err := s.registries.ListVersions(c.Request.Context())
+	if err != nil {
+		status := 400
+		if err != registry.ErrNotConfigured {
+			status = 502
+		}
+		fail(c, status, err)
+		return
+	}
+	ok(c, list)
+}
+
 func (s *Server) getRegistryStorage(c *gin.Context) {
 	v, err := s.registries.StorageConfig()
 	if err != nil {

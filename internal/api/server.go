@@ -111,6 +111,7 @@ func (s *Server) Router() *gin.Engine {
 	api.GET("/tasks/:id/logs", s.taskLogs)
 	api.GET("/tasks/:id/events", s.taskEvents)
 	api.GET("/settings/status", s.settingsStatus)
+	api.GET("/registry/versions", s.listRegistryVersions)
 
 	// 管理员专属：一切变更操作、凭据、SSH 终端和用户管理。
 	admin := api.Group("")
@@ -165,7 +166,6 @@ func (s *Server) Router() *gin.Engine {
 	admin.DELETE("/sources/:id", s.deleteSource)
 	admin.POST("/sources/:id/download", s.download)
 	admin.POST("/sources/:id/publish", s.publishSourceImage)
-	admin.POST("/centers/:id/software/build", s.buildCenterSoftware)
 	admin.POST("/centers/:id/software/release", s.releaseCenterSoftware)
 	admin.DELETE("/centers/:id/software/images", s.deleteCenterSoftwareImage)
 	admin.POST("/releases/plan", s.releasePlan)
@@ -1190,6 +1190,12 @@ func (s *Server) prepareDeploymentItems(ctx context.Context, selections []deploy
 	if len(selections) == 0 {
 		return nil, fmt.Errorf("请至少选择一个需要部署的软件")
 	}
+	// 软件发布只认镜像仓库：版本必须先在「软件仓库」页构建发布，源码不再
+	// 发送到中心构建。
+	client, _, err := s.registryReleaseClient()
+	if err != nil {
+		return nil, err
+	}
 	items := make([]deploy.Item, 0, len(selections))
 	seenSources := map[string]bool{}
 	for _, selection := range selections {
@@ -1208,20 +1214,20 @@ func (s *Server) prepareDeploymentItems(ctx context.Context, selections []deploy
 		if err = source.ValidateCommit(commit); err != nil {
 			return nil, fmt.Errorf("%s 的 commit 无效，请刷新版本", src.Name)
 		}
-		if !selection.BuiltImage {
-			verifyCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-			err = s.sources.VerifySelection(verifyCtx, src, selection.Ref, selection.Kind, commit)
-			cancel()
-			if err != nil {
-				return nil, fmt.Errorf("%s: %w", src.Name, err)
-			}
+		expected := build.ReleaseImageTag(src, selection.Ref, commit)
+		tags, err := client.Tags(ctx, registry.RepoPath(src))
+		if err != nil {
+			return nil, err
+		}
+		if !registry.TagsHaveVersion(tags, expected) {
+			return nil, fmt.Errorf("%s 的版本 %s（%s）尚未构建发布到镜像仓库，请先在「软件仓库」页构建发布", src.Name, selection.Ref, shortCommit(commit))
 		}
 		items = append(items, deploy.Item{
 			SourceID:      src.ID,
 			SourceName:    src.Name,
 			Ref:           selection.Ref,
 			Commit:        commit,
-			ExpectedImage: build.ReleaseImageTag(src, selection.Ref, commit),
+			ExpectedImage: expected,
 		})
 	}
 	return items, nil
@@ -1271,6 +1277,31 @@ func (s *Server) checkUnifiedRelease(ctx context.Context, centerID string, softw
 		}
 		if len(check.MissingServices) > 0 {
 			errors = append(errors, strings.Join(check.MissingServices, "；"))
+		}
+		// 版本必须已在镜像仓库发布该中心平台的标签；混合显卡机型在预检期
+		// 就暴露缺失，而不是等分发时失败。
+		if client, _, clientErr := s.registryReleaseClient(); clientErr != nil {
+			softwareReady = false
+			errors = append(errors, clientErr.Error())
+		} else if platform := centerReleasePlatform(center); platform != "" {
+			for _, item := range softwareItems {
+				src, srcErr := s.sources.Get(item.SourceID)
+				if srcErr != nil {
+					softwareReady = false
+					errors = append(errors, srcErr.Error())
+					continue
+				}
+				repository := registry.RepoPath(src)
+				tag := build.ReleaseRegistryTag(src, item.Ref, item.Commit, platform)
+				digest, digestErr := client.ManifestDigest(ctx, repository, tag)
+				if digestErr != nil {
+					softwareReady = false
+					errors = append(errors, digestErr.Error())
+				} else if digest == "" {
+					softwareReady = false
+					errors = append(errors, fmt.Sprintf("%s 的版本 %s 未发布 %s 平台镜像（%s:%s），请先在「软件仓库」页构建发布", item.SourceName, item.Ref, build.AcceleratorName(platform), repository, tag))
+				}
+			}
 		}
 	}
 
@@ -1629,33 +1660,11 @@ func (s *Server) prepareSoftwareRelease(ctx context.Context, centerID string, it
 		}
 	}
 	if len(missing) == 0 {
-		r.Log("阶段 2/4：目标中心已存在全部精确版本镜像，无需准备源码")
-		r.Log("阶段 3/4：跳过镜像构建")
+		r.Log("阶段 2/4：目标中心已存在全部精确版本镜像，无需分发")
+		r.Log("阶段 3/4：跳过镜像分发")
 		r.Progress(65)
-	} else if s.registryReleaseEnabled(ctx, r) {
-		return s.prepareRegistrySoftwareRelease(ctx, centerID, missing, r)
 	} else {
-		for index, item := range missing {
-			src, err := s.sources.Get(item.SourceID)
-			if err != nil {
-				return err
-			}
-			start := 5 + float64(index)*60/float64(len(missing))
-			end := 5 + float64(index+1)*60/float64(len(missing))
-			prepareEnd := start + (end-start)*0.25
-			checkout, err := s.sources.EnsureCheckout(ctx, src, item.Ref, item.Commit, phaseReporter{reporter: r, prefix: fmt.Sprintf("阶段 2/4：准备 %s 源码", item.SourceName), start: start, end: prepareEnd})
-			if err != nil {
-				return fmt.Errorf("准备 %s:%s@%s 源码失败: %w", item.SourceName, item.Ref, shortCommit(item.Commit), err)
-			}
-			reporter := phaseReporter{reporter: r, prefix: fmt.Sprintf("阶段 3/4：构建 %s", item.SourceName), start: prepareEnd, end: end}
-			err = s.builds.Run(ctx, build.Options{
-				CenterID: centerID, ContextDir: checkout.Path, Dockerfile: "auto", ImageTag: item.ExpectedImage,
-				BuildArgs: map[string]string{}, SourceID: src.ID, SourceName: src.Name, SourceRef: item.Ref, Commit: item.Commit,
-			}, reporter)
-			if err != nil {
-				return fmt.Errorf("构建 %s 失败: %w", item.SourceName, err)
-			}
-		}
+		return s.prepareRegistrySoftwareRelease(ctx, centerID, missing, r)
 	}
 	r.Log("阶段 4/4：开始部署已锁定的镜像")
 	return nil
