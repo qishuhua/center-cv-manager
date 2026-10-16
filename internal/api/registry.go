@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"center-cv-manager/internal/domain"
@@ -70,6 +72,22 @@ func (s *Server) listRegistryVersions(c *gin.Context) {
 		return
 	}
 	ok(c, list)
+}
+
+// deleteRegistryVersion 删除镜像仓库中一个软件版本（该版本全部平台标签）。
+// 中心上已运行的实例不受影响；删除后该版本不能再发布。
+func (s *Server) deleteRegistryVersion(c *gin.Context) {
+	repository := strings.TrimSpace(c.Query("repository"))
+	version := strings.TrimSpace(c.Query("version"))
+	if repository == "" || version == "" {
+		fail(c, 400, fmt.Errorf("请指定要删除的软件镜像版本"))
+		return
+	}
+	if err := s.registries.DeleteVersion(c.Request.Context(), repository, version); err != nil {
+		fail(c, 400, err)
+		return
+	}
+	ok(c, true)
 }
 
 func (s *Server) getRegistryStorage(c *gin.Context) {

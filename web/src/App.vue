@@ -413,6 +413,23 @@ async function publishSoftwareToCenter(item:DeployItem,workflowID:number){
   await Promise.all([refreshActiveCenterOverview(),refreshTasks()])
 }
 async function openSourcePublish(source:Source){if(!guardAdminAction()||!source.id)return;sourcePublishDialog.source=source;sourcePublishDialog.selectedKey='';sourcePublishDialog.visible=true;sourcePublishDialog.loading=true;try{await loadGitVersions(source.id)}finally{sourcePublishDialog.loading=false}}
+const sourceVersionsDialog=reactive<{visible:boolean;source:Source|null;loading:boolean;deleting:string}>({visible:false,source:null,loading:false,deleting:''})
+// 镜像版本对话框自持一份仓库清单（打开时刷新，含 repository/版本/平台标签）
+const sourceRegistryList=ref<RegistrySourceVersions[]>([])
+const sourceRegistryEntry=computed(()=>{const source=sourceVersionsDialog.source;return sourceRegistryList.value.find(item=>item.source_id===source?.id)})
+async function openSourceVersions(source:Source){if(!guardAdminAction()||!source.id)return;sourceVersionsDialog.source=source;sourceVersionsDialog.visible=true;await loadSourceRegistryVersions()}
+async function loadSourceRegistryVersions(){sourceVersionsDialog.loading=true;try{const data=await http.get('/registry/versions');sourceRegistryList.value=Array.isArray(data)?data:[]}catch(e:any){sourceRegistryList.value=[];ElMessage.error(e.message)}finally{sourceVersionsDialog.loading=false}}
+async function removeRegistryVersion(version:RegistrySoftwareVersion){
+  const entry=sourceRegistryEntry.value
+  if(!guardAdminAction()||!entry)return
+  try{
+    await ElMessageBox.confirm(`确定删除镜像版本 ${version.version}（${version.platforms.map(tag=>tag.tag).join('、')}）？各中心已运行的实例不受影响，但该版本将不能再发布；占用的存储由镜像仓库 GC 回收。`,'删除镜像版本',{type:'warning',confirmButtonText:'删除',cancelButtonText:'取消',closeOnClickModal:false})
+    sourceVersionsDialog.deleting=version.version
+    await http.delete(`/registry/versions?repository=${encodeURIComponent(entry.repository)}&version=${encodeURIComponent(version.version)}`)
+    ElMessage.success(`镜像版本 ${version.version} 已删除`)
+    await loadSourceRegistryVersions()
+  }catch(e:any){if(e!=='cancel'&&e!=='close')ElMessage.error(e.message)}finally{sourceVersionsDialog.deleting=''}
+}
 async function submitSourcePublish(){
   const source=sourcePublishDialog.source
   const selected=(gitVersions[source?.id||'']||[]).find(item=>softwareOptionKey(item)===sourcePublishDialog.selectedKey)
@@ -554,7 +571,7 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
       </template>
       <template v-else-if="section==='sources'">
         <div class="toolbar"><div><p>所有同一 Git 服务下的软件仓库共用一套加密访问令牌。</p><el-tag :type="gitCredential.configured?'success':'warning'" effect="plain">{{gitCredential.configured?(gitCredential.base_url?`已配置：${gitCredential.base_url}`:'已配置访问令牌'):'尚未配置访问令牌'}}</el-tag>&nbsp;<el-tag :type="registrySettings.configured?'success':'info'" effect="plain">{{registrySettings.configured?(registrySettings.endpoint||'镜像仓库已配置'):'镜像仓库未启用'}}</el-tag></div><div><el-button :icon="Lock" @click="editRegistry">配置镜像仓库</el-button><el-button :icon="Lock" @click="editGitCredential">配置 Git 令牌</el-button><el-button type="primary" :icon="Plus" @click="editSource()">添加软件仓库</el-button></div></div>
-        <div class="panel"><el-table :data="sources" empty-text="暂无软件仓库"><el-table-column prop="name" label="软件" width="180"/><el-table-column prop="repository" label="Git 仓库" min-width="260"><template #default="{row}"><code>{{row.repository}}</code></template></el-table-column><el-table-column prop="description" label="说明"/><el-table-column label="操作" width="230"><template #default="{row}"><el-button @click="editSource(row)">编辑</el-button><el-button v-if="isAdmin" type="primary" link @click="openSourcePublish(row)">构建发布</el-button><el-button type="danger" link @click="removeSource(row)">删除</el-button></template></el-table-column></el-table></div>
+        <div class="panel"><el-table :data="sources" empty-text="暂无软件仓库"><el-table-column prop="name" label="软件" width="180"/><el-table-column prop="repository" label="Git 仓库" min-width="240"><template #default="{row}"><code>{{row.repository}}</code></template></el-table-column><el-table-column prop="description" label="说明"/><el-table-column v-if="isAdmin" label="操作" width="300"><template #default="{row}"><el-button @click="editSource(row)">编辑</el-button><el-button type="primary" link @click="openSourcePublish(row)">构建发布</el-button><el-button link @click="openSourceVersions(row)">镜像版本</el-button><el-button type="danger" link @click="removeSource(row)">删除</el-button></template></el-table-column><el-table-column v-else label="操作" width="80"><template #default="{row}"><el-button @click="editSource(row)">编辑</el-button></template></el-table-column></el-table></div>
       </template>
 
       <template v-else-if="section==='releases'">
@@ -703,6 +720,16 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
       <el-option v-for="item in gitVersions[sourcePublishDialog.source?.id||'']||[]" :key="softwareOptionKey(item)" :label="`${item.kind==='tag'?'标签':'分支'} · ${item.ref} · ${item.commit.slice(0,8)}`" :value="softwareOptionKey(item)"/>
     </el-select>
     <template #footer><el-button @click="sourcePublishDialog.visible=false">取消</el-button><el-button type="primary" :disabled="!sourcePublishDialog.selectedKey" @click="submitSourcePublish">开始构建发布</el-button></template>
+  </el-dialog>
+  <el-dialog v-model="sourceVersionsDialog.visible" :title="`${sourceVersionsDialog.source?.name||''} · 镜像版本`" width="min(760px,94vw)" append-to-body>
+    <div class="panel-title"><div><h3>镜像仓库已发布版本</h3><p>删除版本会移除其全部平台标签：各中心已运行实例不受影响，但该版本不能再发布；占用的存储由镜像仓库 GC 回收。</p></div><el-button :icon="Refresh" :disabled="sourceVersionsDialog.loading" @click="loadSourceRegistryVersions">刷新</el-button></div>
+    <el-table :data="sourceRegistryEntry?.versions||[]" v-loading="sourceVersionsDialog.loading" empty-text="镜像仓库暂无该软件的已发布版本" max-height="420">
+      <el-table-column label="版本" min-width="240"><template #default="{row}"><code>{{row.version}}</code></template></el-table-column>
+      <el-table-column label="平台标签" min-width="260"><template #default="{row}"><el-tag v-for="tag in row.platforms" :key="tag.tag" size="small" style="margin-right:6px">{{tag.tag}}</el-tag></template></el-table-column>
+      <el-table-column label="发布时间" width="180"><template #default="{row}">{{fmt(row.created_at)}}</template></el-table-column>
+      <el-table-column v-if="isAdmin" label="操作" width="90" fixed="right"><template #default="{row}"><el-button type="danger" link :loading="sourceVersionsDialog.deleting===row.version" @click="removeRegistryVersion(row)">删除</el-button></template></el-table-column>
+    </el-table>
+    <template #footer><el-button @click="sourceVersionsDialog.visible=false">关闭</el-button></template>
   </el-dialog>
   <el-dialog v-model="imageManageDialog.visible" title="管理业务镜像" width="min(1120px,96vw)" append-to-body :close-on-click-modal="false">
     <div class="panel-title"><div><h3>中心已构建镜像</h3><p>仅显示本管理端构建的业务镜像，按构建时间倒序；被容器使用的镜像不可删除。</p></div><el-button :icon="Refresh" :disabled="imageManageDialog.loading" @click="loadCenterSoftwareImages">刷新</el-button></div>

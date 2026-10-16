@@ -7,3 +7,4 @@
 !/cmd/server/web_dist/.keep
 *.log
 .env
+docs/

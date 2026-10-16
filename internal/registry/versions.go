@@ -242,6 +242,47 @@ func VersionsForPlatform(list []SourceVersions, platform string) []SourceVersion
 
 var platformSuffixes = []string{"nvidia", "denglin", "cpu"}
 
+// DeleteVersion 删除一个软件版本的全部平台 manifest（各平台标签随之失效，
+// 中心上已运行的实例不受影响，但该版本不能再发布；blob 存储由仓库 GC 回收）。
+// 只允许删除本管理端前缀下的仓库。
+func (s *Service) DeleteVersion(ctx context.Context, repository, version string) error {
+	if !strings.HasPrefix(repository, DefaultPrefix+"/") {
+		return fmt.Errorf("只能删除 %s 前缀下的软件镜像", DefaultPrefix)
+	}
+	if version == "" || strings.ContainsAny(version, " /") {
+		return fmt.Errorf("镜像版本无效")
+	}
+	client, err := s.Client()
+	if err != nil {
+		return err
+	}
+	tags, err := client.Tags(ctx, repository)
+	if err != nil {
+		return err
+	}
+	deleted := 0
+	for _, tag := range tags {
+		if body, _ := splitTag(tag); body != version {
+			continue
+		}
+		digest, err := client.ManifestDigest(ctx, repository, tag)
+		if err != nil {
+			return err
+		}
+		if digest == "" {
+			continue
+		}
+		if err = client.DeleteManifest(ctx, repository, digest); err != nil {
+			return err
+		}
+		deleted++
+	}
+	if deleted == 0 {
+		return fmt.Errorf("镜像仓库中没有版本 %s 的标签", version)
+	}
+	return nil
+}
+
 // TagsHaveVersion 判断标签列表是否包含指定版本主体（ref-commit12，不含仓库
 // 名与平台后缀）：软件发布只认已构建发布到仓库的版本。
 func TagsHaveVersion(tags []string, version string) bool {

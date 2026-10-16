@@ -80,6 +80,32 @@ func (c *Client) ManifestDigest(ctx context.Context, repository, tag string) (st
 	return digest, nil
 }
 
+// DeleteManifest 按 digest 删除 manifest，版本标签随之失效（blob 存储由
+// 仓库 GC 回收）。202/404 均视为成功；405 表示仓库未开启删除。
+func (c *Client) DeleteManifest(ctx context.Context, repository, digest string) error {
+	if !validRepository(repository) {
+		return fmt.Errorf("镜像仓库路径无效: %s", repository)
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodDelete, fmt.Sprintf("%s/v2/%s/manifests/%s", c.baseURL, repository, digest), nil)
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Accept", manifestAccept)
+	response, err := c.http.Do(request)
+	if err != nil {
+		return fmt.Errorf("删除 %s manifest 失败: %w", repository, err)
+	}
+	defer response.Body.Close()
+	switch response.StatusCode {
+	case http.StatusOK, http.StatusAccepted, http.StatusNotFound:
+		return nil
+	case http.StatusMethodNotAllowed:
+		return fmt.Errorf("镜像仓库未开启删除（registry 配置需 storage.delete.enabled）")
+	default:
+		return fmt.Errorf("删除 %s@%s 返回 HTTP %d", repository, digest, response.StatusCode)
+	}
+}
+
 // validRepository 防止仓库路径被拼进 URL 时越界（路径来自设置前缀 + 软件名，
 // 正常都经过清洗，这里兜底）。
 func validRepository(repository string) bool {

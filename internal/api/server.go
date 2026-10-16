@@ -151,6 +151,7 @@ func (s *Server) Router() *gin.Engine {
 	admin.GET("/registry/storage", s.getRegistryStorage)
 	admin.PUT("/registry/storage", s.saveRegistryStorage)
 	admin.POST("/registry/test", s.testRegistry)
+	admin.DELETE("/registry/versions", s.deleteRegistryVersion)
 	admin.GET("/alert-credential", s.getAlertCredential)
 	admin.PUT("/alert-credential", s.saveAlertCredential)
 	admin.POST("/base-images/upgrade", s.upgradeBaseImages)

@@ -93,6 +93,46 @@ func TestListVersionsAndPlatformFilter(t *testing.T) {
 	}
 }
 
+// TestDeleteVersionRemovesAllPlatformTags 验证按版本删除：命中版本的全部平台
+// 标签 manifest 都被删除，其他版本不受影响，越界仓库被拒绝。
+func TestDeleteVersionRemovesAllPlatformTags(t *testing.T) {
+	deleted := map[string]bool{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		switch {
+		case request.URL.Path == "/v2/_catalog":
+			_, _ = w.Write([]byte(`{"repositories":["center-cv/business"]}`))
+		case request.URL.Path == "/v2/center-cv/business/tags/list":
+			_, _ = w.Write([]byte(`{"tags":["v1-abc-nvidia","v1-abc-denglin","v2-def-nvidia"]}`))
+		case request.Method == http.MethodHead && strings.HasPrefix(request.URL.Path, "/v2/center-cv/business/manifests/"):
+			w.Header().Set("Docker-Content-Digest", "sha256:manifest-"+strings.TrimPrefix(request.URL.Path, "/v2/center-cv/business/manifests/"))
+			w.WriteHeader(http.StatusOK)
+		case request.Method == http.MethodDelete && strings.HasPrefix(request.URL.Path, "/v2/center-cv/business/manifests/"):
+			deleted[strings.TrimPrefix(request.URL.Path, "/v2/center-cv/business/manifests/")] = true
+			w.WriteHeader(http.StatusAccepted)
+		default:
+			t.Errorf("意外请求 %s %s", request.Method, request.URL.Path)
+			w.WriteHeader(http.StatusBadRequest)
+		}
+	}))
+	defer server.Close()
+	store := &fakeStore{settings: domain.RegistrySettings{Endpoint: server.URL}}
+	service := New(store, nil, t.TempDir()+"/config.yml")
+
+	if err := service.DeleteVersion(context.Background(), "center-cv/business", "v1-abc"); err != nil {
+		t.Fatal(err)
+	}
+	// 版本的 nvidia/denglin 两个 manifest 都删了，v2 不受影响。
+	if len(deleted) != 2 || !deleted["sha256:manifest-v1-abc-nvidia"] || !deleted["sha256:manifest-v1-abc-denglin"] {
+		t.Fatalf("删除的 manifest = %#v", deleted)
+	}
+	if err := service.DeleteVersion(context.Background(), "center-cv/business", "v9-none"); err == nil {
+		t.Fatal("不存在的版本应报错")
+	}
+	if err := service.DeleteVersion(context.Background(), "test/busybox", "latest"); err == nil {
+		t.Fatal("前缀外仓库应被拒绝")
+	}
+}
+
 // TestVersionsForPlatformSharedTag 验证通用（无平台后缀）标签对所有平台可用：
 // 平台无关构建一次发布、单个通用标签，发布链路同样回退到通用标签取 digest。
 func TestVersionsForPlatformSharedTag(t *testing.T) {
