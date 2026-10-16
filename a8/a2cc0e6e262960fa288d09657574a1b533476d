@@ -1,0 +1,41 @@
+web/src/types.ts
+  s_a6df3de9deccd1::t_cff78ef4c54725 17
+cmd/server/main.go
+  s_a6df3de9deccd1::t_1f86b2de4cb062 71
+web/src/App.vue
+  s_a6df3de9deccd1::t_50314a6a823a0c 615,619,621
+  s_a6df3de9deccd1::t_260ef363e569e2 336
+  s_a6df3de9deccd1::t_b095ff71569de2 52
+CLAUDE.md
+  s_a6df3de9deccd1::t_d022b6c0293114 67
+internal/registry/storage_test.go
+  s_a6df3de9deccd1::t_b2f5c03ce67907 10,13-28,30,32,36-37,44-45,49,51,53,65,69-72,74-76,78-79
+internal/domain/models.go
+  s_a6df3de9deccd1::t_72ebb1dbe9bbc3 98-100,102-104
+internal/registry/service_test.go
+  s_a6df3de9deccd1::t_a50a68b9599cd9 107
+  s_a6df3de9deccd1::t_5304442f42ff9b 98,103
+internal/registry/storage.go
+  s_a6df3de9deccd1::t_ca3fec6701c7cd 5,44,63-66,75-77,79-87,92-96,98,120-142
+internal/registry/versions_test.go
+  s_a6df3de9deccd1::t_d5dc02f3cc6936 61
+internal/registry/service.go
+  s_a6df3de9deccd1::t_1ab616a7d06a64 16
+  s_a6df3de9deccd1::t_d8cadddc6e09ba 28,33,37-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "a8a2cc0e6e262960fa288d09657574a1b533476d",
+  "prompts": {},
+  "sessions": {
+    "s_a6df3de9deccd1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f338f9b0-c54d-46f9-82e1-a7ba0dabe12b",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
