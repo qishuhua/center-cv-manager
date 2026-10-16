@@ -95,14 +95,16 @@ func TestClientManifestDigest(t *testing.T) {
 
 type fakeStore struct {
 	settings domain.RegistrySettings
+	oss      domain.OSSCredential
 }
 
 func (f *fakeStore) GetRegistrySettings() (domain.RegistrySettings, error) { return f.settings, nil }
 func (f *fakeStore) SaveRegistrySettings(v domain.RegistrySettings) error  { f.settings = v; return nil }
+func (f *fakeStore) GetOSSCredential() (domain.OSSCredential, error)      { return f.oss, nil }
 
 func TestServiceSettings(t *testing.T) {
 	store := &fakeStore{}
-	service := New(store, t.TempDir()+"/config.yml")
+	service := New(store, nil, t.TempDir()+"/config.yml")
 	if _, err := service.SaveSettings(domain.RegistrySettings{Endpoint: "http://127.0.0.1:5000"}); err != nil {
 		t.Fatal(err)
 	}

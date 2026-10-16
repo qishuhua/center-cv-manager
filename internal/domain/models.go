@@ -95,16 +95,13 @@ type RegistrySettings struct {
 	UpdatedAt  time.Time `json:"updated_at,omitempty"`
 }
 
-// RegistryStorage 是渲染 registry config.yml（OSS S3 存储后端）所需的字段。
+// RegistryStorage 是镜像仓库存储侧的唯一可配置项：OSS 凭据、Bucket 与
+// Endpoint 全部复用模型仓库的全局 OSS 配置（oss_credentials），镜像仓库只在
+// 共享 Bucket 内占一个独立前缀，不持有任何凭据。
 type RegistryStorage struct {
-	Region          string    `json:"region"`
-	RegionEndpoint  string    `json:"region_endpoint"`
-	Bucket          string    `json:"bucket"`
-	AccessKeyID     string    `json:"access_key_id"`
-	AccessKeySecret string    `json:"access_key_secret,omitempty"`
-	RootDirectory   string    `json:"root_directory"`
-	Exists          bool      `json:"exists"`
-	UpdatedAt       time.Time `json:"updated_at,omitempty"`
+	RootDirectory string    `json:"root_directory"`
+	Exists        bool      `json:"exists"`
+	UpdatedAt     time.Time `json:"updated_at,omitempty"`
 }
 
 type Source struct {

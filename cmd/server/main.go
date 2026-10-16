@@ -68,7 +68,7 @@ func main() {
 	provisioning := provision.New(centers, alerts)
 	baseImages := baseimage.New(st, cipher, centers)
 	models := modelasset.New(st, cipher, centers)
-	registries := registry.New(st, filepath.Join(abs, "registry", "config.yml"))
+	registries := registry.New(st, cipher, filepath.Join(abs, "registry", "config.yml"))
 	// 前端由 web 容器（nginx）提供时 API 不携带静态文件；目录缺失仅提供 API，
 	// make dev 直跑时仍可直接服务 web/dist。
 	static := fs.FS(nil)

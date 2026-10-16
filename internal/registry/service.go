@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"center-cv-manager/internal/domain"
+	"center-cv-manager/internal/secret"
 )
 
 // DefaultEndpoint 是 registry sidecar 的默认地址（与管理端共享网络命名空间，
@@ -24,15 +25,17 @@ var ErrNotConfigured = errors.New("尚未配置镜像仓库")
 type Store interface {
 	GetRegistrySettings() (domain.RegistrySettings, error)
 	SaveRegistrySettings(domain.RegistrySettings) error
+	GetOSSCredential() (domain.OSSCredential, error)
 }
 
 type Service struct {
 	store      Store
+	cipher     *secret.Cipher
 	configPath string
 }
 
-func New(store Store, configPath string) *Service {
-	return &Service{store: store, configPath: configPath}
+func New(store Store, cipher *secret.Cipher, configPath string) *Service {
+	return &Service{store: store, cipher: cipher, configPath: configPath}
 }
 
 func (s *Service) Settings() (domain.RegistrySettings, error) {

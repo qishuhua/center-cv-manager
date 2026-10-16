@@ -58,7 +58,7 @@ func TestListVersionsAndPlatformFilter(t *testing.T) {
 	defer server.Close()
 
 	store := &fakeStore{settings: domain.RegistrySettings{Endpoint: server.URL}}
-	service := New(store, t.TempDir()+"/config.yml")
+	service := New(store, nil, t.TempDir()+"/config.yml")
 	list, err := service.ListVersions(context.Background())
 	if err != nil {
 		t.Fatal(err)

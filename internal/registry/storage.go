@@ -2,12 +2,12 @@ package registry
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"center-cv-manager/internal/center"
 	"center-cv-manager/internal/domain"
 	"gopkg.in/yaml.v3"
 )
@@ -41,7 +41,7 @@ type storageDocument struct {
 	} `yaml:"http"`
 }
 
-// StorageConfig 读取已渲染的 registry config.yml（secretkey 打码返回）。
+// StorageConfig 读取已渲染的 registry config.yml，只返回非敏感字段（存储前缀）。
 func (s *Service) StorageConfig() (domain.RegistryStorage, error) {
 	out := domain.RegistryStorage{}
 	raw, err := os.ReadFile(s.configPath)
@@ -55,72 +55,47 @@ func (s *Service) StorageConfig() (domain.RegistryStorage, error) {
 	if err = yaml.Unmarshal(raw, &document); err != nil {
 		return out, fmt.Errorf("解析 registry 配置失败: %w", err)
 	}
-	out.Region = document.Storage.S3.Region
-	out.RegionEndpoint = document.Storage.S3.RegionEndpoint
-	out.Bucket = document.Storage.S3.Bucket
-	out.AccessKeyID = document.Storage.S3.AccessKey
-	if document.Storage.S3.SecretKey != "" {
-		out.AccessKeySecret = center.Mask
-	}
 	out.RootDirectory = strings.Trim(document.Storage.S3.RootDirectory, "/")
 	out.Exists = true
 	return out, nil
 }
 
-// SaveStorageConfig 校验输入并把 config.yml 原子写入数据目录；secret 传入掩码
-// 时沿用文件中的旧值。registry 容器只在启动时读取，保存后需重启该容器生效。
+// SaveStorageConfig 渲染并写入 registry config.yml。OSS 凭据、Bucket 与
+// Endpoint 全部取自模型仓库的全局 OSS 配置（oss_credentials）——镜像仓库不
+// 单独持有凭据，只在共享 Bucket 内使用独立前缀（与 center-images/、
+// center-models/ 并列）。registry 容器只在启动时读取，保存后需重启该容器生效。
 func (s *Service) SaveStorageConfig(input domain.RegistryStorage) (domain.RegistryStorage, error) {
-	input.Region = strings.TrimSpace(input.Region)
-	input.RegionEndpoint = strings.TrimSpace(input.RegionEndpoint)
-	input.Bucket = strings.TrimSpace(input.Bucket)
-	input.AccessKeyID = strings.TrimSpace(input.AccessKeyID)
 	input.RootDirectory = strings.Trim(strings.TrimSpace(input.RootDirectory), "/")
-	if input.Bucket == "" || input.AccessKeyID == "" {
-		return domain.RegistryStorage{}, fmt.Errorf("Bucket 和 AccessKey ID 不能为空")
-	}
-	if input.RegionEndpoint == "" {
-		input.RegionEndpoint = "https://oss-cn-shanghai.aliyuncs.com"
-	}
-	if !strings.HasPrefix(input.RegionEndpoint, "https://") && !strings.HasPrefix(input.RegionEndpoint, "http://") {
-		return domain.RegistryStorage{}, fmt.Errorf("Region Endpoint 需为完整 URL（例如 https://oss-cn-shanghai.aliyuncs.com）")
-	}
 	if input.RootDirectory == "" {
 		input.RootDirectory = "registry"
 	}
 	if strings.Contains(input.RootDirectory, "..") || strings.ContainsAny(input.RootDirectory, " \t\n") {
 		return domain.RegistryStorage{}, fmt.Errorf("根目录前缀不能包含 .. 或空白字符")
 	}
-	secret := input.AccessKeySecret
-	if secret == "" || secret == center.Mask {
-		existing, err := s.StorageConfig()
-		if err != nil {
-			return domain.RegistryStorage{}, err
-		}
-		if existing.Exists {
-			raw, readErr := os.ReadFile(s.configPath)
-			if readErr != nil {
-				return domain.RegistryStorage{}, readErr
-			}
-			var document storageDocument
-			if readErr = yaml.Unmarshal(raw, &document); readErr != nil {
-				return domain.RegistryStorage{}, readErr
-			}
-			secret = document.Storage.S3.SecretKey
-		}
+	oss, err := s.store.GetOSSCredential()
+	if err != nil {
+		return domain.RegistryStorage{}, err
 	}
-	if secret == "" || secret == center.Mask {
-		return domain.RegistryStorage{}, fmt.Errorf("AccessKey Secret 不能为空")
+	if !oss.Configured {
+		return domain.RegistryStorage{}, fmt.Errorf("请先在「模型仓库」配置 OSS 凭据，镜像仓库复用同一套存储")
+	}
+	secretKey, err := s.cipher.Decrypt(oss.AccessKeySecret)
+	if err != nil {
+		return domain.RegistryStorage{}, fmt.Errorf("解密全局 OSS 凭据失败: %w", err)
+	}
+	if oss.AccessKeyID == "" || secretKey == "" || oss.Bucket == "" {
+		return domain.RegistryStorage{}, fmt.Errorf("全局 OSS 凭据不完整，请先在「模型仓库」补全")
 	}
 
 	document := storageDocument{Version: "0.1"}
 	document.Log.Level = "info"
-	document.Storage.S3.AccessKey = input.AccessKeyID
-	document.Storage.S3.SecretKey = secret
-	document.Storage.S3.Region = input.Region
-	document.Storage.S3.RegionEndpoint = input.RegionEndpoint
-	document.Storage.S3.Bucket = input.Bucket
+	document.Storage.S3.AccessKey = oss.AccessKeyID
+	document.Storage.S3.SecretKey = secretKey
+	document.Storage.S3.Region = regionFromEndpoint(oss.Endpoint)
+	document.Storage.S3.RegionEndpoint = normalizeOSSEndpoint(oss.Endpoint)
+	document.Storage.S3.Bucket = oss.Bucket
 	document.Storage.S3.RootDirectory = "/" + input.RootDirectory
-	document.Storage.S3.Secure = strings.HasPrefix(input.RegionEndpoint, "https://")
+	document.Storage.S3.Secure = true
 	document.Storage.S3.ForcePathStyle = false
 	document.Storage.Delete.Enabled = true
 	document.HTTP.Addr = ":5000"
@@ -138,8 +113,30 @@ func (s *Service) SaveStorageConfig(input domain.RegistryStorage) (domain.Regist
 	if err = os.Rename(temporary, s.configPath); err != nil {
 		return domain.RegistryStorage{}, err
 	}
-	input.AccessKeySecret = center.Mask
 	input.Exists = true
 	input.UpdatedAt = time.Now()
 	return input, nil
+}
+
+// regionFromEndpoint 从 OSS endpoint 提取 region（oss-cn-shanghai.aliyuncs.com
+// → oss-cn-shanghai）。registry 的 S3 驱动对 region 取值不敏感，仅为可读保留。
+func regionFromEndpoint(endpoint string) string {
+	if parsed, err := url.Parse(endpoint); err == nil && parsed.Host != "" {
+		endpoint = parsed.Host
+	}
+	if index := strings.Index(endpoint, "."); index > 0 {
+		return endpoint[:index]
+	}
+	return endpoint
+}
+
+// normalizeOSSEndpoint 补全协议（无 scheme 时默认 https）。
+func normalizeOSSEndpoint(endpoint string) string {
+	if endpoint == "" {
+		return "https://oss-cn-shanghai.aliyuncs.com"
+	}
+	if !strings.Contains(endpoint, "://") {
+		return "https://" + endpoint
+	}
+	return endpoint
 }

@@ -14,7 +14,7 @@ export interface CenterOverview {center:Center;online:boolean;error?:string;acce
 export interface OSSCredential {endpoint:string;bucket:string;access_key_id:string;access_key_secret?:string;images_prefix:string;models_prefix:string;configured:boolean;updated_at?:string}
 export interface AlertCredential {feishu_webhook?:string;configured:boolean;updated_at?:string}
 export interface RegistrySettings {endpoint:string;configured:boolean;updated_at?:string}
-export interface RegistryStorage {region:string;region_endpoint:string;bucket:string;access_key_id:string;access_key_secret?:string;root_directory:string;exists:boolean;updated_at?:string}
+export interface RegistryStorage {root_directory:string;exists:boolean;updated_at?:string}
 export interface RegistryPlatformTag {platform:string;tag:string;digest:string}
 export interface RegistrySoftwareVersion {version:string;ref:string;commit:string;created_at:string;platforms:RegistryPlatformTag[]}
 export interface RegistrySourceVersions {repository:string;source_id:string;source_name:string;versions:RegistrySoftwareVersion[]}
