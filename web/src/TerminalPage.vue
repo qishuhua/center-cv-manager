@@ -80,7 +80,16 @@ function clearTerminal(){terminal?.clear();terminal?.focus()}
 async function copySelection(){
   const selection=terminal?.getSelection()
   if(!selection){ElMessage.info('请先在终端中选择内容');return}
-  try{await navigator.clipboard.writeText(selection);ElMessage.success('已复制终端内容')}catch{ElMessage.error('复制失败，请使用 Ctrl+C')}
+  try{await navigator.clipboard.writeText(selection);ElMessage.success('已复制终端内容')}
+  catch{
+    // 局域网 IP 的 HTTP 访问没有 navigator.clipboard（仅安全上下文可用），
+    // 退回 execCommand 方案。
+    try{
+      const textarea=document.createElement('textarea');textarea.value=selection;textarea.style.position='fixed';textarea.style.opacity='0'
+      document.body.appendChild(textarea);textarea.select();document.execCommand('copy');document.body.removeChild(textarea)
+      ElMessage.success('已复制终端内容')
+    }catch{ElMessage.error('复制失败，请使用 Ctrl+C')}
+  }
 }
 
 watch(()=>props.centers,values=>{if(!selectedCenterId.value&&values[0]?.id)selectCenter(values[0].id)},{immediate:true})

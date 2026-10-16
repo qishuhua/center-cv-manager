@@ -13,9 +13,12 @@ const formats=ref<FormatForm[]>([])
 const uploading=ref(false),progress=ref(0),message=ref('')
 
 function defaultVersion(){const d=new Date();const p=(v:number)=>String(v).padStart(2,'0');return `${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`}
-function reset(){form.model=props.modelName;form.version=defaultVersion();formats.value=[{key:crypto.randomUUID(),platform:'onnx',hardwareProfile:''}];progress.value=0;message.value=''}
+// crypto.randomUUID 仅安全上下文（https / localhost）可用，局域网 IP 的
+// HTTP 访问下为 undefined——用降级实现，否则对话框在挂载时即抛错打不开。
+function newKey(){return typeof crypto!=='undefined'&&typeof crypto.randomUUID==='function'?crypto.randomUUID():`key-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,10)}`}
+function reset(){form.model=props.modelName;form.version=defaultVersion();formats.value=[{key:newKey(),platform:'onnx',hardwareProfile:''}];progress.value=0;message.value=''}
 watch(()=>props.modelValue,value=>{if(value)reset()})
-function addFormat(platform:ModelPlatform){formats.value.push({key:crypto.randomUUID(),platform,hardwareProfile:''})}
+function addFormat(platform:ModelPlatform){formats.value.push({key:newKey(),platform,hardwareProfile:''})}
 function removeFormat(key:string){formats.value=formats.value.filter(item=>item.key!==key)}
 const modelExtension=(platform:ModelPlatform)=>platform==='onnx'?'onnx':platform==='denglin'?'engine':'plan'
 const platformName=(platform:ModelPlatform)=>platform==='onnx'?'ONNX':platform==='denglin'?'登临 engine':'NVIDIA plan'
