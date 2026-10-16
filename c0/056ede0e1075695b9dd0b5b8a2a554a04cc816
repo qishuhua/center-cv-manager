@@ -1,0 +1,63 @@
+internal/api/software_publish.go
+  s_a6df3de9deccd1::t_efd02019be201c 219,225-227
+  s_a6df3de9deccd1::t_c08c8dbe302bf2 107-108,111
+  s_a6df3de9deccd1::t_6c6b7bbcc10138 11
+internal/api/server.go
+  s_a6df3de9deccd1::t_66f7d9ea7316ff 1540
+  s_a6df3de9deccd1::t_9143ce1bf138ad 1095
+internal/registry/service.go
+  s_a6df3de9deccd1::t_0565cec96af207 84-86
+  s_a6df3de9deccd1::t_29124d1cad5489 13
+  s_a6df3de9deccd1::t_1236dfe9384e21 4-5
+  s_a6df3de9deccd1::t_8851f32b259f99 36-39,46-66
+  s_a6df3de9deccd1::t_8575acb5969fd4 67-68
+internal/api/release_registry.go
+  s_a6df3de9deccd1::t_700d0376f6a109 18-19,28
+Makefile
+  s_a6df3de9deccd1::t_cc0f2415439fad 11
+internal/registry/versions.go
+  s_a6df3de9deccd1::t_58591956a5f0d0 224-226,233-234
+  s_a6df3de9deccd1::t_b333d09b215340 269-270
+  s_a6df3de9deccd1::t_663d9e7508773d 168
+internal/registry/versions_test.go
+  s_a6df3de9deccd1::t_622b415a948ab1 96-97,104-105,107-108
+internal/build/service.go
+  s_a6df3de9deccd1::t_1a8242757a0dfa 327
+  s_a6df3de9deccd1::t_d62bc88aec64ff 223-224
+  s_a6df3de9deccd1::t_5436ff7acb0de6 212
+  s_a6df3de9deccd1::t_566afc9227ef0d 167,170
+  s_a6df3de9deccd1::t_27ebae3d9a81de 131-133
+  s_a6df3de9deccd1::t_811890ed45c507 268
+  s_a6df3de9deccd1::t_d9bcab60ac2217 288
+web/src/App.vue
+  s_a6df3de9deccd1::t_26f3d4c16c7038 53
+  s_a6df3de9deccd1::t_28098723aae279 195
+  s_a6df3de9deccd1::t_a16dfe076ac986 462
+  s_a6df3de9deccd1::t_d894d2a6c34c9e 22
+  s_a6df3de9deccd1::t_e251b800257de2 151
+internal/api/release_notify.go
+  s_a6df3de9deccd1::t_f55314281fa54c 108-109
+  s_a6df3de9deccd1::t_cc8414714e71c5 112,119
+  s_a6df3de9deccd1::t_64d416a5060b7f 5,10,12
+  s_a6df3de9deccd1::t_65ee761805a424 36,48
+  s_a6df3de9deccd1::t_38768bf8e5df32 67,70-74,97-107,110-111,113-118,120-127
+  s_a6df3de9deccd1::t_ebebad5ceefc3c 11
+  s_a6df3de9deccd1::t_b290c957a99357 83-96,128-129
+  s_a6df3de9deccd1::t_70778e00944500 130
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "c0056ede0e1075695b9dd0b5b8a2a554a04cc816",
+  "prompts": {},
+  "sessions": {
+    "s_a6df3de9deccd1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f338f9b0-c54d-46f9-82e1-a7ba0dabe12b",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
