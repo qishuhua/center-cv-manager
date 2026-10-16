@@ -1,0 +1,30 @@
+README.md
+  s_a6df3de9deccd1::t_0290a1eb29865f 32
+  s_a6df3de9deccd1::t_d589ead3d3f29f 50
+  s_a6df3de9deccd1::t_a17c9b6e2f6335 35
+CLAUDE.md
+  s_a6df3de9deccd1::t_8c3127d84d7cd6 51
+internal/api/task_actions_test.go
+  s_a6df3de9deccd1::t_5574671423ded3 15,26-27
+web/src/App.vue
+  s_a6df3de9deccd1::t_928d8bde13b3ae 583
+  s_a6df3de9deccd1::t_dffeded0389401 748
+internal/api/task_actions.go
+  s_a6df3de9deccd1::t_20087ba70a44dd 17-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "1d5a6eeeb80f72ac0f09b2887e0799e9fb4dc683",
+  "prompts": {},
+  "sessions": {
+    "s_a6df3de9deccd1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f338f9b0-c54d-46f9-82e1-a7ba0dabe12b",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
