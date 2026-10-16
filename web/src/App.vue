@@ -186,13 +186,13 @@ function syncCenterSoftwareSelections(){
     centerSoftwareSelections[row.key]=match?.version||available[0]?.version||''
   }
 }
-function registryVersionLabel(item:RegistrySoftwareVersion){return `${item.version} · ${item.platforms.map(tag=>tag.platform).join('/')} · ${fmt(item.created_at)}`}
+function registryVersionLabel(item:RegistrySoftwareVersion){return `${item.version} · ${item.platforms.map(tag=>tag.platform==='shared'?'通用':tag.platform).join('/')} · ${fmt(item.created_at)}`}
 async function submitCenterSoftwareRelease(row:CenterSoftwareRow){
   if(!guardAdminAction()||!row.source?.id)return
   const centerID=activeCenterOverview.value?.center.id
   const entry=centerRegistryBySource.value[row.source.id]
   const selected=entry?.versions.find(item=>item.version===centerSoftwareSelections[row.key])
-  const platformTag=selected?.platforms.find(tag=>tag.platform===centerSoftwarePlatform.value)
+  const platformTag=selected?.platforms.find(tag=>tag.platform===centerSoftwarePlatform.value||tag.platform==='shared')
   if(!centerID||!entry||!selected||!platformTag)return
   const running=row.current.some(item=>item.version===selected.ref&&(!item.commit||item.commit===selected.commit))
   try{

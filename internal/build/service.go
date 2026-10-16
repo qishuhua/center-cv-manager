@@ -179,9 +179,6 @@ type LocalOptions struct {
 	ContextDir  string            `json:"-"`
 	Dockerfile  string            `json:"dockerfile"`
 	RegistryRef string            `json:"registry_ref"`
-	// ExtraTags 是同一次构建额外打的仓库标签：平台无关（universal）变体一次
-	// 构建、nvidia/denglin/cpu 三标签指向同一镜像。
-	ExtraTags   []string          `json:"extra_tags"`
 	NoCache     bool              `json:"no_cache"`
 	BuildArgs   map[string]string `json:"build_args"`
 	SourceID    string            `json:"source_id"`
@@ -189,7 +186,7 @@ type LocalOptions struct {
 	SourceRef   string            `json:"source_ref"`
 	Commit      string            `json:"commit"`
 	// Accelerator 取 nvidia/denglin/cpu/universal：决定 Dockerfile 变体与
-	// 来源标签；universal 表示平台无关构建。
+	// 来源标签；universal 表示平台无关构建（RegistryRef 用无后缀通用标签）。
 	Accelerator string            `json:"accelerator"`
 }
 
@@ -247,8 +244,7 @@ func (s *Service) BuildLocal(ctx context.Context, o LocalOptions, r Reporter) er
 	}
 	r.Message("正在本地构建镜像")
 	r.Logf("加速卡类型: %s，使用 %s", AcceleratorName(o.Accelerator), filepath.ToSlash(rel))
-	tags := append([]string{o.RegistryRef}, o.ExtraTags...)
-	r.Log("开始构建镜像 " + strings.Join(tags, "、"))
+	r.Log("开始构建镜像 " + o.RegistryRef)
 	stream, err := archive.TarWithOptions(base, &archive.TarOptions{})
 	if err != nil {
 		return fmt.Errorf("创建构建上下文: %w", err)
@@ -260,7 +256,7 @@ func (s *Service) BuildLocal(ctx context.Context, o LocalOptions, r Reporter) er
 		args[k] = &value
 	}
 	labels := map[string]string{LabelSourceID: o.SourceID, LabelSourceName: o.SourceName, LabelSourceRef: o.SourceRef, LabelCommit: o.Commit, "com.center-manager.accelerator": o.Accelerator}
-	resp, err := docker.ImageBuild(ctx, stream, types.ImageBuildOptions{Dockerfile: filepath.ToSlash(rel), Tags: tags, Remove: true, NoCache: o.NoCache, BuildArgs: args, Labels: labels})
+	resp, err := docker.ImageBuild(ctx, stream, types.ImageBuildOptions{Dockerfile: filepath.ToSlash(rel), Tags: []string{o.RegistryRef}, Remove: true, NoCache: o.NoCache, BuildArgs: args, Labels: labels})
 	if err != nil {
 		return fmt.Errorf("本地 docker build: %w", err)
 	}
@@ -311,8 +307,8 @@ func (s *Service) PushRef(ctx context.Context, ref string, r Reporter) (string, 
 
 // DetectBuildVariants 返回源码需要构建的平台变体：存在 Dockerfile.nvidia /
 // Dockerfile.denglin 时各自成变体（全部构建成功才允许推送，保证版本完整）；
-// 只有通用 Dockerfile 时构建一次（universal），以 nvidia/denglin/cpu 三个
-// 标签发布同一镜像，两类显卡中心都能拉取。
+// 只有通用 Dockerfile（或 Dockerfile.cpu）时构建一次（universal），以不带
+// 平台后缀的通用标签发布，各类显卡中心都能拉取。
 func DetectBuildVariants(dir string) ([]string, error) {
 	variants := []string{}
 	if existsRegularFile(filepath.Join(dir, "Dockerfile.nvidia")) {

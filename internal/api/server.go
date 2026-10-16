@@ -1311,15 +1311,13 @@ func (s *Server) checkUnifiedRelease(ctx context.Context, centerID string, softw
 					errors = append(errors, srcErr.Error())
 					continue
 				}
-				repository := registry.RepoPath(src)
-				tag := build.ReleaseRegistryTag(item.Ref, item.Commit, platform)
-				digest, digestErr := client.ManifestDigest(ctx, repository, tag)
+				_, digest, digestErr := manifestDigestForPlatform(ctx, client, registry.RepoPath(src), item, platform)
 				if digestErr != nil {
 					softwareReady = false
 					errors = append(errors, digestErr.Error())
 				} else if digest == "" {
 					softwareReady = false
-					errors = append(errors, fmt.Sprintf("%s 的镜像版本 %s 缺少 %s 平台镜像，请先在「软件仓库」页构建发布", item.SourceName, build.ReleaseVersionBody(item.Ref, item.Commit), build.AcceleratorName(platform)))
+					errors = append(errors, fmt.Sprintf("%s 的镜像版本 %s 未发布 %s 平台镜像，请先在「软件仓库」页构建发布", item.SourceName, build.ReleaseVersionBody(item.Ref, item.Commit), build.AcceleratorName(platform)))
 				}
 			}
 		}

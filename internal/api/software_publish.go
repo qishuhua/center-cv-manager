@@ -98,25 +98,22 @@ func (s *Server) publishSourceImage(c *gin.Context) {
 		// 仓库里的版本要么完整覆盖所有平台，要么不存在。
 		planned := make([]string, 0, 3)
 		for _, variant := range variants {
-			tag := build.ReleaseRegistryTag(ref, commit, variantName(variant))
+			// 平台后缀只留给真分变体的仓库；通用 Dockerfile 一次构建、一个
+			// 不带后缀的通用标签，全部平台（含 CPU）的中心都能拉取。
+			platformTag := variant
+			if variant == "universal" {
+				platformTag = ""
+			}
+			tag := build.ReleaseRegistryTag(ref, commit, platformTag)
 			options := build.LocalOptions{
 				ContextDir: checkout.Path, Dockerfile: "auto", RegistryRef: registry.Reference(host, repository, tag),
 				SourceID: sourceID, SourceName: sourceName, SourceRef: ref, Commit: commit, Accelerator: variant,
-			}
-			if variant == "universal" {
-				// 主标签是 -nvidia（variantName），补齐 -denglin 与 -cpu，
-				// 同一镜像三平台标签，纯 CPU 中心也能拉取。
-				options.ExtraTags = []string{
-					registry.Reference(host, repository, build.ReleaseRegistryTag(ref, commit, "denglin")),
-					registry.Reference(host, repository, build.ReleaseRegistryTag(ref, commit, "cpu")),
-				}
 			}
 			h.Message(fmt.Sprintf("阶段 2/3：构建 %s 镜像", build.AcceleratorName(variant)))
 			if err = s.builds.BuildLocal(ctx, options, h); err != nil {
 				return fmt.Errorf("构建 %s 失败（未推送任何镜像）: %w", build.AcceleratorName(variant), err)
 			}
 			planned = append(planned, options.RegistryRef)
-			planned = append(planned, options.ExtraTags...)
 		}
 		h.Message("阶段 3/3：推送镜像仓库")
 		for _, ref := range planned {
@@ -127,15 +124,6 @@ func (s *Server) publishSourceImage(c *gin.Context) {
 		h.Message(fmt.Sprintf("发布完成：%s 共 %d 个平台镜像已入库，各中心可按显卡类型拉取", repository, len(planned)))
 		return nil
 	}))
-}
-
-// variantName 把 universal 变体的主标签定为 nvidia（ExtraTags 补齐其余平台），
-// 其余变体标签即平台名。
-func variantName(variant string) string {
-	if variant == "universal" {
-		return "nvidia"
-	}
-	return variant
 }
 
 // centerRegistryVersions 列出镜像仓库中匹配中心显卡平台的软件版本，供中心

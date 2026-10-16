@@ -44,6 +44,23 @@ func centerReleasePlatform(center domain.Center) string {
 	return ""
 }
 
+// manifestDigestForPlatform 查询版本镜像的 digest：优先带平台后缀的标签，
+// 未命中回退通用（无后缀）标签——平台无关构建一次发布、全部平台可用。
+// 返回命中的标签与 digest；两者皆空表示该版本在本平台不可用。
+func manifestDigestForPlatform(ctx context.Context, client *registry.Client, repository string, item deploy.Item, platform string) (string, string, error) {
+	tag := build.ReleaseRegistryTag(item.Ref, item.Commit, platform)
+	digest, err := client.ManifestDigest(ctx, repository, tag)
+	if err != nil || digest != "" {
+		return tag, digest, err
+	}
+	shared := build.ReleaseVersionBody(item.Ref, item.Commit)
+	digest, err = client.ManifestDigest(ctx, repository, shared)
+	if err != nil || digest != "" {
+		return shared, digest, err
+	}
+	return "", "", nil
+}
+
 // prepareRegistrySoftwareRelease 是软件发布的镜像准备阶段：核对镜像仓库中
 // 该中心平台的版本镜像（不构建——版本必须已在「软件仓库」页发布），再经
 // SSH 反向隧道把镜像按 digest 拉到中心、重打成本地发布标签。manifest 经
@@ -72,8 +89,7 @@ func (s *Server) prepareRegistrySoftwareRelease(ctx context.Context, centerID st
 			return err
 		}
 		repository := registry.RepoPath(src)
-		tag := build.ReleaseRegistryTag(item.Ref, item.Commit, platform)
-		digest, err := client.ManifestDigest(ctx, repository, tag)
+		tag, digest, err := manifestDigestForPlatform(ctx, client, repository, item, platform)
 		if err != nil {
 			return err
 		}

@@ -222,18 +222,15 @@ func (s *Service) ListVersions(ctx context.Context) ([]SourceVersions, error) {
 }
 
 // VersionsForPlatform 过滤出指定显卡平台可用的版本并剔除没有可用版本的
-// 软件。只认带平台后缀的标签：发布编排按平台后缀查询 digest，无后缀的历史
-// 标签无法走分发链路，不提供选择。
+// 软件。平台后缀标签精确匹配；通用（无后缀）标签是平台无关构建的产物，
+// 对所有平台可用——发布链路（manifestDigestForPlatform）有对应的取用顺序。
 func VersionsForPlatform(list []SourceVersions, platform string) []SourceVersions {
 	out := make([]SourceVersions, 0, len(list))
 	for _, source := range list {
 		filtered := SourceVersions{Repository: source.Repository, SourceID: source.SourceID, SourceName: source.SourceName}
 		for _, version := range source.Versions {
-			for _, tag := range version.Platforms {
-				if tag.Platform == platform {
-					filtered.Versions = append(filtered.Versions, version)
-					break
-				}
+			if TagForPlatform(version, platform) != "" {
+				filtered.Versions = append(filtered.Versions, version)
 			}
 		}
 		if len(filtered.Versions) > 0 {
@@ -266,11 +263,16 @@ func splitTag(tag string) (version, platform string) {
 	return tag, "shared"
 }
 
-// TagForPlatform 返回版本在指定平台下的仓库标签（无后缀的历史标签不属于
-// 任何平台，返回空串）。
+// TagForPlatform 返回版本在指定平台下的仓库标签：优先平台后缀标签，回退
+// 通用（无后缀）标签；两者皆无返回空串。
 func TagForPlatform(version SoftwareVersion, platform string) string {
 	for _, tag := range version.Platforms {
 		if tag.Platform == platform {
+			return tag.Tag
+		}
+	}
+	for _, tag := range version.Platforms {
+		if tag.Platform == "shared" {
 			return tag.Tag
 		}
 	}
