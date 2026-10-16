@@ -1,8 +1,8 @@
 // Package registry 管理共享镜像仓库（registry:3 + OSS S3 兼容存储后端）。
 // 发布模型：管理端本地构建一次并推送仓库，各中心发布时经 SSH 反向隧道按
 // digest 拉取镜像，manifest 经隧道回到管理端，镜像层由 registry 307 重定向
-// 到 OSS 签名 URL 直下，不占用管理端出口带宽。仓库未配置或不可达时，发布
-// 自动回退既有的中心远端构建路径。
+// 到 OSS 签名 URL 直下，不占用管理端出口带宽。软件发布硬依赖镜像仓库：版本
+// 必须先经「软件仓库」页构建发布。
 package registry
 
 import (
@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"center-cv-manager/internal/domain"
@@ -32,10 +33,37 @@ type Service struct {
 	store      Store
 	cipher     *secret.Cipher
 	configPath string
+
+	clientMu     sync.Mutex
+	cachedClient *Client
+	cachedURL    string
 }
 
 func New(store Store, cipher *secret.Cipher, configPath string) *Service {
 	return &Service{store: store, cipher: cipher, configPath: configPath}
+}
+
+// Client 返回共享的 registry 客户端（按 endpoint 缓存）：Client 内部的
+// digest 缓存因此跨请求生效，版本清单不必每次重拉全部 manifest 与 config。
+func (s *Service) Client() (*Client, error) {
+	settings, err := s.Settings()
+	if err != nil {
+		return nil, err
+	}
+	if !settings.Configured {
+		return nil, ErrNotConfigured
+	}
+	s.clientMu.Lock()
+	defer s.clientMu.Unlock()
+	if s.cachedClient != nil && s.cachedURL == settings.Endpoint {
+		return s.cachedClient, nil
+	}
+	client, err := NewClient(settings.Endpoint)
+	if err != nil {
+		return nil, err
+	}
+	s.cachedClient, s.cachedURL = client, settings.Endpoint
+	return client, nil
 }
 
 func (s *Service) Settings() (domain.RegistrySettings, error) {
@@ -52,8 +80,10 @@ func (s *Service) SaveSettings(input domain.RegistrySettings) (domain.RegistrySe
 		if _, _, err := ParseEndpoint(input.Endpoint); err != nil {
 			return domain.RegistrySettings{}, err
 		}
-		input.Configured = true
 	}
+	// Configured 完全由 endpoint 推导：清空地址即关闭，避免回显/持久化请求体
+	// 携带的旧值。
+	input.Configured = input.Endpoint != ""
 	input.UpdatedAt = time.Now()
 	if err := s.store.SaveRegistrySettings(input); err != nil {
 		return domain.RegistrySettings{}, err

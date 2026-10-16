@@ -2,10 +2,14 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
+
+	"center-cv-manager/internal/domain"
+	"center-cv-manager/internal/task"
 )
 
 // textSender 抽象飞书文本发送，便于测试。
@@ -29,6 +33,7 @@ type releaseNotifier struct {
 	order    map[string]int
 	mu       sync.Mutex
 	outcomes []releaseOutcome
+	seen     map[string]bool
 }
 
 func newReleaseNotifier(sender textSender, operator string, centerLines []string) *releaseNotifier {
@@ -40,7 +45,7 @@ func newReleaseNotifier(sender textSender, operator string, centerLines []string
 			order[center] = i
 		}
 	}
-	n := &releaseNotifier{sender: sender, operator: operator, names: names, order: order}
+	n := &releaseNotifier{sender: sender, operator: operator, names: names, order: order, seen: map[string]bool{}}
 	var message strings.Builder
 	message.WriteString("🚀 版本发布开始")
 	if operator != "" {
@@ -59,13 +64,67 @@ func newReleaseNotifier(sender textSender, operator string, centerLines []string
 }
 
 // record 由每个中心的发布任务在结束时调用；最后一个记录触发结束消息。
+// 幂等：同一中心的重复记录（executor 与兜底轮询并发到达）只保留首条。
 func (n *releaseNotifier) record(center string, err error) {
 	n.mu.Lock()
+	if n.seen[center] {
+		n.mu.Unlock()
+		return
+	}
+	n.seen[center] = true
 	n.outcomes = append(n.outcomes, releaseOutcome{center: center, order: n.order[center], err: err})
 	complete := len(n.outcomes) >= len(n.names)
 	n.mu.Unlock()
 	if complete {
 		n.sendEnd()
+	}
+}
+
+// watchReleaseNotificationsAsync 按任务参数里的中心名启动兜底轮询。
+func (s *Server) watchReleaseNotificationsAsync(notifier *releaseNotifier, created []*domain.Task) {
+	ids := make([]string, 0, len(created))
+	names := make([]string, 0, len(created))
+	for _, item := range created {
+		if item == nil {
+			continue
+		}
+		ids = append(ids, item.ID)
+		names = append(names, item.Params["center_name"])
+	}
+	go s.watchReleaseNotifications(notifier, ids, names)
+}
+
+// watchReleaseNotifications 兜底记录：任务管理器对已取消的上下文直接跳过
+// executor，其中的 record 不会触发（如提交发布后立即"停止所有任务"），群内
+// 会只剩"发布开始"没有下文。这里轮询任务终态补记，直到全部结束。
+func (s *Server) watchReleaseNotifications(notifier *releaseNotifier, taskIDs, centerNames []string) {
+	deadline := time.Now().Add(time.Hour)
+	for time.Now().Before(deadline) {
+		pending := false
+		for index, id := range taskIDs {
+			if index >= len(centerNames) {
+				break
+			}
+			current, found := s.tasks.Get(id)
+			if !found {
+				continue
+			}
+			switch current.Status {
+			case task.Pending, task.Running:
+				pending = true
+			case task.Cancelled:
+				notifier.record(centerNames[index], fmt.Errorf("任务已停止"))
+			case task.Failed:
+				// 正常路径 executor 已记录真实错误；这里兜底进程重启等场景。
+				notifier.record(centerNames[index], errors.New(current.Error))
+			default:
+				notifier.record(centerNames[index], nil)
+			}
+		}
+		if !pending {
+			return
+		}
+		time.Sleep(3 * time.Second)
 	}
 }
 

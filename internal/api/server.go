@@ -1092,6 +1092,7 @@ func (s *Server) releaseModels(c *gin.Context) {
 			return err
 		}))
 	}
+	s.watchReleaseNotificationsAsync(notifier, created)
 	ok(c, created)
 }
 
@@ -1536,6 +1537,7 @@ func (s *Server) release(c *gin.Context) {
 			return err
 		}))
 	}
+	s.watchReleaseNotificationsAsync(notifier, created)
 	ok(c, created)
 }
 

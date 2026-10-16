@@ -15,8 +15,8 @@ import (
 // 被占用时 RequestRemoteForward 会退回远端自动分配的端口。
 const registryForwardPort = 5000
 
-// registryReleaseClient 返回软件发布使用的镜像仓库客户端。软件发布硬依赖
-// 镜像仓库：版本必须先构建发布，源码不再发送到中心构建。
+// registryReleaseClient 返回软件发布使用的镜像仓库客户端与设置。软件发布
+// 硬依赖镜像仓库：版本必须先构建发布，源码不再发送到中心构建。
 func (s *Server) registryReleaseClient() (*registry.Client, domain.RegistrySettings, error) {
 	settings, err := s.registries.Settings()
 	if err != nil {
@@ -25,7 +25,7 @@ func (s *Server) registryReleaseClient() (*registry.Client, domain.RegistrySetti
 	if !settings.Configured {
 		return nil, settings, fmt.Errorf("软件发布依赖镜像仓库，请先在「软件仓库」页配置：%w", registry.ErrNotConfigured)
 	}
-	client, err := registry.NewClient(settings.Endpoint)
+	client, err := s.registries.Client()
 	if err != nil {
 		return nil, settings, err
 	}

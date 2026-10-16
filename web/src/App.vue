@@ -19,7 +19,7 @@ const YamlEditor=defineAsyncComponent(()=>import('./YamlEditor.vue'))
 interface DeployItem {source_id:string;ref:string;commit:string}
 interface ModelReleasePlan {ready:boolean;error?:string;action:'blocked'|'skip'|'download_and_activate'|'keep_current';download_bytes:number;current:Record<string,{version:string;platform:string;manifest_digest:string}>;targets:ModelVersion[]}
 interface DeploymentPlan {service_mappings?:Record<string,string[]>;center:Center;ready:boolean;build_required:boolean;error?:string;images:Record<string,string>;missing_images:string[];missing_services:string[];model_plan:ModelReleasePlan}
-interface CenterSoftwareRow {key:string;source?:Source;current:OverviewVersion[];gitError?:string}
+interface CenterSoftwareRow {key:string;source?:Source;current:OverviewVersion[]}
 interface SourcePublishDialog {visible:boolean;source:Source|null;selectedKey:string;loading:boolean}
 interface ImageManageDialog {visible:boolean;loading:boolean;images:SoftwareImage[];deleting:string}
 interface CenterModelRow {model:string;current?:CurrentModelVersion;options:ModelVersion[]}
@@ -50,7 +50,7 @@ const registryDialog=ref(false),registryTesting=ref(false)
 const registrySettings=reactive<RegistrySettings>({endpoint:'http://127.0.0.1:5000',configured:false})
 const registrySettingsForm=reactive<RegistrySettings>({endpoint:'http://127.0.0.1:5000',configured:false})
 const registryStorageForm=reactive<RegistryStorage>({root_directory:'registry',exists:false})
-const buildCheckouts=reactive<Record<string,Checkout[]>>({}),gitVersions=reactive<Record<string,Version[]>>({}),gitVersionErrors=reactive<Record<string,string>>({})
+const gitVersions=reactive<Record<string,Version[]>>({}),gitVersionErrors=reactive<Record<string,string>>({})
 const deployForm=reactive<{center_ids:string[];source_ids:string[];items:DeployItem[];model_keys:string[]}>({center_ids:[],source_ids:[],items:[],model_keys:[]})
 const deploymentPlan=ref<DeploymentPlan[]>([]),deploymentPlanning=ref(false),deploymentVersionsLoading=ref(false),deploymentTasks=ref<Task[]>([])
 const deploymentFailuresNotified=new Set<string>()
@@ -148,7 +148,7 @@ const centerSoftwareRows=computed<CenterSoftwareRow[]>(()=>{
   const deployed=activeCenterOverview.value?.versions||[],matched=new Set<number>(),rows:CenterSoftwareRow[]=[]
   for(const source of sources.value){
     const current=deployed.filter((item,index)=>{const same=item.source_id===source.id||(!item.source_id&&item.source_name===source.name);if(same)matched.add(index);return same})
-    rows.push({key:source.id||source.name,source,current,gitError:gitVersionErrors[source.id||'']})
+    rows.push({key:source.id||source.name,source,current})
   }
   const orphaned=new Map<string,OverviewVersion[]>()
   deployed.forEach((item,index)=>{if(matched.has(index))return;const key=item.source_id||item.source_name;orphaned.set(key,[...(orphaned.get(key)||[]),item])})
@@ -192,7 +192,7 @@ async function submitCenterSoftwareRelease(row:CenterSoftwareRow){
   const centerID=activeCenterOverview.value?.center.id
   const entry=centerRegistryBySource.value[row.source.id]
   const selected=entry?.versions.find(item=>item.version===centerSoftwareSelections[row.key])
-  const platformTag=selected?.platforms.find(tag=>tag.platform===centerSoftwarePlatform.value||tag.platform==='shared')
+  const platformTag=selected?.platforms.find(tag=>tag.platform===centerSoftwarePlatform.value)
   if(!centerID||!entry||!selected||!platformTag)return
   const running=row.current.some(item=>item.version===selected.ref&&(!item.commit||item.commit===selected.commit))
   try{
@@ -442,7 +442,6 @@ async function removeCenterSoftwareImage(img:SoftwareImage){
   }catch(e:any){if(e!=='cancel'&&e!=='close')ElMessage.error(e.message)}finally{imageManageDialog.deleting=''}
 }
 async function toggleCenterModelPin(){if(!guardAdminAction())return;const centerID=activeCenterOverview.value?.center.id,pinned=centerModelSetPinned.value;if(!centerID)return;try{if(pinned)await ElMessageBox.confirm('解绑后才能新增、删除或切换任一模型版本，确定整体解绑？','解绑模型版本组',{type:'warning',confirmButtonText:'确认解绑',cancelButtonText:'取消'});else await ElMessageBox.confirm(`将固定当前 ${deployedCenterModels.value.length} 个模型组成的版本快照。固定后任何模型调整都必须先整体解绑，是否继续？`,'固定模型版本组',{type:'warning',confirmButtonText:'固定当前版本组',cancelButtonText:'取消'});centerPinBusy.value='model-set';await http.put(`/centers/${centerID}/models/pin`,{pinned:!pinned});ElMessage.success(pinned?'模型版本组已解绑':'当前模型版本组已固定');await refreshActiveCenterOverview()}catch(e:any){if(e!=='cancel'&&e!=='close')ElMessage.error(e.message)}finally{centerPinBusy.value=''}}
-async function loadBuildCheckouts(sourceID:string,silent=false){try{const data=await http.get(`/sources/${sourceID}/checkouts`);buildCheckouts[sourceID]=Array.isArray(data)?data:[]}catch(e:any){buildCheckouts[sourceID]=[];if(!silent)ElMessage.error(e.message)}}
 function invalidateDeploymentPlan(){deploymentPlan.value=[]}
 // 统一发布只认镜像仓库已发布的版本：源码不再发送到中心构建。
 const registryAllVersions=ref<RegistrySourceVersions[]>([]),registryVersionsError=ref('')
@@ -460,7 +459,7 @@ function modelPlanSummary(item:DeploymentPlan){const plan=item.model_plan;if(!pl
 async function planDeployment(){if(!guardAdminAction())return;if(!deployForm.items.length&&!deployForm.model_keys.length){ElMessage.warning('请至少选择一个软件版本或模型版本');return};if(deployForm.items.some(item=>!item.ref||!item.commit)){ElMessage.warning('每个软件都必须选择一个已发布的镜像版本');return};if(!deployForm.center_ids.length){ElMessage.warning('请至少选择一个发布中心');return};deploymentPlanning.value=true;try{const result:DeploymentPlan[]=await http.post('/releases/plan',{center_ids:deployForm.center_ids,items:deployForm.items,model_selections:modelSelections()});deploymentPlan.value=Array.isArray(result)?result:[];const ready=deploymentPlan.value.filter(item=>item.ready).length;const distributes=deploymentPlan.value.filter(item=>item.ready&&item.build_required).length;if(ready)ElMessage.success(`发布计划已生成：${ready} 个中心可发布，其中 ${distributes} 个将从镜像仓库分发镜像`);else ElMessage.warning('当前没有满足发布条件的中心，请查看下方原因')}catch(e:any){deploymentPlan.value=[];ElMessage.error(e.message)}finally{deploymentPlanning.value=false}}
 async function refreshDeploymentTasks(){window.clearTimeout(deploymentPollTimer);if(!deploymentTasks.value.length)return;try{deploymentTasks.value=await Promise.all(deploymentTasks.value.map(task=>http.get(`/tasks/${task.id}`)));for(const task of deploymentTasks.value){if(task.status==='FAILED'&&!deploymentFailuresNotified.has(task.id)){deploymentFailuresNotified.add(task.id);ElMessage.error(`中心 ${task.params?.center_name||task.params?.center_id} 部署失败：${task.error||task.message||'请查看任务日志'}`)}}if(deploymentTasks.value.some(task=>['PENDING','RUNNING'].includes(task.status)))deploymentPollTimer=window.setTimeout(refreshDeploymentTasks,2000)}catch(e:any){ElMessage.error(e.message)}}
 async function startDeployment(){if(!guardAdminAction())return;if(!deploymentPlan.value.length){ElMessage.warning('请先生成发布计划');return};if(!deploymentPlan.value.some(item=>item.ready)){ElMessage.warning('当前没有通过巡检的发布中心');return};try{deploymentFailuresNotified.clear();deploymentTasks.value=await http.post('/releases',{center_ids:deployForm.center_ids,items:deployForm.items,model_selections:modelSelections()});const skipped=Math.max(0,deployForm.center_ids.length-deploymentTasks.value.length);if(skipped)ElMessage.warning(`已创建 ${deploymentTasks.value.length} 个发布任务，${skipped} 个中心未通过最新复检并已跳过`);else ElMessage.success(`已创建 ${deploymentTasks.value.length} 个中心版本发布任务`);await refreshDeploymentTasks();await loadAll()}catch(e:any){ElMessage.error(e.message)}}
-async function openTask(v:Task){sourceEvents.value?.close();activeTask.value=v;logDrawer.value=true;try{taskLogs.value=await http.get(`/tasks/${v.id}/logs`)}catch{taskLogs.value=[]};if(['RUNNING','PENDING'].includes(v.status)){const es=new EventSource(eventURL(v.id));sourceEvents.value=es;es.addEventListener('log',(ev:any)=>{try{taskLogs.value.push(JSON.parse(ev.data).message)}catch{}});es.addEventListener('progress',(ev:any)=>{try{Object.assign(activeTask.value!,JSON.parse(ev.data))}catch{}});es.addEventListener('status',async(ev:any)=>{try{Object.assign(activeTask.value!,JSON.parse(ev.data))}catch{};const status=JSON.parse(ev.data).status;if(['SUCCESS','FAILED','CANCELLED'].includes(status)){es.close();if(status==='SUCCESS'&&v.type==='DOWNLOAD_SOURCE'&&v.params?.source_id)delete buildCheckouts[v.params.source_id];await loadAll();if(['CENTER_OPERATION','MODEL_RELEASE','RELEASE_VERSION','BUILD_IMAGE','PUBLISH_IMAGE','RELEASE_SOFTWARE','COMPOSE_PUBLISH','MODULE_OPERATION','RESET_CENTER','PAUSE_CENTER','RESUME_CENTER','INITIALIZE_CENTER'].includes(v.type)&&activeCenterOverview.value?.center.id===v.params?.center_id)await refreshActiveCenterOverview()}});es.onerror=()=>es.close()}}
+async function openTask(v:Task){sourceEvents.value?.close();activeTask.value=v;logDrawer.value=true;try{taskLogs.value=await http.get(`/tasks/${v.id}/logs`)}catch{taskLogs.value=[]};if(['RUNNING','PENDING'].includes(v.status)){const es=new EventSource(eventURL(v.id));sourceEvents.value=es;es.addEventListener('log',(ev:any)=>{try{taskLogs.value.push(JSON.parse(ev.data).message)}catch{}});es.addEventListener('progress',(ev:any)=>{try{Object.assign(activeTask.value!,JSON.parse(ev.data))}catch{}});es.addEventListener('status',async(ev:any)=>{try{Object.assign(activeTask.value!,JSON.parse(ev.data))}catch{};const status=JSON.parse(ev.data).status;if(['SUCCESS','FAILED','CANCELLED'].includes(status)){es.close();await loadAll();if(['CENTER_OPERATION','MODEL_RELEASE','RELEASE_VERSION','BUILD_IMAGE','PUBLISH_IMAGE','RELEASE_SOFTWARE','COMPOSE_PUBLISH','MODULE_OPERATION','RESET_CENTER','PAUSE_CENTER','RESUME_CENTER','INITIALIZE_CENTER'].includes(v.type)&&activeCenterOverview.value?.center.id===v.params?.center_id)await refreshActiveCenterOverview()}});es.onerror=()=>es.close()}}
 function closeLogs(){sourceEvents.value?.close();sourceEvents.value=null}
 onMounted(async()=>{window.addEventListener('manager-auth-required',()=>{authState.authenticated=false;authState.role='';passwordDialog.value=false;resetPasswordForm()});await checkAuth();if(authState.authenticated&&!authState.must_change_password)await loadAll();taskPollTimer=window.setTimeout(pollTasks,2000)})
 onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTimer);window.clearTimeout(baseImagePollTimer);window.clearTimeout(taskPollTimer);closeLogs();closeCenterOperationStream()})

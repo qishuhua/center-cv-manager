@@ -165,14 +165,7 @@ func (c *Client) ImageInfo(ctx context.Context, repository, tag string) (ImageIn
 // ListVersions 汇总镜像仓库内的软件版本：只统计本管理端前缀下、带来源标签
 // 的镜像；按 ref-commit 主体聚合各平台标签。
 func (s *Service) ListVersions(ctx context.Context) ([]SourceVersions, error) {
-	settings, err := s.Settings()
-	if err != nil {
-		return nil, err
-	}
-	if !settings.Configured {
-		return nil, ErrNotConfigured
-	}
-	client, err := NewClient(settings.Endpoint)
+	client, err := s.Client()
 	if err != nil {
 		return nil, err
 	}
@@ -228,22 +221,19 @@ func (s *Service) ListVersions(ctx context.Context) ([]SourceVersions, error) {
 	return out, nil
 }
 
-// VersionsForPlatform 过滤出指定显卡平台可用的版本（含 shared 标签），并剔除
-// 没有可用版本的软件。
+// VersionsForPlatform 过滤出指定显卡平台可用的版本并剔除没有可用版本的
+// 软件。只认带平台后缀的标签：发布编排按平台后缀查询 digest，无后缀的历史
+// 标签无法走分发链路，不提供选择。
 func VersionsForPlatform(list []SourceVersions, platform string) []SourceVersions {
 	out := make([]SourceVersions, 0, len(list))
 	for _, source := range list {
 		filtered := SourceVersions{Repository: source.Repository, SourceID: source.SourceID, SourceName: source.SourceName}
 		for _, version := range source.Versions {
-			compatible := false
 			for _, tag := range version.Platforms {
-				if tag.Platform == platform || tag.Platform == "shared" {
-					compatible = true
+				if tag.Platform == platform {
+					filtered.Versions = append(filtered.Versions, version)
 					break
 				}
-			}
-			if compatible {
-				filtered.Versions = append(filtered.Versions, version)
 			}
 		}
 		if len(filtered.Versions) > 0 {
@@ -276,25 +266,11 @@ func splitTag(tag string) (version, platform string) {
 	return tag, "shared"
 }
 
-// VersionsCompatible 报告版本是否可用于指定平台（供展示层判断）。
-func VersionsCompatible(version SoftwareVersion, platform string) bool {
-	for _, tag := range version.Platforms {
-		if tag.Platform == platform || tag.Platform == "shared" {
-			return true
-		}
-	}
-	return false
-}
-
-// TagForPlatform 返回版本在指定平台下的仓库标签。
+// TagForPlatform 返回版本在指定平台下的仓库标签（无后缀的历史标签不属于
+// 任何平台，返回空串）。
 func TagForPlatform(version SoftwareVersion, platform string) string {
 	for _, tag := range version.Platforms {
 		if tag.Platform == platform {
-			return tag.Tag
-		}
-	}
-	for _, tag := range version.Platforms {
-		if tag.Platform == "shared" {
 			return tag.Tag
 		}
 	}

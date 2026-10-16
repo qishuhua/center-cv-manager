@@ -8,6 +8,7 @@ import (
 
 	"center-cv-manager/internal/build"
 	"center-cv-manager/internal/deploy"
+	"center-cv-manager/internal/domain"
 	"center-cv-manager/internal/registry"
 	"center-cv-manager/internal/source"
 	"center-cv-manager/internal/task"
@@ -103,9 +104,11 @@ func (s *Server) publishSourceImage(c *gin.Context) {
 				SourceID: sourceID, SourceName: sourceName, SourceRef: ref, Commit: commit, Accelerator: variant,
 			}
 			if variant == "universal" {
+				// 主标签是 -nvidia（variantName），补齐 -denglin 与 -cpu，
+				// 同一镜像三平台标签，纯 CPU 中心也能拉取。
 				options.ExtraTags = []string{
-					registry.Reference(host, repository, build.ReleaseRegistryTag(ref, commit, "nvidia")),
 					registry.Reference(host, repository, build.ReleaseRegistryTag(ref, commit, "denglin")),
+					registry.Reference(host, repository, build.ReleaseRegistryTag(ref, commit, "cpu")),
 				}
 			}
 			h.Message(fmt.Sprintf("阶段 2/3：构建 %s 镜像", build.AcceleratorName(variant)))
@@ -213,11 +216,13 @@ func (s *Server) releaseCenterSoftware(c *gin.Context) {
 	versions := softwareVersionText(src.Name, ref, commit)
 	// 与统一发布一致：开始/结束向飞书群发送通知（尽力而为，不影响任务）。
 	notifier := newReleaseNotifier(s.alerts, releaseOperator(c), []string{centerName + "：" + versions})
-	ok(c, s.tasks.Submit("RELEASE_SOFTWARE", map[string]string{
+	created := s.tasks.Submit("RELEASE_SOFTWARE", map[string]string{
 		"center_id": centerID, "center_name": centerName, "repository": in.Repository, "tag": in.Tag, "versions": versions,
 	}, func(ctx context.Context, h *task.Handle) error {
 		err := s.runRelease(ctx, centerID, []deploy.Item{item}, nil, h)
 		notifier.record(centerName, err)
 		return err
-	}))
+	})
+	s.watchReleaseNotificationsAsync(notifier, []*domain.Task{created})
+	ok(c, created)
 }

@@ -128,8 +128,9 @@ func sanitizeImagePart(value string) string {
 }
 
 // streamDockerMessages 消费 dockerd 的 JSON 输出流（构建/推送通用），逐行转写
-// 到 Reporter，在 error 字段出现时终止；返回流中出现的 aux digest（构建流为空）。
-func streamDockerMessages(body io.Reader, r Reporter) (string, error) {
+// 到 Reporter，在 error 字段出现时终止；返回流中出现的 aux digest（构建流为
+// 空）。action 用于错误文案（构建/推送）。
+func streamDockerMessages(body io.Reader, r Reporter, action string) (string, error) {
 	digest := ""
 	decoder := json.NewDecoder(body)
 	for {
@@ -163,10 +164,10 @@ func streamDockerMessages(body io.Reader, r Reporter) (string, error) {
 			r.Log(line)
 		}
 		if msg.Error != "" {
-			return digest, fmt.Errorf("Docker 构建失败: %s", msg.Error)
+			return digest, fmt.Errorf("Docker %s失败: %s", action, msg.Error)
 		}
 		if msg.ErrorDetail != nil && msg.ErrorDetail.Message != "" {
-			return digest, fmt.Errorf("Docker 构建失败: %s", msg.ErrorDetail.Message)
+			return digest, fmt.Errorf("Docker %s失败: %s", action, msg.ErrorDetail.Message)
 		}
 	}
 }
@@ -208,8 +209,7 @@ func LocalDocker(ctx context.Context) (*client.Client, error) {
 	return cli, nil
 }
 
-// LocalDockerAvailable 报告本地 Docker 引擎是否可用，用于发布前决定走仓库
-// 分发还是回退中心远端构建。
+// LocalDockerAvailable 报告本地 Docker 引擎是否可用（构建发布的预检）。
 func LocalDockerAvailable() bool {
 	cli, err := LocalDocker(context.Background())
 	if err != nil {
@@ -219,18 +219,9 @@ func LocalDockerAvailable() bool {
 	return true
 }
 
-// RunLocal 本地构建镜像、推送镜像仓库，返回推送后的 manifest digest。发布
-// 回退路径使用；多平台原子发布用 BuildLocal + PushRef 组合（全部变体构建
-// 成功后才开始推送）。
-func (s *Service) RunLocal(ctx context.Context, o LocalOptions, r Reporter) (string, error) {
-	if err := s.BuildLocal(ctx, o, r); err != nil {
-		return "", err
-	}
-	r.Message("正在推送到镜像仓库")
-	return s.PushRef(ctx, o.RegistryRef, r)
-}
-
 // BuildLocal 在本地 Docker 引擎构建镜像并打上仓库标签，不推送。
+// 多平台原子发布由调用方组合 BuildLocal + PushRef：全部变体构建成功后
+// 才开始推送。
 func (s *Service) BuildLocal(ctx context.Context, o LocalOptions, r Reporter) error {
 	if err := ValidateImageTag(o.RegistryRef); err != nil {
 		return err
@@ -274,7 +265,7 @@ func (s *Service) BuildLocal(ctx context.Context, o LocalOptions, r Reporter) er
 		return fmt.Errorf("本地 docker build: %w", err)
 	}
 	defer resp.Body.Close()
-	if _, err = streamDockerMessages(resp.Body, r); err != nil {
+	if _, err = streamDockerMessages(resp.Body, r, "构建"); err != nil {
 		return err
 	}
 	return nil
@@ -294,7 +285,7 @@ func (s *Service) PushRef(ctx context.Context, ref string, r Reporter) (string, 
 	if err != nil {
 		return "", fmt.Errorf("推送镜像仓库: %w", err)
 	}
-	digest, err := streamDockerMessages(push, r)
+	digest, err := streamDockerMessages(push, r, "推送")
 	if err != nil {
 		return "", err
 	}
@@ -333,7 +324,7 @@ func DetectBuildVariants(dir string) ([]string, error) {
 	if len(variants) > 0 {
 		return variants, nil
 	}
-	if existsRegularFile(filepath.Join(dir, "Dockerfile")) {
+	if existsRegularFile(filepath.Join(dir, "Dockerfile")) || existsRegularFile(filepath.Join(dir, "Dockerfile.cpu")) {
 		return []string{"universal"}, nil
 	}
 	return nil, fmt.Errorf("源码中没有 Dockerfile、Dockerfile.nvidia 或 Dockerfile.denglin")

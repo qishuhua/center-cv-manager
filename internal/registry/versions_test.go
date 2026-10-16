@@ -93,19 +93,19 @@ func TestListVersionsAndPlatformFilter(t *testing.T) {
 	}
 }
 
-// TestVersionsForPlatformSharedTag 验证无平台后缀的历史标签对所有平台可用。
+// TestVersionsForPlatformSharedTag 验证无平台后缀的历史标签不提供给任何平台：
+// 发布编排按平台后缀查询 digest，shared 标签走不通分发链路。
 func TestVersionsForPlatformSharedTag(t *testing.T) {
 	list := []SourceVersions{{
 		Repository: "center-cv/x", SourceID: "s1", SourceName: "x",
 		Versions: []SoftwareVersion{{Version: "v0-aaa", Platforms: []PlatformTag{{Platform: "shared", Tag: "v0-aaa"}}}},
 	}}
 	for _, platform := range []string{"nvidia", "denglin", "cpu"} {
-		filtered := VersionsForPlatform(list, platform)
-		if len(filtered) != 1 || len(filtered[0].Versions) != 1 {
-			t.Fatalf("平台 %s 应看到 shared 标签版本: %+v", platform, filtered)
+		if filtered := VersionsForPlatform(list, platform); len(filtered) != 0 {
+			t.Fatalf("平台 %s 不应看到 shared 标签版本: %+v", platform, filtered)
 		}
-		if got := TagForPlatform(filtered[0].Versions[0], platform); got != "v0-aaa" {
-			t.Fatalf("平台 %s 的标签 = %q", platform, got)
+		if got := TagForPlatform(list[0].Versions[0], platform); got != "" {
+			t.Fatalf("平台 %s 的标签 = %q，期望空串", platform, got)
 		}
 	}
 }
