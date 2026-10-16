@@ -1,0 +1,21 @@
+web/src/ModelUploadDialog.vue
+  s_a6df3de9deccd1::t_40c798dbe5b855 16-19,21
+web/src/TerminalPage.vue
+  s_a6df3de9deccd1::t_65b4c95734dca9 83-92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "a6b985686b2bfb1d9b9279650cb0fbb2bc6eaffa",
+  "prompts": {},
+  "sessions": {
+    "s_a6df3de9deccd1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f338f9b0-c54d-46f9-82e1-a7ba0dabe12b",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
