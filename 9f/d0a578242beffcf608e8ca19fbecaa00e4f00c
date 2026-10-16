@@ -1,0 +1,41 @@
+internal/registry/versions.go
+  s_a6df3de9deccd1::t_cbbd892842622d 245-285
+web/src/App.vue
+  s_a6df3de9deccd1::t_ccf9ec5cd93158 724-727,729-733
+  s_a6df3de9deccd1::t_5ac66c83fdc2fe 416,420,422,425-427,429-432
+  s_a6df3de9deccd1::t_0d49a8be975029 417-419,421,423-424,428
+  s_a6df3de9deccd1::t_20f009f286ab61 728
+  s_a6df3de9deccd1::t_8852712bbeec31 574
+internal/registry/client.go
+  s_a6df3de9deccd1::t_40112408164db1 83-108
+internal/api/registry.go
+  s_a6df3de9deccd1::t_eb46cdae118aaf 5-6
+  s_a6df3de9deccd1::t_e4000540471226 77-92
+.gitignore
+  h_4ba6e213f37271 10
+internal/registry/versions_test.go
+  s_a6df3de9deccd1::t_9618fe3fd2ab23 96-135
+internal/api/server.go
+  s_a6df3de9deccd1::t_1e3623890d8a4d 154
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "9fd0a578242beffcf608e8ca19fbecaa00e4f00c",
+  "prompts": {},
+  "humans": {
+    "h_4ba6e213f37271": {
+      "author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  },
+  "sessions": {
+    "s_a6df3de9deccd1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f338f9b0-c54d-46f9-82e1-a7ba0dabe12b",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
