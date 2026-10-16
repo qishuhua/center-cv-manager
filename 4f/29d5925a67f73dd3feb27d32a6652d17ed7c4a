@@ -1,0 +1,51 @@
+internal/api/server.go
+  s_a6df3de9deccd1::t_aae2b387c8a995 1314,1320
+internal/api/release_registry.go
+  s_a6df3de9deccd1::t_efccc52fd68039 92
+  s_a6df3de9deccd1::t_60b0c0ca26c6c0 47-63
+internal/api/software_publish.go
+  s_a6df3de9deccd1::t_aee746cbc77c63 101-107
+CLAUDE.md
+  s_a6df3de9deccd1::t_c04c7434833064 100
+internal/registry/versions_test.go
+  s_a6df3de9deccd1::t_ed97e7d8b3aaff 96-97,104-106,108-109,112-118
+  s_a6df3de9deccd1::t_55a304bc552f4b 119
+web/src/App.vue
+  s_a6df3de9deccd1::t_7f6ea538f8bec0 195
+  s_a6df3de9deccd1::t_8558c59d2da828 189
+internal/build/service.go
+  s_a6df3de9deccd1::t_c44bd791ce4130 310-311
+  s_a6df3de9deccd1::t_98df08a340d5e8 259
+  s_a6df3de9deccd1::t_a86ebe99c75f0a 189
+  s_a6df3de9deccd1::t_d5ca0700193acb 247
+internal/registry/versions.go
+  s_a6df3de9deccd1::t_19310bd7e270ac 266-267,274-275
+  s_a6df3de9deccd1::t_de6d8c1d5050e9 225-226,232-233
+  s_a6df3de9deccd1::t_ad17fca87d3006 276-278
+docs/registry-distribution-architecture.html
+  s_ced253ea19e9cb::t_3904d31c5da942 1-2849
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "4f29d5925a67f73dd3feb27d32a6652d17ed7c4a",
+  "prompts": {},
+  "sessions": {
+    "s_a6df3de9deccd1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f338f9b0-c54d-46f9-82e1-a7ba0dabe12b",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_ced253ea19e9cb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a142aa-8145-7621-959f-89cc414eda72",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
