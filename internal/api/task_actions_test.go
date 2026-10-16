@@ -12,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func TestTaskActionsValidatePersistedState(t *testing.T) {
+func TestDeleteTaskRemovesRecordAndLogs(t *testing.T) {
 	st, err := store.Open(filepath.Join(t.TempDir(), "tasks.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -23,28 +23,8 @@ func TestTaskActionsValidatePersistedState(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := &Server{store: st, tasks: tasks}
-	for _, tc := range []struct {
-		id, status, kind string
-		want             int
-	}{
-		{"running", task.Running, "MODEL_SYNC", 409},
-		{"success", task.Success, "MODEL_SYNC", 409},
-		{"cancelled", task.Cancelled, "MODEL_SYNC", 409},
-		{"legacy-model", task.Failed, "MODEL_SYNC", 400},
-		{"legacy-deploy", task.Failed, "DEPLOY_STACK", 400},
-	} {
-		t.Run(tc.id, func(t *testing.T) {
-			if err := st.SaveTask(&domain.Task{ID: tc.id, Type: tc.kind, Status: tc.status, CreatedAt: time.Now()}); err != nil {
-				t.Fatal(err)
-			}
-			response := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(response)
-			c.Params = gin.Params{{Key: "id", Value: tc.id}}
-			s.retryTask(c)
-			if response.Code != tc.want {
-				t.Fatalf("retry status %d: %s", response.Code, response.Body.String())
-			}
-		})
+	if err := st.SaveTask(&domain.Task{ID: "legacy-model", Type: "MODEL_SYNC", Status: task.Failed, CreatedAt: time.Now()}); err != nil {
+		t.Fatal(err)
 	}
 	if err := st.AppendLog("legacy-model", "old log"); err != nil {
 		t.Fatal(err)

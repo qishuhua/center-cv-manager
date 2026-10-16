@@ -172,7 +172,6 @@ func (s *Server) Router() *gin.Engine {
 	admin.POST("/releases", s.release)
 	admin.POST("/tasks/:id/cancel", s.cancelTask)
 	admin.POST("/tasks/cancel-all", s.cancelAllTasks)
-	admin.POST("/tasks/:id/retry", s.retryTask)
 	admin.GET("/users", s.listUsers)
 	// 账号体系与审计记录类操作仅限内建 admin 账号，不随管理权限下放。
 	superAdmin := admin.Group("")
