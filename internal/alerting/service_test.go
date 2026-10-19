@@ -25,7 +25,7 @@ func (r *memoryRepository) SaveAlertCredential(value domain.AlertCredential) err
 	return nil
 }
 
-func TestCredentialIsGlobalEncryptedAndMasked(t *testing.T) {
+func TestCredentialIsGlobalEncryptedAndReadable(t *testing.T) {
 	cipher, err := secret.LoadOrCreate(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -37,13 +37,13 @@ func TestCredentialIsGlobalEncryptedAndMasked(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !public.Configured || public.FeishuWebhook != "********" {
-		t.Fatalf("public credential was not masked: %#v", public)
+	if !public.Configured || public.FeishuWebhook != webhook {
+		t.Fatalf("saved credential was not readable: %#v", public)
 	}
 	if repository.credential.FeishuWebhook == webhook {
 		t.Fatal("webhook was stored as plaintext")
 	}
-	config, err := service.Config()
+	config, err := service.Credential()
 	if err != nil {
 		t.Fatal(err)
 	}

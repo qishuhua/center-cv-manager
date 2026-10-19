@@ -1,6 +1,7 @@
 package sshx
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"time"
@@ -19,6 +20,11 @@ type Config struct {
 }
 
 func Dial(cfg Config) (*ssh.Client, string, error) {
+	return DialContext(context.Background(), cfg)
+}
+
+// DialContext bounds both TCP connection and SSH handshake, and honors cancellation.
+func DialContext(ctx context.Context, cfg Config) (*ssh.Client, string, error) {
 	var auth ssh.AuthMethod
 	if cfg.PrivateKey != "" {
 		var signer ssh.Signer
@@ -45,9 +51,23 @@ func Dial(cfg Config) (*ssh.Client, string, error) {
 		}
 		return nil
 	}
-	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", cfg.Host, cfg.Port), &ssh.ClientConfig{User: cfg.Username, Auth: []ssh.AuthMethod{auth}, HostKeyCallback: callback, Timeout: 12 * time.Second})
+	address := net.JoinHostPort(cfg.Host, fmt.Sprint(cfg.Port))
+	connectCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
+	defer cancel()
+	conn, err := (&net.Dialer{}).DialContext(connectCtx, "tcp", address)
 	if err != nil {
 		return nil, fingerprint, fmt.Errorf("SSH 连接失败: %w", err)
 	}
+	deadline, _ := connectCtx.Deadline()
+	_ = conn.SetDeadline(deadline)
+	stop := context.AfterFunc(connectCtx, func() { _ = conn.Close() })
+	sshConn, channels, requests, err := ssh.NewClientConn(conn, address, &ssh.ClientConfig{User: cfg.Username, Auth: []ssh.AuthMethod{auth}, HostKeyCallback: callback})
+	stop()
+	if err != nil {
+		_ = conn.Close()
+		return nil, fingerprint, fmt.Errorf("SSH 连接失败: %w", err)
+	}
+	_ = conn.SetDeadline(time.Time{})
+	client := ssh.NewClient(sshConn, channels, requests)
 	return client, fingerprint, nil
 }

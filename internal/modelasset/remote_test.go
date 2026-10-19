@@ -9,9 +9,23 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 )
+
+func TestModelPathGuardHomeRelativeTerminates(t *testing.T) {
+	done := make(chan string, 1)
+	go func() { done <- modelPathGuard("~/.local/share/center-manager/data/models", "permission-probe") }()
+	select {
+	case command := <-done:
+		if !strings.Contains(command, `test ! -L "$HOME"`) || !strings.Contains(command, "permission-probe") {
+			t.Fatalf("missing home/path checks: %s", command)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("home-relative path traversal did not terminate")
+	}
+}
 
 type quietReporter struct{}
 

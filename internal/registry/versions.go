@@ -173,6 +173,19 @@ func (s *Service) ListVersions(ctx context.Context) ([]SourceVersions, error) {
 	if err != nil {
 		return nil, err
 	}
+	// 来源记录重建后 ID 会变化；仓库路径才是历史镜像与当前软件的关联。
+	sources, err := s.store.ListSources()
+	if err != nil {
+		return nil, fmt.Errorf("读取当前软件配置失败: %w", err)
+	}
+	currentSources := make(map[string]SourceVersions, len(sources))
+	for _, source := range sources {
+		path := RepoPath(source)
+		if previous, exists := currentSources[path]; exists && previous.SourceID != source.ID {
+			return nil, fmt.Errorf("镜像仓库路径 %s 对应多个软件，请检查软件名称", path)
+		}
+		currentSources[path] = SourceVersions{Repository: path, SourceID: source.ID, SourceName: source.Name}
+	}
 	out := []SourceVersions{}
 	for _, repository := range repositories {
 		if !strings.HasPrefix(repository, DefaultPrefix+"/") {
@@ -183,6 +196,9 @@ func (s *Service) ListVersions(ctx context.Context) ([]SourceVersions, error) {
 			return nil, err
 		}
 		source := SourceVersions{Repository: repository}
+		if current, exists := currentSources[repository]; exists {
+			source = current
+		}
 		versions := map[string]*SoftwareVersion{}
 		for _, tag := range tags {
 			info, err := client.ImageInfo(ctx, repository, tag)

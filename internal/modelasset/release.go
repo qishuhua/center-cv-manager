@@ -623,11 +623,13 @@ func (s *Service) SetModelSetPinned(ctx context.Context, centerID string, pinned
 	if err != nil {
 		return ModelSetPin{}, nil, err
 	}
-	client, fingerprint, err := sshx.Dial(cfg)
+	client, fingerprint, err := sshx.DialContext(ctx, cfg)
 	if err != nil {
 		return ModelSetPin{}, nil, err
 	}
 	defer client.Close()
+	stopOnCancel := context.AfterFunc(ctx, func() { _ = client.Close() })
+	defer stopOnCancel()
 	_ = s.centers.RememberHostKey(stored, fingerprint)
 	targetRoot := modular.ModelsRoot(stored)
 	files, err := prepareRemoteFiles(ctx, client, cfg.Password, targetRoot, discardReporter{})

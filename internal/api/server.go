@@ -239,7 +239,7 @@ func (s *Server) saveCenter(c *gin.Context) {
 	ok(c, out)
 }
 
-func (s *Server) submitCenterInitialization(v domain.Center, items []deploy.Item, models []modelasset.ReleaseItem, operator string) (*domain.Task, error) {
+func (s *Server) submitCenterInitialization(v domain.Center, items []deploy.Item, models []modelasset.ReleaseItem) (*domain.Task, error) {
 	s.initializationMu.Lock()
 	defer s.initializationMu.Unlock()
 	current, err := s.centers.GetPublic(v.ID)
@@ -255,10 +255,8 @@ func (s *Server) submitCenterInitialization(v domain.Center, items []deploy.Item
 	softwareJSON, _ := json.Marshal(items)
 	modelsJSON, _ := json.Marshal(models)
 	params := map[string]string{"center_id": v.ID, "center_name": v.Name, "items": string(softwareJSON), "models": string(modelsJSON)}
-	finish := notifyCenterOperation(s.alerts, "🛠️", "初始化中心", operator, v.Name, "将上传模块配置、按依赖顺序启动全部服务，并发布所选业务代码与模型版本；初始化期间服务分批上线。")
 	return s.tasks.Submit("INITIALIZE_CENTER", params, func(ctx context.Context, h *task.Handle) error {
-		var successDetail string
-		err := centerlock.Within(ctx, v.ID, func(ctx context.Context) error {
+		return centerlock.Within(ctx, v.ID, func(ctx context.Context) error {
 			current, err := s.centers.GetPublic(v.ID)
 			if err != nil {
 				return err
@@ -305,26 +303,9 @@ func (s *Server) submitCenterInitialization(v domain.Center, items []deploy.Item
 			if finished.Deployment != nil && finished.Deployment.Status != "ready" {
 				return fmt.Errorf("初始化未完成，当前状态: %s", finished.Deployment.Status)
 			}
-			// 汇总本次实际发布的业务镜像与模型版本，随完成通知发送到飞书。
-			lines := make([]string, 0, len(items)+len(plan.ModelPlan.Targets)+2)
-			lines = append(lines, "业务镜像：")
-			for _, item := range items {
-				lines = append(lines, "- "+softwareVersionText(item.SourceName, item.Ref, item.Commit))
-			}
-			lines = append(lines, "模型：")
-			for _, item := range plan.ModelPlan.Targets {
-				variant := item.Platform
-				if item.HardwareProfile != "" {
-					variant += "-" + item.HardwareProfile
-				}
-				lines = append(lines, fmt.Sprintf("- %s:%s[%s]@%s", item.Model, item.Version, variant, item.ManifestDigest[:12]))
-			}
-			successDetail = strings.Join(lines, "\n")
 			h.Message("初始化部署完成，所选业务代码与模型已发布，全部模块已就绪")
 			return nil
 		})
-		finish(err, successDetail)
-		return err
 	}), nil
 }
 
@@ -378,7 +359,7 @@ func (s *Server) initializeCenter(c *gin.Context) {
 		fail(c, 400, err)
 		return
 	}
-	result, err := s.submitCenterInitialization(v, items, models, releaseOperator(c))
+	result, err := s.submitCenterInitialization(v, items, models)
 	if err != nil {
 		fail(c, 409, err)
 		return

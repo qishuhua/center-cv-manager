@@ -31,12 +31,7 @@ func New(store Repository, cipher *secret.Cipher) *Service {
 }
 
 func (s *Service) Credential() (domain.AlertCredential, error) {
-	value, err := s.store.GetAlertCredential()
-	if err == nil && value.FeishuWebhook != "" {
-		value.FeishuWebhook = center.Mask
-		value.Configured = true
-	}
-	return value, err
+	return s.Config()
 }
 
 func (s *Service) SaveCredential(input domain.AlertCredential) (domain.AlertCredential, error) {
@@ -64,8 +59,7 @@ func (s *Service) SaveCredential(input domain.AlertCredential) (domain.AlertCred
 	if err = s.store.SaveAlertCredential(input); err != nil {
 		return domain.AlertCredential{}, err
 	}
-	input.FeishuWebhook = center.Mask
-	return input, nil
+	return s.Credential()
 }
 
 func (s *Service) Config() (domain.AlertCredential, error) {

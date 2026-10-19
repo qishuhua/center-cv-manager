@@ -142,8 +142,8 @@ func (s *Service) ResetCenter(ctx context.Context, id string, r Reporter) error 
 		if err = s.centers.ResetRuntime(id, next); err != nil {
 			return err
 		}
-		r.Progress(100)
-		r.Message("重置完成，等待用户重新初始化；镜像、数据卷及模型文件已保留")
+		r.Progress(90)
+		r.Message("容器和部署配置已清理，等待模型版本组解绑")
 		return nil
 	})
 }

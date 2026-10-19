@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"time"
 )
 
 func (s *Server) resetCenterDeployment(c *gin.Context) {
@@ -21,11 +22,8 @@ func (s *Server) resetCenterDeployment(c *gin.Context) {
 		s.storeError(c, err)
 		return
 	}
-	finish := notifyCenterOperation(s.alerts, "⚙️", "重置中心", releaseOperator(c), center.Name, "将删除受管 Compose 容器与部署配置，服务立即下线；镜像、数据卷与模型文件保留。")
 	ok(c, s.tasks.Submit("RESET_CENTER", map[string]string{"center_id": center.ID, "center_name": center.Name, "confirm_reset": "true"}, func(ctx context.Context, h *task.Handle) error {
-		err := s.runCenterReset(ctx, center.ID, h)
-		finish(err, "")
-		return err
+		return s.runCenterReset(ctx, center.ID, h)
 	}))
 }
 
@@ -34,9 +32,15 @@ func (s *Server) runCenterReset(ctx context.Context, id string, h *task.Handle) 
 		if err := s.provisioning.ResetCenter(ctx, id, h); err != nil {
 			return err
 		}
-		if _, _, err := s.models.SetModelSetPinned(ctx, id, false); err != nil {
+		h.Message("正在解绑模型版本组")
+		h.Log("容器和部署配置清理完成，正在解绑模型版本组（最长等待 60 秒）")
+		cleanupCtx, cancel := context.WithTimeout(ctx, time.Minute)
+		defer cancel()
+		if _, _, err := s.models.SetModelSetPinned(cleanupCtx, id, false); err != nil {
 			return fmt.Errorf("中心已重置，但模型版本组解绑失败，请重试重置: %w", err)
 		}
+		h.Log("模型版本组解绑完成")
+		h.Message("重置完成，等待用户重新初始化；镜像、数据卷及模型文件已保留")
 		return nil
 	})
 }

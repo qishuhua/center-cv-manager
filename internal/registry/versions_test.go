@@ -2,6 +2,7 @@ package registry
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -44,7 +45,7 @@ func TestListVersionsAndPlatformFilter(t *testing.T) {
 				fmt.Fprintf(w, `{"created":"2026-10-16T10:00:00Z","config":{"Labels":{"%s":"s1","%s":"business","%s":"v1","%s":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}}`,
 					build.LabelSourceID, build.LabelSourceName, build.LabelSourceRef, build.LabelCommit)
 			case "sha256:config-v2-def-nvidia":
-				fmt.Fprintf(w, `{"created":"2026-10-16T11:00:00Z","config":{"Labels":{"%s":"s1","%s":"business","%s":"v2","%s":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}}}`,
+				fmt.Fprintf(w, `{"created":"2026-10-16T11:00:00Z","config":{"Labels":{"%s":"s2","%s":"business","%s":"v2","%s":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}}}`,
 					build.LabelSourceID, build.LabelSourceName, build.LabelSourceRef, build.LabelCommit)
 			default:
 				w.WriteHeader(http.StatusNotFound)
@@ -90,6 +91,29 @@ func TestListVersionsAndPlatformFilter(t *testing.T) {
 	}
 	if version, platform := splitTag("plain"); version != "plain" || platform != "shared" {
 		t.Fatalf("splitTag(plain) = %q, %q", version, platform)
+	}
+	// 同一仓库保留旧 ID 镜像，重新添加软件后应恢复全部历史版本。
+	// 再次查询也覆盖镜像元数据缓存命中时当前来源配置仍然生效。
+	for _, id := range []string{"s2", "restored-source"} {
+		store.sources = []domain.Source{{ID: id, Name: "Business"}}
+		restored, err := service.ListVersions(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(restored) != 1 || restored[0].SourceID != id || restored[0].SourceName != "Business" || len(restored[0].Versions) != 2 {
+			t.Fatalf("恢复软件 %s 的历史版本失败: %+v", id, restored)
+		}
+		if restored[0].Versions[0].Version != "v2-def" || len(restored[0].Versions[1].Platforms) != 2 {
+			t.Fatalf("恢复后版本或平台丢失: %+v", restored)
+		}
+	}
+	store.sources = append(store.sources, domain.Source{ID: "ambiguous", Name: "business"})
+	if _, err := service.ListVersions(context.Background()); err == nil {
+		t.Fatal("同一路径对应多个软件时应报错，不能任意关联")
+	}
+	store.sourcesErr = errors.New("sources unavailable")
+	if _, err := service.ListVersions(context.Background()); !errors.Is(err, store.sourcesErr) {
+		t.Fatalf("读取软件配置失败应传播错误: %v", err)
 	}
 }
 

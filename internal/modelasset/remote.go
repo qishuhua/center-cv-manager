@@ -89,7 +89,7 @@ func modelPathGuard(root, name string) string {
 	seen := map[string]bool{}
 	var checks []string
 	for _, current := range paths {
-		for current != "/" {
+		for current != "/" && current != "." {
 			if !seen[current] {
 				checks = append(checks, "test ! -L "+shellQuote(current))
 				seen[current] = true

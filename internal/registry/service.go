@@ -24,6 +24,7 @@ const DefaultEndpoint = "http://127.0.0.1:5000"
 var ErrNotConfigured = errors.New("尚未配置镜像仓库")
 
 type Store interface {
+	ListSources() ([]domain.Source, error)
 	GetRegistrySettings() (domain.RegistrySettings, error)
 	SaveRegistrySettings(domain.RegistrySettings) error
 	GetOSSCredential() (domain.OSSCredential, error)

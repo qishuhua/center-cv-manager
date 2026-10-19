@@ -94,13 +94,17 @@ func TestClientManifestDigest(t *testing.T) {
 }
 
 type fakeStore struct {
-	settings domain.RegistrySettings
-	oss      domain.OSSCredential
+	sources    []domain.Source
+	sourcesErr error
+	settings   domain.RegistrySettings
+	oss        domain.OSSCredential
 }
+
+func (f *fakeStore) ListSources() ([]domain.Source, error) { return f.sources, f.sourcesErr }
 
 func (f *fakeStore) GetRegistrySettings() (domain.RegistrySettings, error) { return f.settings, nil }
 func (f *fakeStore) SaveRegistrySettings(v domain.RegistrySettings) error  { f.settings = v; return nil }
-func (f *fakeStore) GetOSSCredential() (domain.OSSCredential, error)      { return f.oss, nil }
+func (f *fakeStore) GetOSSCredential() (domain.OSSCredential, error)       { return f.oss, nil }
 
 func TestServiceSettings(t *testing.T) {
 	store := &fakeStore{}
