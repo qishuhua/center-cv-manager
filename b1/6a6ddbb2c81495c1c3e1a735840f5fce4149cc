@@ -1,0 +1,73 @@
+internal/provision/reset.go
+  s_25d6be1c9d1612::t_a7dabff08c9ab5 145-146
+internal/alerting/service.go
+  s_658a08c281061c::t_a43c77e7a04bec 34,62
+internal/alerting/service_test.go
+  s_658a08c281061c::t_99a782e565201b 28,40-41,46
+internal/api/center_notify.go
+  s_658a08c281061c::t_621e362e880eeb 35,37
+internal/api/reset.go
+  s_a58261b331e82e::t_a63a946bcf3161 9,26,35-39,42-43
+internal/api/server.go
+  s_658a08c281061c::t_89a2c8e192c64b 242,259,362
+internal/modelasset/release.go
+  s_658a08c281061c::t_8e5969a7be9d10 626,631-632
+internal/modelasset/remote.go
+  s_658a08c281061c::t_892c0b39f4e4f6 92
+internal/modelasset/remote_test.go
+  s_658a08c281061c::t_9e8c26cc081ad0 12,17-29
+internal/registry/service.go
+  s_658a08c281061c::t_3c71f65c2521f9 27
+internal/registry/service_test.go
+  s_a6df3de9deccd1::t_fe35f91af69ef1 97-100,103-104,107
+internal/registry/versions.go
+  s_658a08c281061c::t_48e5465986d61c 176-188,199-201
+internal/registry/versions_test.go
+  s_658a08c281061c::t_8d2aa8f85d1214 5,48,95-117
+internal/sshx/client.go
+  s_658a08c281061c::t_e206a3ed1c08b8 4,23-27,54-65,67,70-71
+internal/sshx/client_context_test.go
+  s_658a08c281061c::t_ee90ca3bb76ade 1-47
+web/src/App.vue
+  s_658a08c281061c::t_2757d4fcf0359c 629
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "b16a6ddbb2c81495c1c3e1a735840f5fce4149cc",
+  "prompts": {},
+  "sessions": {
+    "s_25d6be1c9d1612": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "76a9e7d6-4dbe-4d30-ae84-ab68b2137c33",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_658a08c281061c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a152f9-d3c4-7ad0-b28b-279f23669349",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_a58261b331e82e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a15303-039e-73b0-b68e-a85f8ea1c707",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_a6df3de9deccd1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f338f9b0-c54d-46f9-82e1-a7ba0dabe12b",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
