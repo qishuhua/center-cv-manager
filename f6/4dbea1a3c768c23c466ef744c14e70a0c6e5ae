@@ -1,0 +1,59 @@
+internal/templates/chute_test.go
+  s_ac6447b43eb58b::t_bc55f5d92a486f 27-28,46-47
+  s_ac6447b43eb58b::t_e84bd651b89dea 48,98,103-104,109-111,113
+internal/api/server.go
+  s_ac6447b43eb58b::t_03ba0f37a47589 248
+internal/templates/modules.go
+  s_ac6447b43eb58b::t_5cb53e08637d8b 101
+internal/provision/service.go
+  s_ac6447b43eb58b::t_4934b1c52c82e4 221
+internal/templates/chute.go
+  s_ac6447b43eb58b::t_1ba2e7d5b0d418 187-189
+  s_ac6447b43eb58b::t_c29b1aead7c917 10-11,15-17
+web/src/types.ts
+  s_ac6447b43eb58b::t_b696ea6ec893c3 3
+internal/center/service_test.go
+  s_ac6447b43eb58b::t_8dfe762a832d80 46-54,58
+  s_ac6447b43eb58b::t_129ed40ea12354 73
+  s_ac6447b43eb58b::t_ac8e2e37121bb3 84
+internal/store/sqlite.go
+  s_ac6447b43eb58b::t_dfcbf9db2e373e 90
+  s_ac6447b43eb58b::t_fb7fdbfefe0197 202
+  s_ac6447b43eb58b::t_fee46aadd3da93 254
+  s_ac6447b43eb58b::t_b9e136c2008a16 213,233
+web/src/App.vue
+  s_ac6447b43eb58b::t_0d677fce769318 670
+  s_ac6447b43eb58b::t_70856b62844a5f 41,293
+  s_ac6447b43eb58b::t_45feb53d2d2c61 43
+  s_ac6447b43eb58b::t_07ff89b9fa336c 295
+internal/center/service.go
+  s_ac6447b43eb58b::t_0b44acdd243de4 145
+  s_ac6447b43eb58b::t_7feffc27635c84 129
+internal/provision/wms.go
+  s_ac6447b43eb58b::t_30ac30768fd5dd 60
+  s_ac6447b43eb58b::t_88f6dae63908d1 17-20
+CLAUDE.md
+  s_ac6447b43eb58b::t_7c826869b8a4db 72
+  s_ac6447b43eb58b::t_c795ae2db70ce2 83
+internal/templates/embed.go
+  s_ac6447b43eb58b::t_cf543435b88f49 221-225
+internal/store/sqlite_test.go
+  s_ac6447b43eb58b::t_10e02c66695c23 124,127
+  s_ac6447b43eb58b::t_df1a0c43c48e0f 136
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "f64dbea1a3c768c23c466ef744c14e70a0c6e5ae",
+  "prompts": {},
+  "sessions": {
+    "s_ac6447b43eb58b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0f3efa61-c7a5-4cfd-97f6-19016a013e0e",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
