@@ -2223,17 +2223,22 @@
                                "refId": "C"
                            },
                            {
-                               "expr": "sum(rate(video_transcode_jobs_alarm_failed_total{job=\"video-transcode-service\"}[$__rate_interval])) * 60",
-                               "legendFormat": "业务 OSS / 告警上报失败",
+                               "expr": "sum(rate(center_alarm_jobs_alarm_failed_total{job=\"center-alarm-service\"}[$__rate_interval])) * 60",
+                               "legendFormat": "业务 OSS / 告警上报失败（上报服务）",
                                "refId": "D"
                            },
                            {
-                               "expr": "sum(rate(video_transcode_jobs_material_oss_failed_total{job=\"video-transcode-service\"}[$__rate_interval])) * 60",
-                               "legendFormat": "素材 OSS 上传失败",
+                               "expr": "sum(rate(center_alarm_jobs_material_oss_failed_total{job=\"center-alarm-service\"}[$__rate_interval])) * 60",
+                               "legendFormat": "素材 OSS 上传失败（上报服务）",
                                "refId": "E"
+                           },
+                           {
+                               "expr": "sum(rate(video_transcode_jobs_report_publish_failed_total{job=\"video-transcode-service\"}[$__rate_interval])) * 60",
+                               "legendFormat": "转码结果发布失败",
+                               "refId": "G"
                            }
                        ],
-                       "title": "转码任务结果与失败类型速率（次/分钟）",
+                       "title": "转码/上报任务结果与失败类型速率（次/分钟）",
                        "type": "timeseries"
                    },
 

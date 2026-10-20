@@ -121,6 +121,31 @@ func TestCenterRuntimeSchemaUpgrade(t *testing.T) {
 	if loaded.CPUCount != 0 || loaded.GPUCount != 0 || loaded.DetectedAccelerator != "" || loaded.ComposeContent != "" || loaded.InitializedAt != nil {
 		t.Fatalf("runtime migration defaults mismatch: %#v", loaded)
 	}
+	if loaded.WMSURL != "" || loaded.OrganCode != "" || loaded.MisAuth != "" {
+		t.Fatalf("错分检测字段迁移默认值不匹配: %#v", loaded)
+	}
+	loaded.WMSURL, loaded.OrganCode, loaded.MisAuth = "http://10.21.61.48:31995", "637101", "auth"
+	loaded.TestMode = true
+	if err = st.SaveCenter(loaded); err != nil {
+		t.Fatal(err)
+	}
+	reloaded, err := st.GetCenter("legacy-center")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reloaded.WMSURL != "http://10.21.61.48:31995" || reloaded.OrganCode != "637101" || reloaded.MisAuth != "auth" {
+		t.Fatalf("错分检测字段回读不匹配: %#v", reloaded)
+	}
+	if !reloaded.TestMode {
+		t.Fatal("测试模式字段回读应为 true")
+	}
+	reloaded.TestMode = false
+	if err = st.SaveCenter(reloaded); err != nil {
+		t.Fatal(err)
+	}
+	if again, err := st.GetCenter("legacy-center"); err != nil || again.TestMode {
+		t.Fatal("测试模式字段应支持关闭回写")
+	}
 }
 
 func TestAlertCredentialRoundTrip(t *testing.T) {

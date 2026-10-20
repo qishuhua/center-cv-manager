@@ -3,7 +3,19 @@ package api
 import (
 	"context"
 	"time"
+
+	"center-cv-manager/internal/domain"
 )
+
+// notificationSender 返回中心的飞书通知发送器；测试模式中心返回 nil，
+// 静默该中心的全部管理端通知（发布开始/结束、初始化、暂停/恢复、模型固定/解绑）。
+// 各通知函数对 nil 发送器均为安全空操作，任务本身不受影响。
+func (s *Server) notificationSender(center domain.Center) textSender {
+	if center.TestMode {
+		return nil
+	}
+	return s.alerts
+}
 
 // notifyCenterResult 在同步完成的中心级即时操作（固定/解绑模型版本组）结束时
 // 发送一条结果消息：成功发操作图标 + 完成消息（可附明细），失败发 ❌ 失败消息。
@@ -32,9 +44,9 @@ func notifyCenterResult(sender textSender, icon, action, operator, centerName, s
 	send(message)
 }
 
-// notifyCenterOperation 在中心级运维操作（暂停/恢复）提交时向飞书群
+// notifyCenterOperation 在中心级运维操作（初始化/暂停/恢复）提交时向飞书群
 // 发送开始消息，并返回结束回调：任务结束时按结果发送成功或失败消息；成功消息
-// 可附带操作明细。初始化和重置中心不发送通知。
+// 可附带操作明细（如初始化发布的业务代码与模型版本清单）。重置中心不发送通知。
 // 与发布通知一致：尽力而为，发送失败不影响操作任务本身。
 func notifyCenterOperation(sender textSender, icon, action, operator, centerName, detail string) func(error, string) {
 	send := func(text string) {

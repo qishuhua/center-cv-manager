@@ -35,7 +35,7 @@ groups:
       # recreation (new ID) are detected without treating first discovery as
       # a restart.
       - record: business_container:start_time_seconds
-        expr: max by (name) (label_replace(container_start_time_seconds{job="cadvisor",name=~"/?(center-cv-service-[0-7]|center-cv-ingress|chute-verification-service|video-transcode-service)"}, "name", "$1", "name", "/?(.+)"))
+        expr: max by (name) (label_replace(container_start_time_seconds{job="cadvisor",name=~"/?(center-cv-service-[0-7]|center-cv-ingress|chute-verification-service|video-transcode-service|center-alarm-service)"}, "name", "$1", "name", "/?(.+)"))
 
       # Use the probe sample time: readiness from before this restart cannot
       # resolve its alert. A failed scrape must not count as ready either.
@@ -63,7 +63,7 @@ groups:
           description: '业务容器 {{ $labels.name }} 检测到重启，尚未确认本次启动后的 ready 检查成功；ready 后自动恢复，请检查容器日志、退出原因和在途任务。'
 
       - alert: BusinessContainerOomKilled
-        expr: increase(container_oom_events_total{job="cadvisor",name=~"/?(center-cv-service-[0-7]|center-cv-ingress|chute-verification-service|video-transcode-service)"}[10m]) > 0
+        expr: increase(container_oom_events_total{job="cadvisor",name=~"/?(center-cv-service-[0-7]|center-cv-ingress|chute-verification-service|video-transcode-service|center-alarm-service)"}[10m]) > 0
         labels:
           severity: critical
         annotations:

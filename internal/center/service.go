@@ -2,6 +2,7 @@ package center
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -15,6 +16,9 @@ import (
 )
 
 const Mask = "********"
+
+// defaultMisAuth 是两服务共用的 misAuth 公开约定默认值（上游 Compose 同值）。
+const defaultMisAuth = "20260606123a"
 
 type Repository interface {
 	ListCenters() ([]domain.Center, error)
@@ -47,6 +51,46 @@ func validate(v domain.Center) error {
 	}
 	if !centerpath.ValidRemoteFile(v.ComposeFile) {
 		return fmt.Errorf("Compose 文件必须是中心服务器上的绝对路径或 ~/ 开头的家目录路径")
+	}
+	if v.WMSURL != "" {
+		parsed, err := url.Parse(v.WMSURL)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+			return fmt.Errorf("WMS 服务地址必须是 http://主机[:端口] 形式的基地址")
+		}
+		if parsed.Scheme != "http" && parsed.Scheme != "https" {
+			return fmt.Errorf("WMS 服务地址仅支持 http 或 https")
+		}
+		if (parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.User != nil {
+			return fmt.Errorf("WMS 服务地址只能是基地址，不能包含路径、查询参数、fragment 或凭据")
+		}
+		if v.OrganCode == "" {
+			return fmt.Errorf("启用错分检测（填写 WMS 服务地址）时必须填写机构编码")
+		}
+		if v.MisAuth == "" {
+			return fmt.Errorf("启用错分检测（填写 WMS 服务地址）时必须填写 misAuth 鉴权值")
+		}
+	}
+	if err := validatePlainToken("机构编码", v.OrganCode, 128); err != nil {
+		return err
+	}
+	if err := validatePlainToken("misAuth 鉴权值", v.MisAuth, 512); err != nil {
+		return err
+	}
+	return nil
+}
+
+// validatePlainToken 校验与两服务约定一致的标识值：非空时限定长度且不含空白/控制字符。
+func validatePlainToken(name, value string, maxBytes int) error {
+	if value == "" {
+		return nil
+	}
+	if len(value) > maxBytes {
+		return fmt.Errorf("%s长度不能超过 %d 字节", name, maxBytes)
+	}
+	for _, ch := range value {
+		if ch <= 0x20 || ch == 0x7f {
+			return fmt.Errorf("%s不能包含空白或控制字符", name)
+		}
 	}
 	return nil
 }
@@ -87,6 +131,14 @@ func (s *Service) Save(input domain.Center) (domain.Center, error) {
 	if input.ComposeFile == "" {
 		input.ComposeFile = centerpath.DefaultComposeFile
 	}
+	// 与两服务 CV_WMS_URL 口径一致：去掉首尾空白与尾斜杠后入库。
+	input.WMSURL = strings.TrimRight(strings.TrimSpace(input.WMSURL), "/")
+	input.OrganCode = strings.TrimSpace(input.OrganCode)
+	input.MisAuth = strings.TrimSpace(input.MisAuth)
+	// misAuth 留空时使用公开约定默认值（上游 Compose 同值），写入 module.env 时始终显式。
+	if input.WMSURL != "" && input.MisAuth == "" {
+		input.MisAuth = defaultMisAuth
+	}
 	now := time.Now()
 	var old domain.Center
 	var exists bool
@@ -96,6 +148,9 @@ func (s *Service) Save(input domain.Center) (domain.Center, error) {
 		input.ID = uuid.NewString()
 	}
 	if exists {
+		if old.Deployment == nil && (input.WMSURL != "" || input.OrganCode != "" || input.MisAuth != "") {
+			return domain.Center{}, fmt.Errorf("旧中心（未模块化）不支持错分检测配置")
+		}
 		input.CreatedAt = old.CreatedAt
 		input.Deployment = old.Deployment
 		if old.Deployment != nil && input.ComposeFile != old.ComposeFile {

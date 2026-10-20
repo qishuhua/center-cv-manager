@@ -131,6 +131,7 @@ services:
       - --progs=/etc/mtail
       - --logs=/data/logs/*.log
       - --logs=/data/logs/video-transcode-service
+      - --logs=/data/logs/center-alarm-service
       - --ignore_filename_regex_pattern=\.[^.]+\.log$
       - --logtostderr
     volumes:

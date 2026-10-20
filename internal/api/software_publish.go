@@ -202,15 +202,23 @@ func (s *Server) releaseCenterSoftware(c *gin.Context) {
 	item := deploy.Item{SourceID: src.ID, SourceName: src.Name, Ref: ref, Commit: commit, ExpectedImage: build.ReleaseImageTag(src, ref, commit)}
 	centerID, centerName := center.ID, center.Name
 	versions := softwareVersionText(src.Name, ref, commit)
-	// 与统一发布一致：开始/结束向飞书群发送通知（尽力而为，不影响任务）。
-	notifier := newReleaseNotifier(s.alerts, releaseOperator(c), []string{centerName + "：" + versions})
+	// 与统一发布一致：开始/结束向飞书群发送通知（尽力而为，不影响任务）；
+	// 测试模式中心完全静默。
+	var notifier *releaseNotifier
+	if !center.TestMode {
+		notifier = newReleaseNotifier(s.alerts, releaseOperator(c), []string{centerName + "：" + versions})
+	}
 	created := s.tasks.Submit("RELEASE_SOFTWARE", map[string]string{
 		"center_id": centerID, "center_name": centerName, "repository": in.Repository, "tag": in.Tag, "versions": versions,
 	}, func(ctx context.Context, h *task.Handle) error {
 		err := s.runRelease(ctx, centerID, []deploy.Item{item}, nil, h)
-		notifier.record(centerName, err)
+		if notifier != nil {
+			notifier.record(centerName, err)
+		}
 		return err
 	})
-	s.watchReleaseNotificationsAsync(notifier, []*domain.Task{created})
+	if notifier != nil {
+		s.watchReleaseNotificationsAsync(notifier, []*domain.Task{created})
+	}
 	ok(c, created)
 }

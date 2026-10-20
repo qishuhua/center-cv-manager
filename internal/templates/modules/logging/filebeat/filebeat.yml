@@ -51,6 +51,21 @@ filebeat.inputs:
       event.dataset: video-transcode-service
     fields_under_root: true
 
+  - type: filestream
+    id: center-alarm-service-business-logs-v1
+    enabled: true
+    paths:
+      # 主日志文件无扩展名（与转码服务同款 spdlog 行为），需显式列出。
+      - /data/logs/center-alarm-service
+      - /data/logs/center-alarm-service.log
+      - /data/logs/center-alarm-service.*.log
+      - /data/logs/center-alarm-service-*.log
+      - /data/logs/center-alarm-service-*.*.log
+    fields:
+      service.name: center-alarm-service
+      event.dataset: center-alarm-service
+    fields_under_root: true
+
 processors:
   - add_host_metadata: ~
 

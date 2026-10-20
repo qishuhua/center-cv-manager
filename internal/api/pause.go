@@ -21,7 +21,7 @@ func (s *Server) pauseCenter(c *gin.Context) {
 		s.storeError(c, err)
 		return
 	}
-	finish := notifyCenterOperation(s.alerts, "⏸️", "暂停中心", releaseOperator(c), center.Name, "全部受管服务将按依赖反序停止并移除容器，外部访问随之中断；数据卷、镜像与配置保留，可随时恢复。")
+	finish := notifyCenterOperation(s.notificationSender(center), "⏸️", "暂停中心", releaseOperator(c), center.Name, "全部受管服务将按依赖反序停止并移除容器，外部访问随之中断；数据卷、镜像与配置保留，可随时恢复。")
 	ok(c, s.tasks.Submit("PAUSE_CENTER", map[string]string{"center_id": center.ID, "center_name": center.Name, "confirm": "true"}, func(ctx context.Context, h *task.Handle) error {
 		err := s.provisioning.PauseCenter(ctx, center.ID, h)
 		finish(err, "")
@@ -42,7 +42,7 @@ func (s *Server) resumeCenter(c *gin.Context) {
 		s.storeError(c, err)
 		return
 	}
-	finish := notifyCenterOperation(s.alerts, "▶️", "恢复中心", releaseOperator(c), center.Name, "将按模块依赖顺序重新启动全部服务并等待就绪。")
+	finish := notifyCenterOperation(s.notificationSender(center), "▶️", "恢复中心", releaseOperator(c), center.Name, "将按模块依赖顺序重新启动全部服务并等待就绪。")
 	ok(c, s.tasks.Submit("RESUME_CENTER", map[string]string{"center_id": center.ID, "center_name": center.Name, "confirm": "true"}, func(ctx context.Context, h *task.Handle) error {
 		err := s.provisioning.ResumeCenter(ctx, center.ID, h)
 		finish(err, "")

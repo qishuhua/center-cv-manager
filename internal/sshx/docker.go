@@ -18,7 +18,15 @@ type DockerClient struct {
 }
 
 func NewDocker(cfg Config, socket string) (*DockerClient, string, error) {
-	sshClient, fp, err := Dial(cfg)
+	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+	defer cancel()
+	return NewDockerContext(ctx, cfg, socket)
+}
+
+// NewDockerContext 用调用方 ctx 约束 SSH 拨号/握手与 Docker Ping 的总时长，
+// 供状态探测等对时延敏感的路径设置比默认 12 秒更紧的上限。
+func NewDockerContext(ctx context.Context, cfg Config, socket string) (*DockerClient, string, error) {
+	sshClient, fp, err := DialContext(ctx, cfg)
 	if err != nil {
 		return nil, fp, err
 	}
@@ -34,8 +42,6 @@ func NewDocker(cfg Config, socket string) (*DockerClient, string, error) {
 		sshClient.Close()
 		return nil, fp, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
-	defer cancel()
 	if _, err = cli.Ping(ctx); err != nil {
 		cli.Close()
 		sshClient.Close()

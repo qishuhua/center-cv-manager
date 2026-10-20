@@ -231,15 +231,35 @@ func (s *Server) saveCenter(c *gin.Context) {
 	if id := c.Param("id"); id != "" {
 		v.ID = id
 	}
+	var old domain.Center
+	if v.ID != "" {
+		if stored, err := s.centers.GetPublic(v.ID); err == nil {
+			old = stored
+		}
+	}
 	out, e := s.centers.Save(v)
 	if e != nil {
 		fail(c, 400, e)
 		return
 	}
+	// 错分检测配置变化时把新值同步到远端 business 模块（module.env + Compose），
+	// 随后由用户整体发布生效；初始化前/重置后的中心等初始化渲染时带上。
+	if old.ID != "" && old.Deployment != nil && out.Deployment != nil &&
+		(old.WMSURL != out.WMSURL || old.OrganCode != out.OrganCode || old.MisAuth != out.MisAuth) {
+		status := out.Deployment.Status
+		if status != "preparing" && status != "reset" {
+			ctx, cancel := context.WithTimeout(c.Request.Context(), 45*time.Second)
+			defer cancel()
+			if syncErr := s.provisioning.ApplyBusinessWMS(ctx, out.ID); syncErr != nil {
+				fail(c, 500, fmt.Errorf("中心已保存，但错分检测配置同步失败: %w", syncErr))
+				return
+			}
+		}
+	}
 	ok(c, out)
 }
 
-func (s *Server) submitCenterInitialization(v domain.Center, items []deploy.Item, models []modelasset.ReleaseItem) (*domain.Task, error) {
+func (s *Server) submitCenterInitialization(v domain.Center, items []deploy.Item, models []modelasset.ReleaseItem, operator string) (*domain.Task, error) {
 	s.initializationMu.Lock()
 	defer s.initializationMu.Unlock()
 	current, err := s.centers.GetPublic(v.ID)
@@ -255,8 +275,10 @@ func (s *Server) submitCenterInitialization(v domain.Center, items []deploy.Item
 	softwareJSON, _ := json.Marshal(items)
 	modelsJSON, _ := json.Marshal(models)
 	params := map[string]string{"center_id": v.ID, "center_name": v.Name, "items": string(softwareJSON), "models": string(modelsJSON)}
+	finish := notifyCenterOperation(s.notificationSender(current), "🛠️", "初始化中心", operator, v.Name, "将上传模块配置、按依赖顺序启动全部服务，并发布所选业务代码与模型版本；初始化期间服务分批上线。")
 	return s.tasks.Submit("INITIALIZE_CENTER", params, func(ctx context.Context, h *task.Handle) error {
-		return centerlock.Within(ctx, v.ID, func(ctx context.Context) error {
+		var successDetail string
+		err := centerlock.Within(ctx, v.ID, func(ctx context.Context) error {
 			current, err := s.centers.GetPublic(v.ID)
 			if err != nil {
 				return err
@@ -303,9 +325,26 @@ func (s *Server) submitCenterInitialization(v domain.Center, items []deploy.Item
 			if finished.Deployment != nil && finished.Deployment.Status != "ready" {
 				return fmt.Errorf("初始化未完成，当前状态: %s", finished.Deployment.Status)
 			}
+			// 汇总本次实际发布的业务镜像与模型版本，随完成通知发送到飞书。
+			lines := make([]string, 0, len(items)+len(plan.ModelPlan.Targets)+2)
+			lines = append(lines, "业务镜像：")
+			for _, item := range items {
+				lines = append(lines, "- "+softwareVersionText(item.SourceName, item.Ref, item.Commit))
+			}
+			lines = append(lines, "模型：")
+			for _, item := range plan.ModelPlan.Targets {
+				variant := item.Platform
+				if item.HardwareProfile != "" {
+					variant += "-" + item.HardwareProfile
+				}
+				lines = append(lines, fmt.Sprintf("- %s:%s[%s]@%s", item.Model, item.Version, variant, item.ManifestDigest[:12]))
+			}
+			successDetail = strings.Join(lines, "\n")
 			h.Message("初始化部署完成，所选业务代码与模型已发布，全部模块已就绪")
 			return nil
 		})
+		finish(err, successDetail)
+		return err
 	}), nil
 }
 
@@ -359,7 +398,7 @@ func (s *Server) initializeCenter(c *gin.Context) {
 		fail(c, 400, err)
 		return
 	}
-	result, err := s.submitCenterInitialization(v, items, models)
+	result, err := s.submitCenterInitialization(v, items, models, releaseOperator(c))
 	if err != nil {
 		fail(c, 409, err)
 		return
@@ -525,7 +564,11 @@ func (s *Server) overview(c *gin.Context) {
 				result[index] = item
 				return
 			}
-			remote, fingerprint, connectionErr := sshx.NewDocker(cfg, socket)
+			// 状态探测用紧超时（拨号+握手+Ping 共 5 秒预算）：黑洞型不通的
+			// 中心不再拖满默认 12 秒 SSH 上限，仪表盘整体等待≈最慢一台。
+			probeCtx, probeCancel := context.WithTimeout(requestContext, 5*time.Second)
+			defer probeCancel()
+			remote, fingerprint, connectionErr := sshx.NewDockerContext(probeCtx, cfg, socket)
 			if connectionErr != nil {
 				item.Error = connectionErr.Error()
 				result[index] = item
@@ -533,9 +576,7 @@ func (s *Server) overview(c *gin.Context) {
 			}
 			defer remote.Close()
 			_ = s.centers.RememberHostKey(storedCenter, fingerprint)
-			ctx, cancel := context.WithTimeout(requestContext, 15*time.Second)
-			defer cancel()
-			if _, pingErr := remote.Client.Ping(ctx); pingErr != nil {
+			if _, pingErr := remote.Client.Ping(probeCtx); pingErr != nil {
 				item.Error = "Docker 连接失败: " + pingErr.Error()
 				result[index] = item
 				return
@@ -651,7 +692,7 @@ func (s *Server) setCenterModelPin(c *gin.Context) {
 	}
 	current, versions, err := s.models.SetModelSetPinned(ctx, center.ID, in.Pinned)
 	if err != nil {
-		notifyCenterResult(s.alerts, icon, action, releaseOperator(c), center.Name, "", err)
+		notifyCenterResult(s.notificationSender(center), icon, action, releaseOperator(c), center.Name, "", err)
 		fail(c, http.StatusConflict, err)
 		return
 	}
@@ -660,7 +701,7 @@ func (s *Server) setCenterModelPin(c *gin.Context) {
 		successDetail = "已固定 " + strconv.Itoa(len(versions)) + " 个模型版本：\n" + pinnedModelSummary(versions) +
 			"\n固定后仅允许相同 Manifest 的幂等发布，调整任一模型前需整体解绑。"
 	}
-	notifyCenterResult(s.alerts, icon, action, releaseOperator(c), center.Name, successDetail, nil)
+	notifyCenterResult(s.notificationSender(center), icon, action, releaseOperator(c), center.Name, successDetail, nil)
 	ok(c, current)
 }
 
@@ -1038,6 +1079,7 @@ func (s *Server) releaseModels(c *gin.Context) {
 	type modelReleaseJob struct {
 		centerID     string
 		centerName   string
+		testMode     bool
 		items        []modelasset.ReleaseItem
 		encoded      string
 		versionsText string
@@ -1056,11 +1098,18 @@ func (s *Server) releaseModels(c *gin.Context) {
 		}
 		encodedItems, _ := json.Marshal(resolvedItems)
 		versionsText := strings.Join(versions, "、")
-		jobs = append(jobs, modelReleaseJob{centerID: centerID, centerName: center.Name, items: resolvedItems, encoded: string(encodedItems), versionsText: versionsText})
-		centerLines = append(centerLines, center.Name+"："+versionsText)
+		jobs = append(jobs, modelReleaseJob{centerID: centerID, centerName: center.Name, testMode: center.TestMode, items: resolvedItems, encoded: string(encodedItems), versionsText: versionsText})
+		// 测试模式中心不进入发布通知名单。
+		if !center.TestMode {
+			centerLines = append(centerLines, center.Name+"："+versionsText)
+		}
 	}
 	// 与统一发布一致：开始/结束向飞书群发送通知（尽力而为，不影响任务）。
-	notifier := newReleaseNotifier(s.alerts, releaseOperator(c), centerLines)
+	var notifier *releaseNotifier
+	if len(centerLines) > 0 {
+		notifier = newReleaseNotifier(s.alerts, releaseOperator(c), centerLines)
+	}
+	var notifyTasks []*domain.Task
 	for _, job := range jobs {
 		params := map[string]string{
 			"center_id": job.centerID, "center_name": job.centerName,
@@ -1068,13 +1117,21 @@ func (s *Server) releaseModels(c *gin.Context) {
 			"items": job.encoded, "restart_stack": strconv.FormatBool(in.RestartStack),
 		}
 		job := job
+		notify := notifier != nil && !job.testMode
 		created = append(created, s.tasks.Submit("MODEL_RELEASE", params, func(ctx context.Context, h *task.Handle) error {
 			err := s.runModelRelease(ctx, job.centerID, job.items, in.RestartStack, h)
-			notifier.record(job.centerName, err)
+			if notify {
+				notifier.record(job.centerName, err)
+			}
 			return err
 		}))
+		if notify {
+			notifyTasks = append(notifyTasks, created[len(created)-1])
+		}
 	}
-	s.watchReleaseNotificationsAsync(notifier, created)
+	if notifier != nil {
+		s.watchReleaseNotificationsAsync(notifier, notifyTasks)
+	}
 	ok(c, created)
 }
 
@@ -1497,11 +1554,18 @@ func (s *Server) release(c *gin.Context) {
 		encodedModelItems, _ := json.Marshal(centerModelItems)
 		job := releaseJob{center: center, modelItems: centerModelItems, encoded: string(encodedModelItems), versionsText: strings.Join(allVersions, "、")}
 		jobs = append(jobs, job)
-		centerLines = append(centerLines, center.Name+"："+job.versionsText)
+		// 测试模式中心不进入发布通知名单。
+		if !center.TestMode {
+			centerLines = append(centerLines, center.Name+"："+job.versionsText)
+		}
 	}
 	// 发版开始/结束向飞书群发送通知，告知哪些中心正在发版（尽力而为，不影响发布）。
-	notifier := newReleaseNotifier(s.alerts, releaseOperator(c), centerLines)
+	var notifier *releaseNotifier
+	if len(centerLines) > 0 {
+		notifier = newReleaseNotifier(s.alerts, releaseOperator(c), centerLines)
+	}
 	created := make([]*domain.Task, 0, len(jobs))
+	var notifyTasks []*domain.Task
 	for _, job := range jobs {
 		params := map[string]string{
 			"center_id":   job.center.ID,
@@ -1511,13 +1575,21 @@ func (s *Server) release(c *gin.Context) {
 			"model_items": job.encoded,
 		}
 		centerID, centerName, modelItems := job.center.ID, job.center.Name, job.modelItems
+		notify := notifier != nil && !job.center.TestMode
 		created = append(created, s.tasks.Submit("RELEASE_VERSION", params, func(ctx context.Context, h *task.Handle) error {
 			err := s.runRelease(ctx, centerID, items, modelItems, h)
-			notifier.record(centerName, err)
+			if notify {
+				notifier.record(centerName, err)
+			}
 			return err
 		}))
+		if notify {
+			notifyTasks = append(notifyTasks, created[len(created)-1])
+		}
 	}
-	s.watchReleaseNotificationsAsync(notifier, created)
+	if notifier != nil {
+		s.watchReleaseNotificationsAsync(notifier, notifyTasks)
+	}
 	ok(c, created)
 }
 

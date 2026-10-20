@@ -35,7 +35,10 @@ func NewDeployment(composeFile string, workers int) *domain.Deployment {
 				m.ModelServices = append(m.ModelServices, fmt.Sprintf("center-cv-service-%d", i))
 				m.ReadyURLs = append(m.ReadyURLs, fmt.Sprintf("http://127.0.0.1:%d/api/readyz", 8181+i))
 			}
-			m.ReadyURLs = append(m.ReadyURLs, "http://127.0.0.1:8090/readyz", "http://127.0.0.1:8092/readyz")
+			m.ReadyURLs = append(m.ReadyURLs, "http://127.0.0.1:8090/readyz", "http://127.0.0.1:8092/readyz", "http://127.0.0.1:8093/readyz")
+			// 错分审核服务按中心 WMS 配置条件部署；Wait 会在服务不在本次
+			// 操作范围时过滤该探活（remote.go），未启用的中心不受影响。
+			m.ReadyURLs = append(m.ReadyURLs, "http://127.0.0.1:8091/readyz")
 		case "gateway":
 			m.DependsOn = []string{"business"}
 		case "monitoring":
@@ -92,10 +95,15 @@ func Command(m domain.ComposeModule) string {
 		// Changing it before migration could silently select new data volumes.
 		return "env COMPOSE_REMOVE_ORPHANS=false docker compose -f " + centerpath.ShellQuote(m.ComposeFile)
 	}
+	return CommandWithEnvFile(m, path.Join(path.Dir(m.ComposeFile), "module.env"))
+}
+
+// CommandWithEnvFile builds the modular Compose command with an explicit
+// environment file, used when validating candidate compose/env pairs before
+// either file replaces the live one.
+func CommandWithEnvFile(m domain.ComposeModule, envFile string) string {
 	base := "env -u COMPOSE_PROJECT_NAME -u COMPOSE_FILE -u COMPOSE_ENV_FILES -u COMPOSE_PROFILES -u CENTER_CV_DATA_PREFIX COMPOSE_REMOVE_ORPHANS=false docker compose"
-	if m.Project != "" {
-		base += " -p " + centerpath.ShellQuote(m.Project) + " --env-file " + centerpath.ShellQuote(path.Join(path.Dir(m.ComposeFile), "module.env"))
-	}
+	base += " -p " + centerpath.ShellQuote(m.Project) + " --env-file " + centerpath.ShellQuote(envFile)
 	return base + " -f " + centerpath.ShellQuote(m.ComposeFile)
 }
 
@@ -254,6 +262,8 @@ func ReadyURLsForServices(m domain.ComposeModule, services []string) []string {
 			ports["8091"] = true
 		case "video-transcode-service":
 			ports["8092"] = true
+		case "center-alarm-service":
+			ports["8093"] = true
 		default:
 			if strings.HasPrefix(name, "center-cv-service-") {
 				if index, err := strconv.Atoi(strings.TrimPrefix(name, "center-cv-service-")); err == nil {

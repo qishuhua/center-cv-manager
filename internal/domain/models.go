@@ -25,6 +25,10 @@ type Center struct {
 	ComposeProject      string      `json:"-"`
 	InitializedAt       *time.Time  `json:"initialized_at,omitempty"`
 	Description         string      `json:"description"`
+	WMSURL              string      `json:"wms_url,omitempty"`
+	OrganCode           string      `json:"organ_code,omitempty"`
+	MisAuth             string      `json:"mis_auth,omitempty"`
+	TestMode            bool        `json:"test_mode,omitempty"`
 	CreatedAt           time.Time   `json:"created_at"`
 	UpdatedAt           time.Time   `json:"updated_at"`
 }

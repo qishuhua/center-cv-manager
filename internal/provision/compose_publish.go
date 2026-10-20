@@ -14,6 +14,8 @@ import (
 	"center-cv-manager/internal/modular"
 	"center-cv-manager/internal/sshx"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/errdefs"
 	containertypes "github.com/docker/docker/api/types/container"
 	"gopkg.in/yaml.v3"
 )
@@ -352,6 +354,16 @@ func (s *Service) PublishCompose(ctx context.Context, id, file, revision string,
 				return e
 			}
 		}
+		// 配置变化时按项目标签清理已不在配置中的服务容器（保留数据卷）。
+		if p.Action == "deploy" {
+			removed, e := removeVanishedServices(ctx, r, p.Project, p.Services)
+			if e != nil {
+				return e
+			}
+			if len(removed) > 0 {
+				reporter.Message("已移除发布后不再定义的服务：" + strings.Join(removed, ", "))
+			}
+		}
 		// Re-read all configuration inputs after applying. SSH changes made during
 		// deployment must not be recorded as successfully published.
 		current, err := s.composePublishPlan(ctx, r, c, file)
@@ -368,6 +380,41 @@ func (s *Service) PublishCompose(ctx context.Context, id, file, revision string,
 		reporter.Message("Compose 发布成功")
 		return nil
 	})
+}
+// removeVanishedServices 停止并移除仍带着 Compose 项目标签、但服务已不在
+// 当前配置中的容器（如关闭错分检测后移除错分审核服务）。设计上不使用
+// --remove-orphans，清理必须按项目标签 + 服务名精确匹配；数据卷一律保留。
+func removeVanishedServices(ctx context.Context, r *sshx.DockerClient, project string, keep []string) ([]string, error) {
+	if project == "" || len(keep) == 0 {
+		return nil, nil
+	}
+	kept := make(map[string]bool, len(keep))
+	for _, name := range keep {
+		kept[name] = true
+	}
+	containers, err := r.Client.ContainerList(ctx, containertypes.ListOptions{
+		All:     true,
+		Filters: filters.NewArgs(filters.Arg("label", "com.docker.compose.project="+project)),
+	})
+	if err != nil {
+		return nil, err
+	}
+	removed := []string{}
+	for _, c := range containers {
+		service := c.Labels["com.docker.compose.service"]
+		if service == "" || kept[service] {
+			continue
+		}
+		timeout := 60
+		if err = r.Client.ContainerStop(ctx, c.ID, containertypes.StopOptions{Timeout: &timeout}); err != nil && !errdefs.IsNotFound(err) {
+			return removed, err
+		}
+		if err = r.Client.ContainerRemove(ctx, c.ID, containertypes.RemoveOptions{RemoveVolumes: false}); err != nil && !errdefs.IsNotFound(err) {
+			return removed, err
+		}
+		removed = append(removed, service)
+	}
+	return removed, nil
 }
 func containsString(values []string, value string) bool {
 	for _, s := range values {

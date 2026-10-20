@@ -89,9 +89,18 @@ func TestWaitSkipsAbsentOptionalChuteProbe(t *testing.T) {
 	if err := Wait(ctx, &sshx.DockerClient{Client: cli}, m, nil, []string{"http://127.0.0.1:8091/readyz"}); err != nil {
 		t.Fatal(err)
 	}
-	for _, u := range NewDeployment("/tmp/deploy/compose.yml", 1).Modules[2].ReadyURLs {
+	// 默认部署固定携带错分审核服务探活；服务未部署时由 Wait 过滤兜底。
+	business := NewDeployment("/tmp/deploy/compose.yml", 1).Modules[2]
+	found := false
+	for _, u := range business.ReadyURLs {
 		if strings.Contains(u, ":8091/") {
-			t.Fatal("default deployment probes optional chute service")
+			found = true
 		}
+	}
+	if !found {
+		t.Fatal("default deployment should carry the optional chute service probe")
+	}
+	if ReadyURLsForServices(business, []string{"center-alarm-service"})[0] != "http://127.0.0.1:8093/readyz" {
+		t.Fatal("center-alarm-service should map to its 8093 readyz probe")
 	}
 }

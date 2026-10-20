@@ -112,6 +112,13 @@ func (s *Service) Check(ctx context.Context, centerID string, items []Item) Chec
 		result.Error = "解析 Compose 配置失败: " + err.Error()
 		return result
 	}
+	// 模块化软件发布按 BaseServices 整体 up：未被本次发布分发覆盖的
+	// pull_policy:never 镜像必须已在中心上，否则 up 会在中途失败并
+	// 删掉旧容器（例如启用错分检测但错分审核镜像尚未分发）。
+	if checkErr := requireLocalImages(ctx, remote, composeConfig, items); checkErr != nil {
+		result.Error = checkErr.Error()
+		return result
+	}
 	for serviceName := range serviceImages {
 		result.BaseServices = append(result.BaseServices, serviceName)
 	}
@@ -490,6 +497,48 @@ func imageRepository(reference string) string {
 		reference = reference[:i]
 	}
 	return reference
+}
+
+// requireLocalImages 校验整体 up 会触碰的全部服务：非本次发布分发（按
+// com.center-manager.image.repository 或镜像名匹配发布项）的 pull_policy:never
+// 镜像必须已在中心上，否则 up 会在删除旧容器后因缺镜像中途失败。
+func requireLocalImages(ctx context.Context, remote *sshx.DockerClient, composeConfig string, items []Item) error {
+	var doc struct {
+		Services map[string]struct {
+			Image      string            `yaml:"image"`
+			PullPolicy string            `yaml:"pull_policy"`
+			Labels     map[string]string `yaml:"labels"`
+		} `yaml:"services"`
+	}
+	if err := yaml.Unmarshal([]byte(composeConfig), &doc); err != nil {
+		return err
+	}
+	releasing := map[string]bool{}
+	for _, item := range items {
+		releasing[item.SourceName] = true
+	}
+	names := make([]string, 0, len(doc.Services))
+	for name := range doc.Services {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		svc := doc.Services[name]
+		if !strings.EqualFold(strings.TrimSpace(svc.PullPolicy), "never") || strings.TrimSpace(svc.Image) == "" {
+			continue
+		}
+		repository := svc.Labels["com.center-manager.image.repository"]
+		if repository == "" {
+			repository = imageRepository(svc.Image)
+		}
+		if releasing[repository] {
+			continue
+		}
+		if _, _, err := remote.Client.ImageInspectWithRaw(ctx, svc.Image); err != nil {
+			return fmt.Errorf("服务 %s 需要本地镜像 %s，但中心上不存在；请先发布该服务的业务版本，或预置镜像后再发布", name, svc.Image)
+		}
+	}
+	return nil
 }
 
 func runSSH(ctx context.Context, client *ssh.Client, command, stdin string) (string, error) {

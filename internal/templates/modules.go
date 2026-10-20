@@ -96,7 +96,11 @@ func RenderModules(platform string, opts RenderOptions) (map[string]string, erro
 	}
 	files["gateway/secrets/grafana-logs.htpasswd"] = string(auth)
 	for _, id := range []string{"infra", "logging", "business", "gateway", "monitoring"} {
-		files[id+"/module.env"] = "# Module-specific Compose variables\n"
+		stub := "# Module-specific Compose variables\n"
+		if id == "business" {
+			stub = ApplyMisSortModuleEnv(stub, MisSortOptions{Enabled: opts.WMSURL != "", WMSURL: opts.WMSURL, OrganCode: opts.OrganCode, MisAuth: opts.MisAuth})
+		}
+		files[id+"/module.env"] = stub
 	}
 	return files, nil
 }
