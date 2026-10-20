@@ -1,0 +1,171 @@
+internal/templates/embed.go
+  s_1b0361e8a3a21e::t_a8131e4bf3f9cf 221-225
+internal/provision/service.go
+  s_1b0361e8a3a21e::t_351d785526663e 221
+internal/center/service_test.go
+  s_1b0361e8a3a21e::t_c9428d477f5f22 5
+  s_1b0361e8a3a21e::t_3261c5a895828c 62
+  s_1b0361e8a3a21e::t_23bb9109368f7e 87
+  s_1b0361e8a3a21e::t_dae95afb01ab1d 76,82-84
+  s_1b0361e8a3a21e::t_8ce20420e0cc4b 37-38,40-61,63-75,77-81,85-86,88-90
+  s_1b0361e8a3a21e::t_2d66e96a747ec2 39
+internal/templates/modules/monitoring/prometheus/prometheus.nvidia.yml
+  s_1b0361e8a3a21e::t_41e21e66d28c32 145-146
+  s_1b0361e8a3a21e::t_79560a69e07984 52-56
+  s_1b0361e8a3a21e::t_72fa241d825049 107-108
+internal/api/pause.go
+  s_1b0361e8a3a21e::t_b500982c2421f9 24
+  s_1b0361e8a3a21e::t_03d5997071c1d5 45
+internal/api/software_publish.go
+  s_1b0361e8a3a21e::t_dc9609539c3102 205-210,215-217,220-222
+internal/templates/modules/business/compose.denglin.yml
+  s_1b0361e8a3a21e::t_093aa836a7e99a 161-163
+  s_1b0361e8a3a21e::t_1561797bf783f5 192-211
+  s_1b0361e8a3a21e::t_228e018805864a 133-139,149-157,160,164-172,212-215
+  s_1b0361e8a3a21e::t_ee52b926d70992 158-159
+internal/provision/wms.go
+  s_1b0361e8a3a21e::t_82c49ceef617f9 1-50,52-74,78-93,96-116,118-125,133
+  s_1b0361e8a3a21e::t_037043e67f4d77 75-77
+  s_1b0361e8a3a21e::t_bd9897998137dc 51
+  s_1b0361e8a3a21e::t_841a7acc25c9eb 94-95
+  s_1b0361e8a3a21e::t_81acf687d7a2cf 117
+  s_1b0361e8a3a21e::t_6e94b2a2f65078 126-132
+internal/store/sqlite.go
+  s_1b0361e8a3a21e::t_044b860516d0eb 124-126
+  s_1b0361e8a3a21e::t_51d9188a9a2be0 255
+  s_1b0361e8a3a21e::t_71f6de166709c4 90
+  s_1b0361e8a3a21e::t_ce55dee8f1f369 203
+  s_1b0361e8a3a21e::t_fdcbafd24920d5 127
+  s_1b0361e8a3a21e::t_db4d1d7d2d1ce9 214
+  s_1b0361e8a3a21e::t_cdceb1598a7366 234
+internal/api/server.go
+  s_1b0361e8a3a21e::t_f87cfa4e304c2d 695,704
+  s_1b0361e8a3a21e::t_d8d5750d47ae47 234-239,245-257
+  s_1b0361e8a3a21e::t_ffe27d134db28b 346-347
+  s_1b0361e8a3a21e::t_24174585d2a8b7 1082,1101-1105,1108-1112,1120,1123-1125,1128-1133
+  s_1b0361e8a3a21e::t_aa69609782279c 258,1557-1560,1563-1566,1568,1578,1581-1583,1586-1591
+  s_1b0361e8a3a21e::t_c91e1d4bae8210 262,280-281,328-342
+  s_1b0361e8a3a21e::t_b2051b482d2aef 567-571,579
+  s_1b0361e8a3a21e::t_bc8cc172756687 278
+  s_1b0361e8a3a21e::t_0e064dbba4f09a 401
+internal/sshx/docker.go
+  s_1b0361e8a3a21e::t_5b884bcdb00e42 21-29
+internal/store/sqlite_test.go
+  s_1b0361e8a3a21e::t_4974de2c015eef 128,138-147
+  s_1b0361e8a3a21e::t_79a2882e16f1bb 124-127,129-137,148
+internal/templates/modules/monitoring/grafana/dashboards/center-cv-overview.denglin.json
+  s_1b0361e8a3a21e::t_3717d8f4233055 2165-2166,2170-2171,2173-2177,2180
+internal/templates/modules/monitoring/prometheus/prometheus.denglin.yml
+  s_1b0361e8a3a21e::t_7f8668f95778ae 52-55
+  s_1b0361e8a3a21e::t_d9fe22cfa9308f 148-149
+  s_1b0361e8a3a21e::t_51c814cb1e3064 111-112
+internal/deploy/service.go
+  s_1b0361e8a3a21e::t_32543b89185fc7 115-121
+  s_1b0361e8a3a21e::t_e963bfb24bdfe8 502-543
+internal/templates/modules/monitoring/compose.denglin.yml
+  s_1b0361e8a3a21e::t_957603d5f87abe 148
+internal/templates/chute_test.go
+  s_1b0361e8a3a21e::t_a603872a095b9c 8,11,17-18,24,27,34-35,54,56-57,61-62,65-74,78-82,84-88,92
+  s_1b0361e8a3a21e::t_1a7edd924e5eca 1-7,9-10,12-16,19-23,25-26,28-33,36-53,55,58-60,63-64,75-77,83,89-91,93-142
+internal/templates/modules_test.go
+  s_1b0361e8a3a21e::t_e07da71ff641d7 51-53,59-62
+  s_1b0361e8a3a21e::t_842cd6ee9201fb 54-58
+web/src/types.ts
+  s_1b0361e8a3a21e::t_efb020c702a6c8 3
+internal/api/center_notify.go
+  s_1b0361e8a3a21e::t_5bf5e7390435f2 6-7,10-18
+  s_1b0361e8a3a21e::t_24ff8663b2d3af 47,49
+  s_1b0361e8a3a21e::t_c2ab9a927aac3c 19
+internal/templates/modules/logging/filebeat/filebeat.yml
+  s_1b0361e8a3a21e::t_756fae6314142f 54-68
+internal/center/service.go
+  s_1b0361e8a3a21e::t_4d5eb504a0e3f8 151-153
+  s_1b0361e8a3a21e::t_fcd23428b18bd2 138-141
+  s_1b0361e8a3a21e::t_1ed53d31de285c 55-94
+  s_1b0361e8a3a21e::t_dfe236075214fa 5
+  s_1b0361e8a3a21e::t_d03eb515d259b6 20-22
+  s_1b0361e8a3a21e::t_6c4576ed5d2d31 134-137
+web/src/App.vue
+  s_1b0361e8a3a21e::t_39d5ff36288f4b 41
+  s_1b0361e8a3a21e::t_59cf6f7b3c24b8 42
+  s_1b0361e8a3a21e::t_b7e15ec43e1734 268
+  s_1b0361e8a3a21e::t_fe018a150edc4f 295
+  s_1b0361e8a3a21e::t_f3dce8e6df1397 294
+  s_1b0361e8a3a21e::t_8ba887d055f897 551
+  s_1b0361e8a3a21e::t_55936048e8a188 623
+  s_1b0361e8a3a21e::t_f2a622fe107a25 43
+  s_1b0361e8a3a21e::t_4ec6f07e921885 625-627,629
+  s_1b0361e8a3a21e::t_2c597aa16d6a8c 624
+  s_1b0361e8a3a21e::t_6b9246ace5b597 628
+  s_1b0361e8a3a21e::t_e22f2a38096f88 270
+  s_1b0361e8a3a21e::t_9226a5e7674b49 293
+  s_1b0361e8a3a21e::t_a128ef1e60f251 269
+  s_1b0361e8a3a21e::t_1c23c679a25285 671
+CLAUDE.md
+  s_1b0361e8a3a21e::t_c33c5a02c1b17f 83
+  s_1b0361e8a3a21e::t_14c2659879431c 54
+  s_1b0361e8a3a21e::t_c47c9013ff72d5 72
+internal/provision/compose_publish.go
+  s_1b0361e8a3a21e::t_b429460810c5db 357-366
+  s_1b0361e8a3a21e::t_145561f8c4916d 384-418
+  s_1b0361e8a3a21e::t_bf45ccae2893e0 17-18
+internal/templates/chute.go
+  s_1b0361e8a3a21e::t_86c19b85cd8f30 1-19,23,25-32,35-48,51,55-84,90,92-223
+  s_1b0361e8a3a21e::t_4d0131acfc473e 20-22,24
+  s_1b0361e8a3a21e::t_4d1726b0aad04d 33-34,49-50,52-54
+  s_1b0361e8a3a21e::t_706351613d134d 85-89,91
+internal/modular/remote_test.go
+  s_1b0361e8a3a21e::t_42e3bc352058fa 92-95,97,100-101
+  s_1b0361e8a3a21e::t_98595606e74601 102-105
+internal/templates/modules/monitoring/compose.nvidia.yml
+  s_1b0361e8a3a21e::t_9ebf2bf10e2af9 134
+internal/domain/models.go
+  s_1b0361e8a3a21e::t_70f1b52a7a91c7 28-30
+  s_1b0361e8a3a21e::t_f3b64d04e582c9 31
+internal/templates/modules/business/compose.nvidia.yml
+  s_1b0361e8a3a21e::t_f90bdb8602fd7f 158-159
+  s_1b0361e8a3a21e::t_53e6ad80fe951f 161-163
+  s_1b0361e8a3a21e::t_4d7b86ff15e978 133-139,149-157,160,164-172,212-215
+  s_1b0361e8a3a21e::t_0aac18c19301f6 192-211
+internal/templates/modules/monitoring/alerting/rules/services.yml
+  s_1b0361e8a3a21e::t_720e84091c1951 66
+  s_1b0361e8a3a21e::t_9479b08bae6730 38
+internal/templates/modules.go
+  s_1b0361e8a3a21e::t_26c82b4bbfe6a6 99-103
+internal/modular/config.go
+  s_1b0361e8a3a21e::t_1f185ad53768f9 265-266
+  s_1b0361e8a3a21e::t_f88da18cc90abf 38
+  s_1b0361e8a3a21e::t_e33166460b29a5 98-104,106
+  s_1b0361e8a3a21e::t_7ef7460e2fba34 39-41
+internal/templates/modules/monitoring/grafana/dashboards/center-cv-overview.nvidia.json
+  s_1b0361e8a3a21e::t_de99541af80179 2226,2231
+  s_1b0361e8a3a21e::t_f32d88db1f10ce 2227,2232,2234-2238,2241
+internal/templates/modules/infra/rabbitmq/init.sh
+  s_781c4448ce6146::t_1a73f840e495c6 16-17,57-63,85-91,105-111
+internal/templates/monitoring/rabbitmq/init.sh
+  s_781c4448ce6146::t_7b72f1d6400648 16-17,57-63,85-91,105-111
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "533660aad831b0698976b0b07ad125f7adf7bdbe",
+  "prompts": {},
+  "sessions": {
+    "s_1b0361e8a3a21e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "df4b8b33-4f64-472c-800e-9500c8a4baec",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_781c4448ce6146": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ec37cd70-c10f-4765-8ed4-8505dee44b84",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
