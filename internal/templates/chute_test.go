@@ -24,8 +24,8 @@ func TestRenderModulesChuteAlwaysPresent(t *testing.T) {
 		t.Fatal("未开启错分检测时 module.env 应为注释桩")
 	}
 
-	// 开启错分检测：块不变，module.env 写入轮询开关与三项取值。
-	base.WMSURL, base.OrganCode, base.MisAuth = "http://10.21.61.48:31995", "637101", "20260606123a"
+	// 开启错分检测：块不变，module.env 写入轮询开关与两项取值（机构编码不配置）。
+	base.WMSURL, base.MisAuth = "http://10.21.61.48:31995", "20260606123a"
 	files, err = RenderModules("denglin", base)
 	if err != nil {
 		t.Fatal(err)
@@ -37,12 +37,14 @@ func TestRenderModulesChuteAlwaysPresent(t *testing.T) {
 	for _, line := range []string{
 		"CV_CAMERA_POLL_ENABLED=1",
 		"CV_WMS_URL=http://10.21.61.48:31995",
-		"CV_ORGAN_CODE=637101",
 		"CV_MIS_AUTH=20260606123a",
 	} {
 		if !strings.Contains(env, line) {
 			t.Fatalf("module.env 缺少 %s", line)
 		}
+	}
+	if strings.Contains(env, "CV_ORGAN_CODE=") {
+		t.Fatal("机构编码不再配置，module.env 不应写 CV_ORGAN_CODE")
 	}
 }
 
@@ -93,18 +95,22 @@ func mustApplyChute(t *testing.T, compose, logsRoot string) string {
 }
 
 func TestApplyMisSortModuleEnv(t *testing.T) {
-	opts := MisSortOptions{Enabled: true, WMSURL: "http://h:1", OrganCode: "o", MisAuth: "a"}
+	opts := MisSortOptions{Enabled: true, WMSURL: "http://h:1", MisAuth: "a"}
 	fromStub := ApplyMisSortModuleEnv("# Module-specific Compose variables\n", opts)
 	if fromStub != ApplyMisSortModuleEnv(fromStub, opts) {
 		t.Fatal("重复应用应幂等")
 	}
-	foreign := "RABBITMQ_REALTIME_PRIORITY=7\n" + fromStub
+	// 旧版本写入的 CV_ORGAN_CODE 存量行应被清理，让服务回落插值默认值。
+	foreign := "RABBITMQ_REALTIME_PRIORITY=7\nCV_ORGAN_CODE=637101\n" + fromStub
 	merged := ApplyMisSortModuleEnv(foreign, opts)
 	if !strings.Contains(merged, "RABBITMQ_REALTIME_PRIORITY=7") || merged != ApplyMisSortModuleEnv(merged, opts) {
 		t.Fatal("外部变量必须保留且结果幂等")
 	}
+	if strings.Contains(merged, "CV_ORGAN_CODE=") {
+		t.Fatal("存量 CV_ORGAN_CODE 行应被移除")
+	}
 	disabled := ApplyMisSortModuleEnv(merged, MisSortOptions{})
-	if strings.Contains(disabled, "CV_WMS_URL=") || strings.Contains(disabled, "CV_MIS_AUTH=") || !strings.Contains(disabled, "RABBITMQ_REALTIME_PRIORITY=7") {
+	if strings.Contains(disabled, "CV_WMS_URL=") || strings.Contains(disabled, "CV_MIS_AUTH=") || strings.Contains(disabled, "CV_ORGAN_CODE=") || !strings.Contains(disabled, "RABBITMQ_REALTIME_PRIORITY=7") {
 		t.Fatal("关闭后应移除托管变量并保留外部变量")
 	}
 }

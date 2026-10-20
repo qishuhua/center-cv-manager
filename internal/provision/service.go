@@ -218,7 +218,7 @@ func (s *Service) Initialize(ctx context.Context, centerID string, r Reporter) e
 		return s.prepareModules(ctx, remote, stored, composeFile, accelerator, cpuCount, gpuCount, templates.RenderOptions{
 			Workers: workers, CPUSets: cpuSets, ModelsRoot: modelsRoot, LogsRoot: logsRoot, MediaResourcesRoot: mediaResourcesRoot,
 			ServerName: stored.Name, FeishuWebhook: alertConfig.FeishuWebhook,
-			WMSURL: stored.WMSURL, OrganCode: stored.OrganCode, MisAuth: stored.MisAuth,
+			WMSURL: stored.WMSURL, MisAuth: stored.MisAuth,
 		}, r)
 	}
 	if err = templates.Render(mode, root, templates.RenderOptions{

@@ -98,7 +98,7 @@ func RenderModules(platform string, opts RenderOptions) (map[string]string, erro
 	for _, id := range []string{"infra", "logging", "business", "gateway", "monitoring"} {
 		stub := "# Module-specific Compose variables\n"
 		if id == "business" {
-			stub = ApplyMisSortModuleEnv(stub, MisSortOptions{Enabled: opts.WMSURL != "", WMSURL: opts.WMSURL, OrganCode: opts.OrganCode, MisAuth: opts.MisAuth})
+			stub = ApplyMisSortModuleEnv(stub, MisSortOptions{Enabled: opts.WMSURL != "", WMSURL: opts.WMSURL, MisAuth: opts.MisAuth})
 		}
 		files[id+"/module.env"] = stub
 	}

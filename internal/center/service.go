@@ -63,15 +63,9 @@ func validate(v domain.Center) error {
 		if (parsed.Path != "" && parsed.Path != "/") || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.User != nil {
 			return fmt.Errorf("WMS 服务地址只能是基地址，不能包含路径、查询参数、fragment 或凭据")
 		}
-		if v.OrganCode == "" {
-			return fmt.Errorf("启用错分检测（填写 WMS 服务地址）时必须填写机构编码")
-		}
 		if v.MisAuth == "" {
 			return fmt.Errorf("启用错分检测（填写 WMS 服务地址）时必须填写 misAuth 鉴权值")
 		}
-	}
-	if err := validatePlainToken("机构编码", v.OrganCode, 128); err != nil {
-		return err
 	}
 	if err := validatePlainToken("misAuth 鉴权值", v.MisAuth, 512); err != nil {
 		return err
@@ -132,8 +126,8 @@ func (s *Service) Save(input domain.Center) (domain.Center, error) {
 		input.ComposeFile = centerpath.DefaultComposeFile
 	}
 	// 与两服务 CV_WMS_URL 口径一致：去掉首尾空白与尾斜杠后入库。
+	// 机构编码不再配置：两服务用 Compose 插值默认值（chute 637101）。
 	input.WMSURL = strings.TrimRight(strings.TrimSpace(input.WMSURL), "/")
-	input.OrganCode = strings.TrimSpace(input.OrganCode)
 	input.MisAuth = strings.TrimSpace(input.MisAuth)
 	// misAuth 留空时使用公开约定默认值（上游 Compose 同值），写入 module.env 时始终显式。
 	if input.WMSURL != "" && input.MisAuth == "" {
@@ -148,7 +142,7 @@ func (s *Service) Save(input domain.Center) (domain.Center, error) {
 		input.ID = uuid.NewString()
 	}
 	if exists {
-		if old.Deployment == nil && (input.WMSURL != "" || input.OrganCode != "" || input.MisAuth != "") {
+		if old.Deployment == nil && (input.WMSURL != "" || input.MisAuth != "") {
 			return domain.Center{}, fmt.Errorf("旧中心（未模块化）不支持错分检测配置")
 		}
 		input.CreatedAt = old.CreatedAt

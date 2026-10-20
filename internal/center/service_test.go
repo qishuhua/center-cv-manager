@@ -40,25 +40,22 @@ func TestValidateMisSortFields(t *testing.T) {
 	cases := []struct {
 		name    string
 		wms     string
-		organ   string
 		misAuth string
 		wantErr bool
 	}{
-		{"空配置可用", "", "", "", false},
-		{"完整配置可用", "http://10.21.61.48:31995", "637101", "20260606123a", false},
-		{"缺机构编码", "http://h:31995", "", "auth", true},
-		{"缺 misAuth", "http://h:31995", "637101", "", true},
-		{"无协议纯地址", "10.21.61.48:31995", "637101", "auth", true},
-		{"带业务路径", "http://h:31995/missort", "637101", "auth", true},
-		{"带查询参数", "http://h:31995?a=1", "637101", "auth", true},
-		{"非 http 协议", "ftp://h:31995", "637101", "auth", true},
-		{"带凭据", "http://user:pass@h", "637101", "auth", true},
-		{"机构编码含空白", "http://h", "63 7101", "auth", true},
-		{"misAuth 含控制字符", "http://h", "637101", "auth\x00x", true},
+		{"空配置可用", "", "", false},
+		{"完整配置可用", "http://10.21.61.48:31995", "20260606123a", false},
+		{"缺 misAuth", "http://h:31995", "", true},
+		{"无协议纯地址", "10.21.61.48:31995", "auth", true},
+		{"带业务路径", "http://h:31995/missort", "auth", true},
+		{"带查询参数", "http://h:31995?a=1", "auth", true},
+		{"非 http 协议", "ftp://h:31995", "auth", true},
+		{"带凭据", "http://user:pass@h", "auth", true},
+		{"misAuth 含控制字符", "http://h", "auth\x00x", true},
 	}
 	for _, tc := range cases {
 		v := base
-		v.WMSURL, v.OrganCode, v.MisAuth = tc.wms, tc.organ, tc.misAuth
+		v.WMSURL, v.MisAuth = tc.wms, tc.misAuth
 		if err := validate(v); (err != nil) != tc.wantErr {
 			t.Fatalf("%s: 期望错误=%v，实际 err=%v", tc.name, tc.wantErr, err)
 		}
@@ -73,7 +70,7 @@ func TestSaveMisSortNormalizesAndRejectsLegacy(t *testing.T) {
 	repo := &resetRepository{domain.Center{ID: "c1", Name: "中心", Host: "host", Username: "root", AuthType: "password", Password: "encrypted", ComposeFile: "/srv/deploy/docker-compose.yml"}}
 	repo.value.Deployment = modular.NewDeployment(repo.value.ComposeFile, 1)
 	s := New(repo, cipher)
-	saved, err := s.Save(domain.Center{ID: "c1", Name: "中心", Host: "host", Username: "root", AuthType: "password", Password: Mask, ComposeFile: "/srv/deploy/docker-compose.yml", WMSURL: " http://h:31995/ ", OrganCode: "637101"})
+	saved, err := s.Save(domain.Center{ID: "c1", Name: "中心", Host: "host", Username: "root", AuthType: "password", Password: Mask, ComposeFile: "/srv/deploy/docker-compose.yml", WMSURL: " http://h:31995/ "})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +81,7 @@ func TestSaveMisSortNormalizesAndRejectsLegacy(t *testing.T) {
 		t.Fatalf("misAuth 留空应回填默认值，实际 %q", saved.MisAuth)
 	}
 	repo.value.Deployment = nil
-	if _, err = s.Save(domain.Center{ID: "c1", Name: "中心", Host: "host", Username: "root", AuthType: "password", Password: Mask, ComposeFile: "/srv/deploy/docker-compose.yml", WMSURL: "http://h", OrganCode: "637101", MisAuth: "auth"}); err == nil {
+	if _, err = s.Save(domain.Center{ID: "c1", Name: "中心", Host: "host", Username: "root", AuthType: "password", Password: Mask, ComposeFile: "/srv/deploy/docker-compose.yml", WMSURL: "http://h", MisAuth: "auth"}); err == nil {
 		t.Fatal("旧中心（未模块化）应拒绝错分检测配置")
 	}
 }

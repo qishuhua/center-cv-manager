@@ -7,14 +7,14 @@ import (
 
 // 错分检测（WMS）共享边界：chute-verification-service 只做两路落格事件审核，
 // 摄像机配置轮询收口在 center-cv-ingress。两侧取值统一来自 business 模块
-// module.env 中的 CV_WMS_URL / CV_MIS_AUTH / CV_ORGAN_CODE，路径由各服务自拼。
+// module.env 中的 CV_WMS_URL / CV_MIS_AUTH，路径由各服务自拼；机构编码
+// 不做配置，两服务各用 Compose 插值默认值（chute 637101）。
 
 // MisSortOptions 描述中心的错分检测配置，用于维护 business 模块 module.env。
 type MisSortOptions struct {
-	Enabled   bool
-	WMSURL    string
-	OrganCode string
-	MisAuth   string
+	Enabled bool
+	WMSURL  string
+	MisAuth string
 }
 
 // ChuteServiceName 是错分审核服务的软件名/服务名（软件仓库登记名一致）。
@@ -184,7 +184,9 @@ func envKeyOf(line string) string {
 }
 
 // ApplyMisSortModuleEnv 幂等维护 module.env 中由中心 WMS 设置托管的变量：
-// 启用时写入四个变量，关闭时移除；用户自行添加的其它行与注释保持不动。
+// 启用时写入三个变量，关闭时移除；用户自行添加的其它行与注释保持不动。
+// CV_ORGAN_CODE 已不再配置，但仍按托管变量清理旧版本写入的存量行，
+// 让两服务回落 Compose 插值默认值。
 func ApplyMisSortModuleEnv(env string, opts MisSortOptions) string {
 	managed := map[string]bool{
 		"CV_CAMERA_POLL_ENABLED": true,
@@ -208,7 +210,6 @@ func ApplyMisSortModuleEnv(env string, opts MisSortOptions) string {
 		block := misSortEnvMarker + "\n" +
 			"CV_CAMERA_POLL_ENABLED=1\n" +
 			"CV_WMS_URL=" + opts.WMSURL + "\n" +
-			"CV_ORGAN_CODE=" + opts.OrganCode + "\n" +
 			"CV_MIS_AUTH=" + opts.MisAuth
 		if result == "" {
 			result = block

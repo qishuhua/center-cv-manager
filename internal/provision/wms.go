@@ -14,9 +14,10 @@ import (
 
 const chuteReadyURL = "http://127.0.0.1:8091/readyz"
 
-// ApplyBusinessWMS 把中心的错分检测配置（wms_url/organ_code/mis_auth）幂等同步
-// 到远端 business 模块：module.env 维护四个托管变量，compose.yml 增删错分审核
-// 服务块并补齐 ingress 轮询插值行。写入只置 ConfigChanged 等待整体发布生效，
+// ApplyBusinessWMS 把中心的错分检测配置（wms_url/mis_auth）幂等同步
+// 到远端 business 模块：module.env 维护三个托管变量（机构编码不再配置，
+// 两服务用 Compose 插值默认值），compose.yml 增删错分审核服务块并补齐
+// ingress 轮询插值行。写入只置 ConfigChanged 等待整体发布生效，
 // 不会启动或停止容器；调用方需先持久化中心字段。legacy 中心不支持。
 func (s *Service) ApplyBusinessWMS(ctx context.Context, centerID string) error {
 	return centerlock.Within(ctx, centerID, func(ctx context.Context) error {
@@ -56,7 +57,7 @@ func (s *Service) ApplyBusinessWMS(ctx context.Context, centerID string) error {
 			return err
 		}
 		newEnv := templates.ApplyMisSortModuleEnv(oldEnv, templates.MisSortOptions{
-			Enabled: enabled, WMSURL: c.WMSURL, OrganCode: c.OrganCode, MisAuth: c.MisAuth,
+			Enabled: enabled, WMSURL: c.WMSURL, MisAuth: c.MisAuth,
 		})
 		composeChanged := newCompose != oldCompose
 		envChanged := newEnv != oldEnv

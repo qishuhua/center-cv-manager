@@ -121,10 +121,10 @@ func TestCenterRuntimeSchemaUpgrade(t *testing.T) {
 	if loaded.CPUCount != 0 || loaded.GPUCount != 0 || loaded.DetectedAccelerator != "" || loaded.ComposeContent != "" || loaded.InitializedAt != nil {
 		t.Fatalf("runtime migration defaults mismatch: %#v", loaded)
 	}
-	if loaded.WMSURL != "" || loaded.OrganCode != "" || loaded.MisAuth != "" {
+	if loaded.WMSURL != "" || loaded.MisAuth != "" {
 		t.Fatalf("错分检测字段迁移默认值不匹配: %#v", loaded)
 	}
-	loaded.WMSURL, loaded.OrganCode, loaded.MisAuth = "http://10.21.61.48:31995", "637101", "auth"
+	loaded.WMSURL, loaded.MisAuth = "http://10.21.61.48:31995", "auth"
 	loaded.TestMode = true
 	if err = st.SaveCenter(loaded); err != nil {
 		t.Fatal(err)
@@ -133,7 +133,7 @@ func TestCenterRuntimeSchemaUpgrade(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if reloaded.WMSURL != "http://10.21.61.48:31995" || reloaded.OrganCode != "637101" || reloaded.MisAuth != "auth" {
+	if reloaded.WMSURL != "http://10.21.61.48:31995" || reloaded.MisAuth != "auth" {
 		t.Fatalf("错分检测字段回读不匹配: %#v", reloaded)
 	}
 	if !reloaded.TestMode {

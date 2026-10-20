@@ -245,7 +245,7 @@ func (s *Server) saveCenter(c *gin.Context) {
 	// 错分检测配置变化时把新值同步到远端 business 模块（module.env + Compose），
 	// 随后由用户整体发布生效；初始化前/重置后的中心等初始化渲染时带上。
 	if old.ID != "" && old.Deployment != nil && out.Deployment != nil &&
-		(old.WMSURL != out.WMSURL || old.OrganCode != out.OrganCode || old.MisAuth != out.MisAuth) {
+		(old.WMSURL != out.WMSURL || old.MisAuth != out.MisAuth) {
 		status := out.Deployment.Status
 		if status != "preparing" && status != "reset" {
 			ctx, cancel := context.WithTimeout(c.Request.Context(), 45*time.Second)
