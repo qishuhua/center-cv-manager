@@ -24,7 +24,7 @@ FROM alpine:3.23 AS api
 RUN apk add --no-cache ca-certificates git openssh-client tzdata \
     && addgroup -S manager \
     && adduser -S -G manager manager \
-    && mkdir -p /app/data \
+    && mkdir -p /app/data /app/monitor/targets /app/monitor/secrets \
     && chown -R manager:manager /app
 WORKDIR /app
 COPY --from=go-builder /out/center-cv-manager /usr/local/bin/center-cv-manager
@@ -38,5 +38,6 @@ EXPOSE 8099
 VOLUME ["/app/data"]
 ENTRYPOINT ["center-cv-manager"]
 # 前端由 web 容器（nginx）提供；API 容器不携带静态文件，--web 指向的目录
-# 缺失时仅提供 API（make dev 直跑时仍可直接服务 web/dist）。
-CMD ["--listen", "0.0.0.0:8099", "--data", "/app/data", "--templates", "/app/templates"]
+# 缺失时仅提供 API（make dev 直跑时仍可直接服务 web/dist）。/app/monitor 下
+# 挂载统一监控渲染卷（targets/secrets），目录在镜像内预建保证卷属主。
+CMD ["--listen", "0.0.0.0:8099", "--data", "/app/data", "--templates", "/app/templates", "--monitor", "/app/monitor"]

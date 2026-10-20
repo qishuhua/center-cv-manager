@@ -1,6 +1,6 @@
 export type UserRole='admin'|'viewer'
 export interface UserAccount {username:string;role:UserRole;must_change_password:boolean;created_at:string}
-export interface Center {deployment?:{reselection_required?:boolean;migration?:{completed:boolean};root:string;status:string;modules:ComposeModule[]};id?:string;name:string;host:string;port:number;console_port:number;username:string;auth_type:'password'|'private_key';password?:string;private_key?:string;passphrase?:string;host_key?:string;docker_socket:string;accelerator:'auto'|'nvidia'|'denglin'|'cpu';detected_accelerator?:string;cpu_count:number;gpu_count:number;compose_file:string;initialized_at?:string;description:string;wms_url?:string;mis_auth?:string;test_mode?:boolean;updated_at?:string}
+export interface Center {deployment?:{reselection_required?:boolean;migration?:{completed:boolean};root:string;status:string;modules:ComposeModule[]};id?:string;name:string;host:string;port:number;console_port:number;username:string;auth_type:'password'|'private_key';password?:string;private_key?:string;passphrase?:string;host_key?:string;docker_socket:string;accelerator:'auto'|'nvidia'|'denglin'|'cpu';detected_accelerator?:string;cpu_count:number;gpu_count:number;compose_file:string;initialized_at?:string;description:string;wms_url?:string;mis_auth?:string;mis_sort_enabled?:boolean;test_mode?:boolean;updated_at?:string}
 export interface Source {id?:string;name:string;repository:string;description:string;updated_at?:string}
 export interface GitCredential {base_url:string;username:string;token?:string;configured:boolean;updated_at?:string}
 export interface Version {ref:string;commit:string;kind:'branch'|'tag'}
@@ -13,6 +13,8 @@ export interface CurrentModelVersion {schema_version:1;model:string;version:stri
 export interface CenterOverview {center:Center;online:boolean;error?:string;accelerator?:string;accelerator_error?:string;containers:OverviewContainer[];versions:OverviewVersion[];models:CurrentModelVersion[];models_error?:string}
 export interface OSSCredential {endpoint:string;bucket:string;access_key_id:string;access_key_secret?:string;images_prefix:string;models_prefix:string;configured:boolean;updated_at?:string}
 export interface AlertCredential {feishu_webhook?:string;configured:boolean;updated_at?:string}
+export interface MonitoringCenterStatus {center_id:string;name:string;site?:string;target?:string;test_mode?:boolean;monitored:boolean;reason?:string;up?:boolean}
+export interface MonitoringStatus {stack_online:boolean;error?:string;centers:MonitoringCenterStatus[]}
 export interface RegistrySettings {endpoint:string;configured:boolean;updated_at?:string}
 export interface RegistryStorage {root_directory:string;exists:boolean;updated_at?:string}
 export interface RegistryPlatformTag {platform:string;tag:string;digest:string}

@@ -124,6 +124,9 @@ func TestCenterRuntimeSchemaUpgrade(t *testing.T) {
 	if loaded.WMSURL != "" || loaded.MisAuth != "" {
 		t.Fatalf("错分检测字段迁移默认值不匹配: %#v", loaded)
 	}
+	if !loaded.MisSortEnabled {
+		t.Fatal("错分检测开关迁移默认值应为启用（1），由 wms_url 是否非空决定实际生效")
+	}
 	loaded.WMSURL, loaded.MisAuth = "http://10.21.61.48:31995", "auth"
 	loaded.TestMode = true
 	if err = st.SaveCenter(loaded); err != nil {
@@ -136,6 +139,19 @@ func TestCenterRuntimeSchemaUpgrade(t *testing.T) {
 	if reloaded.WMSURL != "http://10.21.61.48:31995" || reloaded.MisAuth != "auth" {
 		t.Fatalf("错分检测字段回读不匹配: %#v", reloaded)
 	}
+	// 关闭开关：配置值保留、开关位清零，重新打开恢复。
+	reloaded.MisSortEnabled = false
+	if err = st.SaveCenter(reloaded); err != nil {
+		t.Fatal(err)
+	}
+	disabled, err := st.GetCenter("legacy-center")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if disabled.MisSortEnabled || disabled.WMSURL != "http://10.21.61.48:31995" || disabled.MisAuth != "auth" {
+		t.Fatalf("关闭错分开关后配置值应保留: enabled=%v wms=%q mis=%q", disabled.MisSortEnabled, disabled.WMSURL, disabled.MisAuth)
+	}
+	reloaded.MisSortEnabled = true
 	if !reloaded.TestMode {
 		t.Fatal("测试模式字段回读应为 true")
 	}

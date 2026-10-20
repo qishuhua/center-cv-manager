@@ -123,6 +123,9 @@ func Open(path string) (*Store, error) {
 		{"deployment_json", `TEXT NOT NULL DEFAULT 'null'`},
 		{"wms_url", `TEXT NOT NULL DEFAULT ''`},
 		{"mis_auth", `TEXT NOT NULL DEFAULT ''`},
+		// 默认 1：存量与新建中心的启用状态完全由 wms_url 是否非空决定，
+		// 关闭开关只是把此位置 0，配置值保留可恢复。
+		{"mis_sort_enabled", `INTEGER NOT NULL DEFAULT 1`},
 		{"test_mode", `INTEGER NOT NULL DEFAULT 0`},
 	} {
 		if err := ensureColumn(db, "centers", migration.column, migration.definition); err != nil {
@@ -199,7 +202,7 @@ func ensureColumn(db *sql.DB, table, column, definition string) error {
 func (s *Store) Close() error { return s.db.Close() }
 
 func (s *Store) ListCenters() ([]domain.Center, error) {
-	rows, err := s.db.Query(`SELECT id,name,host,port,console_port,username,auth_type,password,private_key,passphrase,host_key,docker_socket,accelerator,detected_accelerator,cpu_count,gpu_count,compose_file,compose_content,initialized_at,description,wms_url,mis_auth,test_mode,created_at,updated_at,deployment_json FROM centers ORDER BY name`)
+	rows, err := s.db.Query(`SELECT id,name,host,port,console_port,username,auth_type,password,private_key,passphrase,host_key,docker_socket,accelerator,detected_accelerator,cpu_count,gpu_count,compose_file,compose_content,initialized_at,description,wms_url,mis_auth,mis_sort_enabled,test_mode,created_at,updated_at,deployment_json FROM centers ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +213,7 @@ func (s *Store) ListCenters() ([]domain.Center, error) {
 		var createdAt, updatedAt sqliteTime
 		var initializedAt nullableSQLiteTime
 		var deploymentJSON string
-		if err = rows.Scan(&v.ID, &v.Name, &v.Host, &v.Port, &v.ConsolePort, &v.Username, &v.AuthType, &v.Password, &v.PrivateKey, &v.Passphrase, &v.HostKey, &v.DockerSocket, &v.Accelerator, &v.DetectedAccelerator, &v.CPUCount, &v.GPUCount, &v.ComposeFile, &v.ComposeContent, &initializedAt, &v.Description, &v.WMSURL, &v.MisAuth, &v.TestMode, &createdAt, &updatedAt, &deploymentJSON); err != nil {
+		if err = rows.Scan(&v.ID, &v.Name, &v.Host, &v.Port, &v.ConsolePort, &v.Username, &v.AuthType, &v.Password, &v.PrivateKey, &v.Passphrase, &v.HostKey, &v.DockerSocket, &v.Accelerator, &v.DetectedAccelerator, &v.CPUCount, &v.GPUCount, &v.ComposeFile, &v.ComposeContent, &initializedAt, &v.Description, &v.WMSURL, &v.MisAuth, &v.MisSortEnabled, &v.TestMode, &createdAt, &updatedAt, &deploymentJSON); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal([]byte(deploymentJSON), &v.Deployment); err != nil {
@@ -230,7 +233,7 @@ func (s *Store) GetCenter(id string) (domain.Center, error) {
 	var createdAt, updatedAt sqliteTime
 	var initializedAt nullableSQLiteTime
 	var deploymentJSON string
-	err := s.db.QueryRow(`SELECT id,name,host,port,console_port,username,auth_type,password,private_key,passphrase,host_key,docker_socket,accelerator,detected_accelerator,cpu_count,gpu_count,compose_file,compose_content,initialized_at,description,wms_url,mis_auth,test_mode,created_at,updated_at,deployment_json FROM centers WHERE id=?`, id).Scan(&v.ID, &v.Name, &v.Host, &v.Port, &v.ConsolePort, &v.Username, &v.AuthType, &v.Password, &v.PrivateKey, &v.Passphrase, &v.HostKey, &v.DockerSocket, &v.Accelerator, &v.DetectedAccelerator, &v.CPUCount, &v.GPUCount, &v.ComposeFile, &v.ComposeContent, &initializedAt, &v.Description, &v.WMSURL, &v.MisAuth, &v.TestMode, &createdAt, &updatedAt, &deploymentJSON)
+	err := s.db.QueryRow(`SELECT id,name,host,port,console_port,username,auth_type,password,private_key,passphrase,host_key,docker_socket,accelerator,detected_accelerator,cpu_count,gpu_count,compose_file,compose_content,initialized_at,description,wms_url,mis_auth,mis_sort_enabled,test_mode,created_at,updated_at,deployment_json FROM centers WHERE id=?`, id).Scan(&v.ID, &v.Name, &v.Host, &v.Port, &v.ConsolePort, &v.Username, &v.AuthType, &v.Password, &v.PrivateKey, &v.Passphrase, &v.HostKey, &v.DockerSocket, &v.Accelerator, &v.DetectedAccelerator, &v.CPUCount, &v.GPUCount, &v.ComposeFile, &v.ComposeContent, &initializedAt, &v.Description, &v.WMSURL, &v.MisAuth, &v.MisSortEnabled, &v.TestMode, &createdAt, &updatedAt, &deploymentJSON)
 	if errors.Is(err, sql.ErrNoRows) {
 		err = ErrNotFound
 	}
@@ -251,7 +254,7 @@ func (s *Store) SaveCenter(v domain.Center) error {
 	if marshalErr != nil {
 		return marshalErr
 	}
-	_, err := s.db.Exec(`INSERT INTO centers(id,name,host,port,console_port,username,auth_type,password,private_key,passphrase,host_key,docker_socket,accelerator,detected_accelerator,cpu_count,gpu_count,compose_file,compose_content,initialized_at,description,wms_url,mis_auth,test_mode,created_at,updated_at,deployment_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,host=excluded.host,port=excluded.port,console_port=excluded.console_port,username=excluded.username,auth_type=excluded.auth_type,password=excluded.password,private_key=excluded.private_key,passphrase=excluded.passphrase,host_key=excluded.host_key,docker_socket=excluded.docker_socket,accelerator=excluded.accelerator,detected_accelerator=excluded.detected_accelerator,cpu_count=excluded.cpu_count,gpu_count=excluded.gpu_count,compose_file=excluded.compose_file,compose_content=excluded.compose_content,initialized_at=excluded.initialized_at,description=excluded.description,wms_url=excluded.wms_url,mis_auth=excluded.mis_auth,test_mode=excluded.test_mode,updated_at=excluded.updated_at,deployment_json=excluded.deployment_json`, v.ID, v.Name, v.Host, v.Port, v.ConsolePort, v.Username, v.AuthType, v.Password, v.PrivateKey, v.Passphrase, v.HostKey, v.DockerSocket, v.Accelerator, v.DetectedAccelerator, v.CPUCount, v.GPUCount, v.ComposeFile, v.ComposeContent, v.InitializedAt, v.Description, v.WMSURL, v.MisAuth, v.TestMode, v.CreatedAt, v.UpdatedAt, string(deploymentJSON))
+	_, err := s.db.Exec(`INSERT INTO centers(id,name,host,port,console_port,username,auth_type,password,private_key,passphrase,host_key,docker_socket,accelerator,detected_accelerator,cpu_count,gpu_count,compose_file,compose_content,initialized_at,description,wms_url,mis_auth,mis_sort_enabled,test_mode,created_at,updated_at,deployment_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,host=excluded.host,port=excluded.port,console_port=excluded.console_port,username=excluded.username,auth_type=excluded.auth_type,password=excluded.password,private_key=excluded.private_key,passphrase=excluded.passphrase,host_key=excluded.host_key,docker_socket=excluded.docker_socket,accelerator=excluded.accelerator,detected_accelerator=excluded.detected_accelerator,cpu_count=excluded.cpu_count,gpu_count=excluded.gpu_count,compose_file=excluded.compose_file,compose_content=excluded.compose_content,initialized_at=excluded.initialized_at,description=excluded.description,wms_url=excluded.wms_url,mis_auth=excluded.mis_auth,mis_sort_enabled=excluded.mis_sort_enabled,test_mode=excluded.test_mode,updated_at=excluded.updated_at,deployment_json=excluded.deployment_json`, v.ID, v.Name, v.Host, v.Port, v.ConsolePort, v.Username, v.AuthType, v.Password, v.PrivateKey, v.Passphrase, v.HostKey, v.DockerSocket, v.Accelerator, v.DetectedAccelerator, v.CPUCount, v.GPUCount, v.ComposeFile, v.ComposeContent, v.InitializedAt, v.Description, v.WMSURL, v.MisAuth, v.MisSortEnabled, v.TestMode, v.CreatedAt, v.UpdatedAt, string(deploymentJSON))
 	return err
 }
 

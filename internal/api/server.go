@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -26,6 +27,7 @@ import (
 	"center-cv-manager/internal/domain"
 	"center-cv-manager/internal/modelasset"
 	"center-cv-manager/internal/modular"
+	"center-cv-manager/internal/monitor"
 	"center-cv-manager/internal/provision"
 	"center-cv-manager/internal/registry"
 	"center-cv-manager/internal/source"
@@ -51,14 +53,15 @@ type Server struct {
 	models           *modelasset.Service
 	alerts           *alerting.Service
 	registries       *registry.Service
+	monitors         *monitor.Service
 	store            *store.Store
 	tasks            *task.Manager
 	sourceRoot       string
 	static           fs.FS
 }
 
-func New(authManager *auth.Manager, centers *center.Service, centerActions *centeraction.Service, sources *source.Service, builds *build.Service, deployments *deploy.Service, provisioning *provision.Service, baseImages *baseimage.Service, models *modelasset.Service, alerts *alerting.Service, registries *registry.Service, st *store.Store, tasks *task.Manager, sourceRoot string, static fs.FS) *Server {
-	return &Server{auth: authManager, centers: centers, centerActions: centerActions, sources: sources, builds: builds, deployments: deployments, provisioning: provisioning, baseImages: baseImages, models: models, alerts: alerts, registries: registries, store: st, tasks: tasks, sourceRoot: sourceRoot, static: static}
+func New(authManager *auth.Manager, centers *center.Service, centerActions *centeraction.Service, sources *source.Service, builds *build.Service, deployments *deploy.Service, provisioning *provision.Service, baseImages *baseimage.Service, models *modelasset.Service, alerts *alerting.Service, registries *registry.Service, monitors *monitor.Service, st *store.Store, tasks *task.Manager, sourceRoot string, static fs.FS) *Server {
+	return &Server{auth: authManager, centers: centers, centerActions: centerActions, sources: sources, builds: builds, deployments: deployments, provisioning: provisioning, baseImages: baseImages, models: models, alerts: alerts, registries: registries, monitors: monitors, store: st, tasks: tasks, sourceRoot: sourceRoot, static: static}
 }
 
 type envelope struct {
@@ -112,6 +115,7 @@ func (s *Server) Router() *gin.Engine {
 	api.GET("/tasks/:id/events", s.taskEvents)
 	api.GET("/settings/status", s.settingsStatus)
 	api.GET("/registry/versions", s.listRegistryVersions)
+	api.GET("/monitoring/status", s.monitoringStatus)
 
 	// 管理员专属：一切变更操作、凭据、SSH 终端和用户管理。
 	admin := api.Group("")
@@ -242,19 +246,28 @@ func (s *Server) saveCenter(c *gin.Context) {
 		fail(c, 400, e)
 		return
 	}
-	// 错分检测配置变化时把新值同步到远端 business 模块（module.env + Compose），
-	// 随后由用户整体发布生效；初始化前/重置后的中心等初始化渲染时带上。
-	if old.ID != "" && old.Deployment != nil && out.Deployment != nil &&
-		(old.WMSURL != out.WMSURL || old.MisAuth != out.MisAuth) {
+	// 错分检测配置同步到远端 business 模块（module.env + Compose）：保存即
+	// 幂等同步，不比较新旧值——远端文件无变化时只读比对、零写入，而上次
+	// 同步失败的中心（记录已更新、远端仍旧值）在任意一次保存时自动重试，
+	// 避免漂移被后续"值未变化"的保存掩盖。初始化前/重置后的中心等初始
+	// 化渲染时带上。
+	if old.ID != "" && old.Deployment != nil && out.Deployment != nil {
 		status := out.Deployment.Status
 		if status != "preparing" && status != "reset" {
 			ctx, cancel := context.WithTimeout(c.Request.Context(), 45*time.Second)
 			defer cancel()
 			if syncErr := s.provisioning.ApplyBusinessWMS(ctx, out.ID); syncErr != nil {
+				log.Printf("错分检测配置同步失败 center=%s(%s): %v", out.ID, out.Name, syncErr)
 				fail(c, 500, fmt.Errorf("中心已保存，但错分检测配置同步失败: %w", syncErr))
 				return
 			}
 		}
+	}
+	// 统一监控：中心清单变化后重渲染 targets，prometheus file_sd 与仪表盘
+	// 生成器自动生效（监控地址为空的新中心也会从这里进入渲染循环）。
+	if err := s.syncMonitoring("中心已保存"); err != nil {
+		fail(c, 500, err)
+		return
 	}
 	ok(c, out)
 }
@@ -266,7 +279,7 @@ func (s *Server) submitCenterInitialization(v domain.Center, items []deploy.Item
 	if err != nil {
 		return nil, err
 	}
-	if err = validateInitialization(current, len(items), len(models)); err != nil {
+	if err = validateInitialization(current, len(items)); err != nil {
 		return nil, err
 	}
 	if s.tasks.HasActive("INITIALIZE_CENTER", "center_id", v.ID) {
@@ -283,7 +296,7 @@ func (s *Server) submitCenterInitialization(v domain.Center, items []deploy.Item
 			if err != nil {
 				return err
 			}
-			if err = validateInitialization(current, len(items), len(models)); err != nil {
+			if err = validateInitialization(current, len(items)); err != nil {
 				return err
 			}
 			if err = s.provisioning.Initialize(ctx, v.ID, h); err != nil {
@@ -311,36 +324,58 @@ func (s *Server) submitCenterInitialization(v domain.Center, items []deploy.Item
 			if err = s.provisioning.ResumeModules(ctx, v.ID, h); err != nil {
 				return err
 			}
-			plan := s.checkUnifiedRelease(ctx, v.ID, items, models)
-			if !plan.Ready {
-				return fmt.Errorf("初始化版本检查失败: %s", plan.Error)
-			}
-			if err = s.runReleaseLocked(ctx, v.ID, items, plan.ModelPlan.Targets, h); err != nil {
-				return err
+			var modelTargets []modelasset.ReleaseItem
+			if len(models) > 0 {
+				plan := s.checkUnifiedRelease(ctx, v.ID, items, models)
+				if !plan.Ready {
+					return fmt.Errorf("初始化版本检查失败: %s", plan.Error)
+				}
+				modelTargets = plan.ModelPlan.Targets
+				if err = s.runReleaseLocked(ctx, v.ID, items, modelTargets, h); err != nil {
+					return err
+				}
+			} else {
+				// 未选择模型：跳过统一发布里"中心已有健康模型"的防呆（普通
+				// 发布仍保留），只分发业务镜像；业务模块就绪后 ResumeModules
+				// 停在等待业务发布，网关与监控等模型发布后经初始化入口续跑。
+				if err = s.runSoftwareRelease(ctx, v.ID, items, h); err != nil {
+					return err
+				}
 			}
 			finished, err := s.centers.GetPublic(v.ID)
 			if err != nil {
 				return err
 			}
-			if finished.Deployment != nil && finished.Deployment.Status != "ready" {
+			// 未选模型的初始化以等待业务发布收尾（预期成功态）；带模型初始化
+			// 与其他非就绪状态仍视为失败。
+			if finished.Deployment != nil && finished.Deployment.Status != "ready" &&
+				!(len(models) == 0 && finished.Deployment.Status == "waiting_business") {
 				return fmt.Errorf("初始化未完成，当前状态: %s", finished.Deployment.Status)
 			}
 			// 汇总本次实际发布的业务镜像与模型版本，随完成通知发送到飞书。
-			lines := make([]string, 0, len(items)+len(plan.ModelPlan.Targets)+2)
+			lines := make([]string, 0, len(items)+len(modelTargets)+2)
 			lines = append(lines, "业务镜像：")
 			for _, item := range items {
 				lines = append(lines, "- "+softwareVersionText(item.SourceName, item.Ref, item.Commit))
 			}
-			lines = append(lines, "模型：")
-			for _, item := range plan.ModelPlan.Targets {
-				variant := item.Platform
-				if item.HardwareProfile != "" {
-					variant += "-" + item.HardwareProfile
+			if len(models) == 0 {
+				lines = append(lines, "模型：未部署（等待模型发布后继续完成网关与监控）")
+			} else {
+				lines = append(lines, "模型：")
+				for _, item := range modelTargets {
+					variant := item.Platform
+					if item.HardwareProfile != "" {
+						variant += "-" + item.HardwareProfile
+					}
+					lines = append(lines, fmt.Sprintf("- %s:%s[%s]@%s", item.Model, item.Version, variant, item.ManifestDigest[:12]))
 				}
-				lines = append(lines, fmt.Sprintf("- %s:%s[%s]@%s", item.Model, item.Version, variant, item.ManifestDigest[:12]))
 			}
 			successDetail = strings.Join(lines, "\n")
-			h.Message("初始化部署完成，所选业务代码与模型已发布，全部模块已就绪")
+			if len(models) == 0 {
+				h.Message("初始化完成：业务镜像已部署，等待发布模型（发布后经初始化入口继续完成网关与监控）")
+			} else {
+				h.Message("初始化部署完成，所选业务代码与模型已发布，全部模块已就绪")
+			}
 			return nil
 		})
 		finish(err, successDetail)
@@ -348,12 +383,12 @@ func (s *Server) submitCenterInitialization(v domain.Center, items []deploy.Item
 	}), nil
 }
 
-func validateInitialization(c domain.Center, softwareCount, modelCount int) error {
+func validateInitialization(c domain.Center, softwareCount int) error {
 	if c.InitializedAt != nil || (c.Deployment != nil && c.Deployment.Status == "ready") {
 		return fmt.Errorf("中心已经完成初始化；如需重新初始化，请先重置服务器")
 	}
-	if softwareCount == 0 || modelCount == 0 {
-		return fmt.Errorf("初始化前必须选择业务代码分支和模型版本")
+	if softwareCount == 0 {
+		return fmt.Errorf("初始化前必须选择业务镜像版本；模型可选，不选则停在等待业务发布，待模型发布后续跑网关与监控")
 	}
 	return nil
 }
@@ -384,7 +419,7 @@ func (s *Server) initializeCenter(c *gin.Context) {
 		fail(c, 400, err)
 		return
 	}
-	if err = validateInitialization(v, len(in.Items), len(in.Models)); err != nil {
+	if err = validateInitialization(v, len(in.Items)); err != nil {
 		fail(c, 409, err)
 		return
 	}
@@ -439,6 +474,11 @@ func (s *Server) deleteCenter(c *gin.Context) {
 	e := s.centers.Delete(c.Param("id"))
 	if e != nil {
 		s.storeError(c, e)
+		return
+	}
+	// 被删中心若还在 targets 里会继续失联告警，同步失败必须提示用户。
+	if err := s.syncMonitoring("中心已删除"); err != nil {
+		fail(c, 500, err)
 		return
 	}
 	ok(c, true)
@@ -850,6 +890,12 @@ func (s *Server) saveAlertCredential(c *gin.Context) {
 		fail(c, 400, err)
 		return
 	}
+	// Webhook 同时是统一监控的通知出口：同步渲染并重载 alertmanager。
+	if syncErr := s.monitors.Sync(); syncErr != nil {
+		fail(c, 500, fmt.Errorf("凭据已保存，但统一监控配置同步失败: %w", syncErr))
+		return
+	}
+	s.reloadAlertmanager(c)
 	ok(c, output)
 }
 

@@ -15,11 +15,18 @@ services:
     environment:
       TZ: Asia/Shanghai
       GIN_MODE: release
+      # 统一监控状态查询走 compose 网络内的 prometheus 服务（本地 go run 时
+      # 回落默认 127.0.0.1:9090，监控栈不可达时状态页显示未启动）。
+      MONITOR_PROMETHEUS_URL: http://prometheus:9090
     ports:
       - "127.0.0.1:${REGISTRY_PORT:-5000}:5000"
     volumes:
       - center-manager-data:/app/data
       - /var/run/docker.sock:/var/run/docker.sock
+      # 统一监控动态配置渲染目录：targets/centers.json 与两个 secret 文件由
+      # API 写入，prometheus/alertmanager/dashboard-generator 只读挂载同名卷。
+      - center-monitor-targets:/app/monitor/targets
+      - center-monitor-secrets:/app/monitor/secrets
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8099/api/v1/health"]
       interval: 15s
@@ -68,7 +75,129 @@ services:
       retries: 5
       start_period: 10s
 
+  # ---- 开发机统一监控（前身 center-cv-monitor 独立仓库，静态配置在
+  # ./monitoring，动态配置由 API 渲染到 center-monitor-targets/secrets 卷）。
+  # 只拉每个中心一条健康信号 + 失联告警；指标与日志保存在中心本地，Grafana
+  # 经中心公网 /prometheus/ 与 /elasticsearch/ 直接查询。监控栈不依赖 api，
+  # 挂掉不影响发布链路。----
+  prometheus:
+    image: prom/prometheus:v3.13.1
+    container_name: center-cv-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION_TIME:-30d}
+      - --storage.tsdb.retention.size=${PROMETHEUS_RETENTION_SIZE:-80GB}
+      - --web.enable-lifecycle
+    ports:
+      # 仅回环：本地 go run 的状态查询与人肉排查用；API 容器走 compose 网络。
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/rules:/etc/prometheus/rules:ro
+      - center-monitor-targets:/etc/prometheus/targets:ro
+      - center-monitor-prometheus:/prometheus
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  alertmanager:
+    image: prom/alertmanager:v0.34.0
+    container_name: center-cv-alertmanager
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    ports:
+      - "127.0.0.1:${ALERTMANAGER_PORT:-9093}:9093"
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./monitoring/alertmanager/templates:/etc/alertmanager/templates:ro
+      - center-monitor-secrets:/monitor-config:ro
+      - center-monitor-alertmanager:/alertmanager
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9093/-/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  grafana:
+    image: grafana/grafana:13.1.1
+    container_name: center-cv-grafana
+    restart: unless-stopped
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_LOG_MODE: console
+    ports:
+      - "0.0.0.0:${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - center-monitor-grafana:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - center-monitor-grafana-dashboards:/var/lib/grafana/dashboards:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  # 仪表盘生成器：轮询 targets 卷里的 centers.json，为每个中心生成数据源与
+  # 仪表盘并同步到 Grafana（15 秒轮询，新加中心零手工配置）。
+  dashboard-generator:
+    image: python:3.13-alpine
+    container_name: center-cv-dashboard-generator
+    restart: unless-stopped
+    command: ["python", "/app/generate_dashboards.py"]
+    environment:
+      DASHBOARD_REFRESH_SECONDS: 15
+      GRAFANA_URL: http://grafana:3000
+      GRAFANA_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GRAFANA_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      CENTER_LOGS_USERNAME: grafana_logs
+    depends_on:
+      grafana:
+        condition: service_healthy
+    volumes:
+      - ./monitoring/scripts/generate_dashboards.py:/app/generate_dashboards.py:ro
+      - center-monitor-targets:/targets:ro
+      - ./monitoring/grafana/dashboards/templates:/templates:ro
+      - center-monitor-grafana-dashboards:/output
+      - center-monitor-secrets:/secrets:ro
+
 volumes:
   center-manager-data:
     external: true
     name: center-manager-data
+  # 统一监控相关卷全部 external：不随 compose 自动创建、down -v 不可能误删。
+  # 首次部署先执行 monitoring/README.md「首次部署」里的 docker volume create
+  # 命令；新增卷时同步更新那条命令与 README。
+  center-monitor-targets:
+    external: true
+    name: center-monitor-targets
+  center-monitor-secrets:
+    external: true
+    name: center-monitor-secrets
+  center-monitor-grafana-dashboards:
+    external: true
+    name: center-monitor-grafana-dashboards
+  center-monitor-prometheus:
+    external: true
+    name: center-monitor-prometheus
+  center-monitor-grafana:
+    external: true
+    name: center-monitor-grafana
+  center-monitor-alertmanager:
+    external: true
+    name: center-monitor-alertmanager

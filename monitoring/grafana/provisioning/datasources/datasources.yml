@@ -1,0 +1,19 @@
+apiVersion: 1
+
+deleteDatasources:
+  - name: Prometheus
+    orgId: 1
+  - name: 开发机健康检查
+    orgId: 1
+datasources:
+  - name: 开发机健康检查
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: GET
+      timeInterval: 15s
+      manageAlerts: false

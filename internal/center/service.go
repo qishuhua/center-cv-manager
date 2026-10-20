@@ -2,6 +2,7 @@ package center
 
 import (
 	"fmt"
+	"log"
 	"net/url"
 	"strings"
 	"time"
@@ -29,9 +30,24 @@ type Repository interface {
 type Service struct {
 	repo   Repository
 	cipher *secret.Cipher
+	// monitorSync 在中心记录变更后触发，由装配层注入统一监控的目标重渲染。
+	// 中心记录的全部写路径（保存、删除、硬件检测、运行时更新、重置）都经
+	// 此处通知，调用方无需各自记得同步；失败仅记日志，不影响业务结果。
+	monitorSync func() error
 }
 
 func New(repo Repository, c *secret.Cipher) *Service { return &Service{repo: repo, cipher: c} }
+
+func (s *Service) SetMonitorSync(fn func() error) { s.monitorSync = fn }
+
+func (s *Service) notifyMonitorSync() {
+	if s.monitorSync == nil {
+		return
+	}
+	if err := s.monitorSync(); err != nil {
+		log.Printf("统一监控配置同步失败: %v", err)
+	}
+}
 
 func validate(v domain.Center) error {
 	if strings.TrimSpace(v.Name) == "" || strings.TrimSpace(v.Host) == "" || strings.TrimSpace(v.Username) == "" {
@@ -196,6 +212,7 @@ func (s *Service) Save(input domain.Center) (domain.Center, error) {
 	if err := s.repo.SaveCenter(input); err != nil {
 		return domain.Center{}, err
 	}
+	s.notifyMonitorSync()
 	s.mask(&input)
 	return input, nil
 }
@@ -215,7 +232,11 @@ func (s *Service) UpdateRuntime(id, accelerator string, cpuCount, gpuCount int, 
 		v.InitializedAt = &now
 	}
 	v.UpdatedAt = now
-	return s.repo.SaveCenter(v)
+	if err = s.repo.SaveCenter(v); err != nil {
+		return err
+	}
+	s.notifyMonitorSync()
+	return nil
 }
 
 // UpdateHardware refreshes detected hardware without marking the center as
@@ -229,10 +250,20 @@ func (s *Service) UpdateHardware(id, accelerator string, cpuCount, gpuCount int)
 	v.CPUCount = cpuCount
 	v.GPUCount = gpuCount
 	v.UpdatedAt = time.Now()
-	return s.repo.SaveCenter(v)
+	if err = s.repo.SaveCenter(v); err != nil {
+		return err
+	}
+	s.notifyMonitorSync()
+	return nil
 }
 
-func (s *Service) Delete(id string) error { return s.repo.DeleteCenter(id) }
+func (s *Service) Delete(id string) error {
+	if err := s.repo.DeleteCenter(id); err != nil {
+		return err
+	}
+	s.notifyMonitorSync()
+	return nil
+}
 func (s *Service) Connection(id string) (sshx.Config, string, domain.Center, error) {
 	v, e := s.repo.GetCenter(id)
 	if e != nil {
@@ -313,7 +344,11 @@ func (s *Service) ResetRuntime(id string, deployment *domain.Deployment) error {
 	v.ComposeContent = ""
 	v.ComposeProject = ""
 	v.UpdatedAt = time.Now()
-	return s.repo.SaveCenter(v)
+	if err = s.repo.SaveCenter(v); err != nil {
+		return err
+	}
+	s.notifyMonitorSync()
+	return nil
 }
 
 func (s *Service) UpdateDeployment(id string, deployment *domain.Deployment) error {

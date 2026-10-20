@@ -104,15 +104,25 @@ npm run dev
 
 ```powershell
 docker volume create center-manager-data
+docker volume create center-monitor-targets
+docker volume create center-monitor-secrets
+docker volume create center-monitor-grafana-dashboards
+docker volume create center-monitor-prometheus
+docker volume create center-monitor-grafana
+docker volume create center-monitor-alertmanager
 docker compose up -d --build
 docker compose ps
 ```
 
-服务发布在宿主机 `0.0.0.0:8099`，局域网通过 `http://<开发机IP>:8099` 访问。数据与源码
-保存在 `center-manager-data` 具名卷；容器配置为 `unless-stopped` 自动重启。首次登录使用
+服务发布在宿主机 `0.0.0.0:8099`，局域网通过 `http://<开发机IP>:8099` 访问；统一监控的
+Grafana 在 `http://<开发机IP>:3000`（默认 `admin/admin`，环境变量 `GRAFANA_ADMIN_PASSWORD`
+可覆盖）。管理数据保存在 `center-manager-data` 具名卷；`center-monitor-*` 为统一监控的
+渲染产物与历史数据卷。容器配置为 `unless-stopped` 自动重启。首次登录使用
 `admin/admin`，系统会建议修改初始密码，也可以像 Grafana 一样暂时跳过。
 
-Compose 使用外部数据卷；上述 `docker volume create` 可重复执行，已有卷会保留。
+Compose 全部使用外部数据卷，不会自动创建；上述 `docker volume create` 可重复执行，已有
+卷会保留。**新增卷时必须同步加进上面的命令清单**，否则 `docker compose up` 报
+`external volume not found`。
 若 Windows 提示端口访问权限错误，可运行 `netsh interface ipv4 show excludedportrange protocol=tcp`
 检查保留端口范围。在项目根目录的 `.env` 中设置 `CENTER_MANAGER_PORT=18099` 可更换宿主机端口，
 再执行 `docker compose up -d`，通过 `http://localhost:18099` 访问；容器内部仍使用 8099。

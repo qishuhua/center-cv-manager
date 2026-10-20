@@ -27,9 +27,12 @@ type Center struct {
 	Description         string      `json:"description"`
 	WMSURL              string      `json:"wms_url,omitempty"`
 	MisAuth             string      `json:"mis_auth,omitempty"`
-	TestMode            bool        `json:"test_mode,omitempty"`
-	CreatedAt           time.Time   `json:"created_at"`
-	UpdatedAt           time.Time   `json:"updated_at"`
+	// MisSortEnabled 是错分检测的启用开关；关闭时 WMSURL/MisAuth 原值保留，
+	// 重新开启后直接恢复使用。启用判定 = WMSURL 非空且本开关为 true。
+	MisSortEnabled bool `json:"mis_sort_enabled,omitempty"`
+	TestMode       bool `json:"test_mode,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // Deployment keeps center paths independent of any individual Compose entry.

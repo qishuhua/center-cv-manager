@@ -1,0 +1,2305 @@
+{
+    "annotations":  {
+                        "list":  [
+
+                                 ]
+                    },
+    "editable":  true,
+    "fiscalYearStartMonth":  0,
+    "graphTooltip":  1,
+    "id":  null,
+    "links":  [
+
+              ],
+    "panels":  [
+                   {
+                       "collapsed":  false,
+                       "gridPos":  {
+                                       "h":  1,
+                                       "w":  24,
+                                       "x":  0,
+                                       "y":  0
+                                   },
+                       "id":  17,
+                       "panels":  [
+
+                                  ],
+                       "title":  "宿主机运行状态",
+                       "type":  "row",
+                       "description":  "宿主机 CPU、内存、磁盘、网络与 GPU 硬件指标集中展示。使用 denglin-gpu-exporter；默认展示全部 GPU，宿主机指标不受 Worker 筛选影响。gpu_index 为物理卡序号，vpu_id / jpu_id 为卡内引擎，不等同于 DL_DEVICES 逻辑设备编号。"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "percent",
+                                                            "min":  0,
+                                                            "max":  100
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  8,
+                                       "w":  12,
+                                       "x":  0,
+                                       "y":  1
+                                   },
+                       "id":  3,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "list",
+                                                      "placement":  "bottom",
+                                                      "showLegend":  true
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "single",
+                                                       "sort":  "none"
+                                                   }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "100 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100",
+                                           "legendFormat":  "CPU",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "宿主机 CPU 使用率",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "description":  "Node Exporter cpufreq 指标，展示所有 CPU 核心当前主频的平均、最高和最低值。",
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "min":  0,
+                                                            "unit":  "MHz"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  8,
+                                       "w":  12,
+                                       "x":  12,
+                                       "y":  1
+                                   },
+                       "id":  46,
+                       "options":  {
+                                       "legend":  {
+                                                      "calcs":  [
+                                                                    "lastNotNull"
+                                                                ],
+                                                      "displayMode":  "table",
+                                                      "placement":  "bottom",
+                                                      "showLegend":  true
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "multi",
+                                                       "sort":  "desc"
+                                                   }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "avg(node_cpu_scaling_frequency_hertz or node_cpu_frequency_hertz) / 1000000",
+                                           "legendFormat":  "CPU 平均主频",
+                                           "refId":  "A"
+                                       },
+                                       {
+                                           "expr":  "max(node_cpu_scaling_frequency_hertz or node_cpu_frequency_hertz) / 1000000",
+                                           "legendFormat":  "CPU 最高主频",
+                                           "refId":  "B"
+                                       },
+                                       {
+                                           "expr":  "min(node_cpu_scaling_frequency_hertz or node_cpu_frequency_hertz) / 1000000",
+                                           "legendFormat":  "CPU 最低主频",
+                                           "refId":  "C"
+                                       }
+                                   ],
+                       "title":  "宿主机 CPU 主频变化",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "decimals":  2,
+                                                            "min":  0,
+                                                            "unit":  "suffix: GB"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  8,
+                                       "w":  8,
+                                       "x":  0,
+                                       "y":  9
+                                   },
+                       "id":  4,
+                       "options":  {
+                                       "legend":  {
+                                                      "calcs":  [
+                                                                    "lastNotNull"
+                                                                ],
+                                                      "displayMode":  "table",
+                                                      "placement":  "bottom",
+                                                      "showLegend":  true
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "single",
+                                                       "sort":  "none"
+                                                   }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / 1000000000",
+                                           "legendFormat":  "已用内存",
+                                           "refId":  "A"
+                                       },
+                                       {
+                                           "expr":  "node_memory_MemTotal_bytes / 1000000000",
+                                           "legendFormat":  "总内存",
+                                           "refId":  "B"
+                                       }
+                                   ],
+                       "title":  "宿主机内存已用 / 总量（GB）",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "percent",
+                                                            "min":  0,
+                                                            "max":  100
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  8,
+                                       "w":  8,
+                                       "x":  8,
+                                       "y":  9
+                                   },
+                       "id":  5,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "list",
+                                                      "placement":  "bottom",
+                                                      "showLegend":  true
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "multi",
+                                                       "sort":  "desc"
+                                                   }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "100 * (1 - node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|overlay\"})",
+                                           "legendFormat":  "{{mountpoint}}",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "磁盘使用率",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "description":  "各网卡最近 5 分钟的平均发送和接收速率。已排除回环、Docker、CNI 等常见虚拟网卡。",
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "min":  0,
+                                                            "unit":  "bps"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  8,
+                                       "w":  8,
+                                       "x":  16,
+                                       "y":  9
+                                   },
+                       "id":  65,
+                       "options":  {
+                                       "legend":  {
+                                                      "calcs":  [
+                                                                    "lastNotNull"
+                                                                ],
+                                                      "displayMode":  "table",
+                                                      "placement":  "bottom",
+                                                      "showLegend":  true
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "multi",
+                                                       "sort":  "desc"
+                                                   }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "rate(node_network_transmit_bytes_total{job=\"node-exporter\",device!~\"lo|docker.*|veth.*|br-.*|virbr.*|cni.*|flannel.*|cali.*\"}[5m]) * 8",
+                                           "legendFormat":  "上行 {{device}}",
+                                           "refId":  "A"
+                                       },
+                                       {
+                                           "expr":  "rate(node_network_receive_bytes_total{job=\"node-exporter\",device!~\"lo|docker.*|veth.*|br-.*|virbr.*|cni.*|flannel.*|cali.*\"}[5m]) * 8",
+                                           "legendFormat":  "下行 {{device}}",
+                                           "refId":  "B"
+                                       }
+                                   ],
+                       "title":  "宿主机网络带宽（各网卡）",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "percent",
+                                                            "min":  0,
+                                                            "max":  100
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  8,
+                                       "w":  12,
+                                       "x":  0,
+                                       "y":  17
+                                   },
+                       "id":  18,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "table",
+                                                      "placement":  "right",
+                                                      "showLegend":  true
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "multi",
+                                                       "sort":  "desc"
+                                                   }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "denglin_gpu_util{job=\"denglin-gpu\"}",
+                                           "legendFormat":  "登临 GPU {{gpu_index}}",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "宿主机 GPU 利用率",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "percent",
+                                                            "min":  0,
+                                                            "max":  100
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  8,
+                                       "w":  12,
+                                       "x":  12,
+                                       "y":  17
+                                   },
+                       "id":  19,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "table",
+                                                      "placement":  "right",
+                                                      "showLegend":  true
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "multi",
+                                                       "sort":  "desc"
+                                                   }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "denglin_mem_util{job=\"denglin-gpu\"}",
+                                           "legendFormat":  "登临 GPU {{gpu_index}}",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "宿主机 GPU 显存利用率",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "mbytes",
+                                                            "min":  0
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  8,
+                                       "w":  12,
+                                       "x":  0,
+                                       "y":  25
+                                   },
+                       "id":  20,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "table",
+                                                      "placement":  "right",
+                                                      "showLegend":  true
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "multi",
+                                                       "sort":  "desc"
+                                                   }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "denglin_gpu_used_mem{job=\"denglin-gpu\"}",
+                                           "legendFormat":  "登临 GPU {{gpu_index}} 已用",
+                                           "refId":  "A"
+                                       },
+                                       {
+                                           "expr":  "denglin_gpu_total_mem{job=\"denglin-gpu\"}",
+                                           "legendFormat":  "登临 GPU {{gpu_index}} 总量",
+                                           "refId":  "B"
+                                       }
+                                   ],
+                       "title":  "宿主机 GPU 显存已用 / 总量（登临）",
+                       "type":  "timeseries",
+                       "description":  "Exporter HELP 标注显存单位为 MiB，按 MiB 展示（使用手册表格写作 MB）。"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "celsius"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  8,
+                                       "w":  12,
+                                       "x":  12,
+                                       "y":  25
+                                   },
+                       "id":  21,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "table",
+                                                      "placement":  "right",
+                                                      "showLegend":  true
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "multi",
+                                                       "sort":  "desc"
+                                                   }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "denglin_gpu_temp{job=\"denglin-gpu\"}",
+                                           "legendFormat":  "登临 GPU {{gpu_index}} 核心",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "宿主机 GPU 温度",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "percent",
+                                                            "min":  0,
+                                                            "max":  100
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  8,
+                                       "w":  12,
+                                       "x":  0,
+                                       "y":  33
+                                   },
+                       "id":  22,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "table",
+                                                      "placement":  "right",
+                                                      "showLegend":  true
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "multi",
+                                                       "sort":  "desc"
+                                                   }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "denglin_enc_util{job=\"denglin-gpu\"}",
+                                           "legendFormat":  "登临 GPU {{gpu_index}} / VPU {{vpu_id}}",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "宿主机 GPU 编码利用率",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "percent",
+                                                            "min":  0,
+                                                            "max":  100
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  8,
+                                       "w":  12,
+                                       "x":  12,
+                                       "y":  33
+                                   },
+                       "id":  23,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "table",
+                                                      "placement":  "right",
+                                                      "showLegend":  true
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "multi",
+                                                       "sort":  "desc"
+                                                   }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "denglin_dec_util{job=\"denglin-gpu\"}",
+                                           "legendFormat":  "登临 GPU {{gpu_index}} / VPU {{vpu_id}}",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "宿主机 GPU 解码利用率",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "watt",
+                                                            "min":  0
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  8,
+                                       "w":  12,
+                                       "x":  0,
+                                       "y":  41
+                                   },
+                       "id":  24,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "table",
+                                                      "placement":  "right",
+                                                      "showLegend":  true
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "multi",
+                                                       "sort":  "desc"
+                                                   }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "denglin_gpu_power{job=\"denglin-gpu\"} / 1000",
+                                           "legendFormat":  "登临 GPU {{gpu_index}} 功耗",
+                                           "refId":  "A"
+                                       },
+                                       {
+                                           "expr":  "denglin_gpu_power_mgmt_limit{job=\"denglin-gpu\"} / 1000",
+                                           "legendFormat":  "登临 GPU {{gpu_index}} 功率上限",
+                                           "refId":  "B"
+                                       }
+                                   ],
+                       "title":  "宿主机 GPU 功耗",
+                       "type":  "timeseries",
+                       "description":  "Exporter 功耗与功率上限单位为 mW，除以 1000 后按 W 展示。"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "percent",
+                                                            "min":  0,
+                                                            "max":  100
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  8,
+                                       "w":  12,
+                                       "x":  12,
+                                       "y":  41
+                                   },
+                       "id":  56,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "table",
+                                                      "placement":  "right",
+                                                      "showLegend":  true
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "multi",
+                                                       "sort":  "desc"
+                                                   }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "denglin_jpu_util{job=\"denglin-gpu\"}",
+                                           "legendFormat":  "登临 GPU {{gpu_index}} / JPU {{jpu_id}}",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "宿主机 JPU 利用率（登临）",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "percent",
+                                                            "min":  0,
+                                                            "max":  100
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  8,
+                                       "w":  24,
+                                       "x":  0,
+                                       "y":  49
+                                   },
+                       "id":  57,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "table",
+                                                      "placement":  "right",
+                                                      "showLegend":  true
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "multi",
+                                                       "sort":  "desc"
+                                                   }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "denglin_fan_speed{job=\"denglin-gpu\"}",
+                                           "legendFormat":  "登临 GPU {{gpu_index}}",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "宿主机 GPU 风扇转速（登临）",
+                       "type":  "timeseries",
+                       "description":  "被动散热 GPU 可能不提供风扇指标，无数据属正常情况。"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "custom":  {
+                                                                           "align":  "auto",
+                                                                           "cellOptions":  {
+                                                                                               "type":  "auto"
+                                                                                           },
+                                                                           "filterable":  true,
+                                                                           "minWidth":  100
+                                                                       },
+                                                            "mappings":  [
+
+                                                                         ]
+                                                        },
+                                           "overrides":  [
+                                                             {
+                                                                 "matcher":  {
+                                                                                 "id":  "byName",
+                                                                                 "options":  "GPU 编号"
+                                                                             },
+                                                                 "properties":  [
+                                                                                    {
+                                                                                        "id":  "custom.width",
+                                                                                        "value":  110
+                                                                                    }
+                                                                                ]
+                                                             },
+                                                             {
+                                                                 "matcher":  {
+                                                                                 "id":  "byName",
+                                                                                 "options":  "XID"
+                                                                             },
+                                                                 "properties":  [
+                                                                                    {
+                                                                                        "id":  "unit",
+                                                                                        "value":  "short"
+                                                                                    },
+                                                                                    {
+                                                                                        "id":  "decimals",
+                                                                                        "value":  0
+                                                                                    },
+                                                                                    {
+                                                                                        "id":  "custom.width",
+                                                                                        "value":  140
+                                                                                    },
+                                                                                    {
+                                                                                        "id":  "custom.align",
+                                                                                        "value":  "center"
+                                                                                    },
+                                                                                    {
+                                                                                        "id":  "custom.cellOptions",
+                                                                                        "value":  {
+                                                                                                      "type":  "color-text"
+                                                                                                  }
+                                                                                    },
+                                                                                    {
+                                                                                        "id":  "thresholds",
+                                                                                        "value":  {
+                                                                                                      "mode":  "absolute",
+                                                                                                      "steps":  [
+                                                                                                                    {
+                                                                                                                        "color":  "red",
+                                                                                                                        "value":  null
+                                                                                                                    },
+                                                                                                                    {
+                                                                                                                        "color":  "green",
+                                                                                                                        "value":  0
+                                                                                                                    },
+                                                                                                                    {
+                                                                                                                        "color":  "red",
+                                                                                                                        "value":  1
+                                                                                                                    }
+                                                                                                                ]
+                                                                                                  }
+                                                                                    },
+                                                                                    {
+                                                                                        "id":  "mappings",
+                                                                                        "value":  [
+                                                                                                      {
+                                                                                                          "type":  "value",
+                                                                                                          "options":  {
+                                                                                                                          "0":  {
+                                                                                                                                    "text":  "正常（0）",
+                                                                                                                                    "color":  "green",
+                                                                                                                                    "index":  0
+                                                                                                                                }
+                                                                                                                      }
+                                                                                                      }
+                                                                                                  ]
+                                                                                    }
+                                                                                ]
+                                                             }
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  10,
+                                       "w":  24,
+                                       "x":  0,
+                                       "y":  57
+                                   },
+                       "id":  28,
+                       "options":  {
+                                       "showHeader":  true,
+                                       "cellHeight":  "sm",
+                                       "enablePagination":  true,
+                                       "sortBy":  [
+                                                      {
+                                                          "displayName":  "XID",
+                                                          "desc":  true
+                                                      }
+                                                  ]
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "denglin_xid{job=\"denglin-gpu\"}",
+                                           "instant":  true,
+                                           "legendFormat":  "登临 GPU {{gpu_index}}",
+                                           "range":  false,
+                                           "refId":  "A",
+                                           "format":  "table"
+                                       }
+                                   ],
+                       "title":  "宿主机 GPU XID 状态（非零优先）",
+                       "type":  "table",
+                       "description":  "每条设备指标独立显示，不按预设卡数合并；通过 GPU 编号、UUID 和采集节点区分设备。0 为正常，非零错误码按登临文档解释。按 XID 降序排列，使用分页查看全部设备；无数据不代表正常。",
+                       "transformations":  [
+                                               {
+                                                   "id":  "filterFieldsByName",
+                                                   "options":  {
+                                                                   "include":  {
+                                                                                   "names":  [
+                                                                                                 "gpu_index",
+                                                                                                 "Value",
+                                                                                                 "model_name",
+                                                                                                 "pci_bus_id",
+                                                                                                 "gpu_id",
+                                                                                                 "instance"
+                                                                                             ]
+                                                                               }
+                                                               }
+                                               },
+                                               {
+                                                   "id":  "organize",
+                                                   "options":  {
+                                                                   "indexByName":  {
+                                                                                       "gpu_index":  0,
+                                                                                       "Value":  1,
+                                                                                       "model_name":  2,
+                                                                                       "pci_bus_id":  3,
+                                                                                       "gpu_id":  4,
+                                                                                       "instance":  5
+                                                                                   },
+                                                                   "renameByName":  {
+                                                                                        "gpu_index":  "GPU 编号",
+                                                                                        "Value":  "XID",
+                                                                                        "model_name":  "型号",
+                                                                                        "pci_bus_id":  "PCI 地址",
+                                                                                        "gpu_id":  "GPU UUID",
+                                                                                        "instance":  "采集节点"
+                                                                                    }
+                                                               }
+                                               }
+                                           ]
+                   },
+                   {
+                       "collapsed":  false,
+                       "gridPos":  {
+                                       "h":  1,
+                                       "w":  24,
+                                       "x":  0,
+                                       "y":  67
+                                   },
+                       "id":  58,
+                       "panels":  [
+
+                                  ],
+                       "title":  "容器信息",
+                       "type":  "row",
+                       "description":  "容器 CPU 使用率与内存使用量。"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "percent"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  9,
+                                       "w":  12,
+                                       "x":  0,
+                                       "y":  68
+                                   },
+                       "id":  6,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "table",
+                                                      "placement":  "right",
+                                                      "showLegend":  true
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "multi",
+                                                       "sort":  "desc"
+                                                   }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "sum by (name) (rate(container_cpu_usage_seconds_total{name!=\"\"}[5m])) * 100",
+                                           "legendFormat":  "{{name}}",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "容器 CPU 使用率",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "bytes"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  9,
+                                       "w":  12,
+                                       "x":  12,
+                                       "y":  68
+                                   },
+                       "id":  7,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "table",
+                                                      "placement":  "right",
+                                                      "showLegend":  true
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "multi",
+                                                       "sort":  "desc"
+                                                   }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "sum by (name) (container_memory_working_set_bytes{name!=\"\"})",
+                                           "legendFormat":  "{{name}}",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "容器内存使用量",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "collapsed":  false,
+                       "gridPos":  {
+                                       "h":  1,
+                                       "w":  24,
+                                       "x":  0,
+                                       "y":  77
+                                   },
+                       "id":  35,
+                       "panels":  [
+
+                                  ],
+                       "title":  "Center CV 运行信息",
+                       "type":  "row",
+                       "description":  "Center CV 服务健康、任务、告警、模型、推理流水线与 GPU 单卡任务上限；支持 Worker 筛选。GPU 硬件利用率与显存信息统一查看宿主机运行状态。"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "mappings":  [
+                                                                             {
+                                                                                 "options":  {
+                                                                                                 "0":  {
+                                                                                                           "color":  "red",
+                                                                                                           "text":  "离线"
+                                                                                                       },
+                                                                                                 "1":  {
+                                                                                                           "color":  "green",
+                                                                                                           "text":  "在线"
+                                                                                                       }
+                                                                                             },
+                                                                                 "type":  "value"
+                                                                             }
+                                                                         ],
+                                                            "thresholds":  {
+                                                                               "mode":  "absolute",
+                                                                               "steps":  [
+                                                                                             {
+                                                                                                 "color":  "red",
+                                                                                                 "value":  null
+                                                                                             },
+                                                                                             {
+                                                                                                 "color":  "green",
+                                                                                                 "value":  1
+                                                                                             }
+                                                                                         ]
+                                                                           }
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  5,
+                                       "w":  24,
+                                       "x":  0,
+                                       "y":  78
+                                   },
+                       "id":  1,
+                       "options":  {
+                                       "colorMode":  "background",
+                                       "graphMode":  "none",
+                                       "justifyMode":  "center",
+                                       "orientation":  "vertical",
+                                       "reduceOptions":  {
+                                                             "calcs":  [
+                                                                           "lastNotNull"
+                                                                       ],
+                                                             "fields":  "",
+                                                             "values":  false
+                                                         },
+                                       "textMode":  "value_and_name",
+                                       "wideLayout":  false,
+                                       "text":  {
+                                                    "titleSize":  11,
+                                                    "valueSize":  18
+                                                }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "up{job=\"center-cv-service\",worker=\"center-cv-service-0\",worker=~\"$worker\"}",
+                                           "instant":  true,
+                                           "legendFormat":  "Worker 0",
+                                           "range":  false,
+                                           "refId":  "A"
+                                       },
+                                       {
+                                           "expr":  "up{job=\"center-cv-service\",worker=\"center-cv-service-1\",worker=~\"$worker\"}",
+                                           "instant":  true,
+                                           "legendFormat":  "Worker 1",
+                                           "range":  false,
+                                           "refId":  "B"
+                                       },
+                                       {
+                                           "expr":  "up{job=\"center-cv-service\",worker=\"center-cv-service-2\",worker=~\"$worker\"}",
+                                           "instant":  true,
+                                           "legendFormat":  "Worker 2",
+                                           "range":  false,
+                                           "refId":  "C"
+                                       },
+                                       {
+                                           "expr":  "up{job=\"center-cv-service\",worker=\"center-cv-service-3\",worker=~\"$worker\"}",
+                                           "instant":  true,
+                                           "legendFormat":  "Worker 3",
+                                           "range":  false,
+                                           "refId":  "D"
+                                       },
+                                       {
+                                           "expr":  "up{job=\"center-cv-service\",worker=\"center-cv-service-4\",worker=~\"$worker\"}",
+                                           "instant":  true,
+                                           "legendFormat":  "Worker 4",
+                                           "range":  false,
+                                           "refId":  "E"
+                                       },
+                                       {
+                                           "expr":  "up{job=\"center-cv-service\",worker=\"center-cv-service-5\",worker=~\"$worker\"}",
+                                           "instant":  true,
+                                           "legendFormat":  "Worker 5",
+                                           "range":  false,
+                                           "refId":  "F"
+                                       },
+                                       {
+                                           "expr":  "up{job=\"center-cv-service\",worker=\"center-cv-service-6\",worker=~\"$worker\"}",
+                                           "instant":  true,
+                                           "legendFormat":  "Worker 6",
+                                           "range":  false,
+                                           "refId":  "G"
+                                       },
+                                       {
+                                           "expr":  "up{job=\"center-cv-service\",worker=\"center-cv-service-7\",worker=~\"$worker\"}",
+                                           "instant":  true,
+                                           "legendFormat":  "Worker 7",
+                                           "range":  false,
+                                           "refId":  "H"
+                                       }
+                                   ],
+                       "title":  "Center CV 状态",
+                       "type":  "stat"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "mappings":  [
+                                                                             {
+                                                                                 "options":  {
+                                                                                                 "0":  {
+                                                                                                           "color":  "red",
+                                                                                                           "text":  "异常"
+                                                                                                       },
+                                                                                                 "1":  {
+                                                                                                           "color":  "green",
+                                                                                                           "text":  "正常"
+                                                                                                       }
+                                                                                             },
+                                                                                 "type":  "value"
+                                                                             }
+                                                                         ],
+                                                            "thresholds":  {
+                                                                               "mode":  "absolute",
+                                                                               "steps":  [
+                                                                                             {
+                                                                                                 "color":  "red",
+                                                                                                 "value":  null
+                                                                                             },
+                                                                                             {
+                                                                                                 "color":  "green",
+                                                                                                 "value":  1
+                                                                                             }
+                                                                                         ]
+                                                                           }
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  5,
+                                       "w":  24,
+                                       "x":  0,
+                                       "y":  83
+                                   },
+                       "id":  2,
+                       "options":  {
+                                       "colorMode":  "background",
+                                       "graphMode":  "none",
+                                       "justifyMode":  "center",
+                                       "orientation":  "vertical",
+                                       "reduceOptions":  {
+                                                             "calcs":  [
+                                                                           "lastNotNull"
+                                                                       ],
+                                                             "fields":  "",
+                                                             "values":  false
+                                                         },
+                                       "textMode":  "value_and_name",
+                                       "wideLayout":  false,
+                                       "text":  {
+                                                    "titleSize":  11,
+                                                    "valueSize":  18
+                                                }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "probe_success{job=\"service-http-health\",worker=\"center-cv-service-0\",worker=~\"$worker\"}",
+                                           "instant":  true,
+                                           "legendFormat":  "Worker 0 HTTP",
+                                           "range":  false,
+                                           "refId":  "A"
+                                       },
+                                       {
+                                           "expr":  "probe_success{job=\"service-http-health\",worker=\"center-cv-service-1\",worker=~\"$worker\"}",
+                                           "instant":  true,
+                                           "legendFormat":  "Worker 1 HTTP",
+                                           "range":  false,
+                                           "refId":  "B"
+                                       },
+                                       {
+                                           "expr":  "probe_success{job=\"service-http-health\",worker=\"center-cv-service-2\",worker=~\"$worker\"}",
+                                           "instant":  true,
+                                           "legendFormat":  "Worker 2 HTTP",
+                                           "range":  false,
+                                           "refId":  "C"
+                                       },
+                                       {
+                                           "expr":  "probe_success{job=\"service-http-health\",worker=\"center-cv-service-3\",worker=~\"$worker\"}",
+                                           "instant":  true,
+                                           "legendFormat":  "Worker 3 HTTP",
+                                           "range":  false,
+                                           "refId":  "D"
+                                       },
+                                       {
+                                           "expr":  "probe_success{job=\"service-http-health\",worker=\"center-cv-service-4\",worker=~\"$worker\"}",
+                                           "instant":  true,
+                                           "legendFormat":  "Worker 4 HTTP",
+                                           "range":  false,
+                                           "refId":  "E"
+                                       },
+                                       {
+                                           "expr":  "probe_success{job=\"service-http-health\",worker=\"center-cv-service-5\",worker=~\"$worker\"}",
+                                           "instant":  true,
+                                           "legendFormat":  "Worker 5 HTTP",
+                                           "range":  false,
+                                           "refId":  "F"
+                                       },
+                                       {
+                                           "expr":  "probe_success{job=\"service-http-health\",worker=\"center-cv-service-6\",worker=~\"$worker\"}",
+                                           "instant":  true,
+                                           "legendFormat":  "Worker 6 HTTP",
+                                           "range":  false,
+                                           "refId":  "G"
+                                       },
+                                       {
+                                           "expr":  "probe_success{job=\"service-http-health\",worker=\"center-cv-service-7\",worker=~\"$worker\"}",
+                                           "instant":  true,
+                                           "legendFormat":  "Worker 7 HTTP",
+                                           "range":  false,
+                                           "refId":  "H"
+                                       },
+                                       {
+                                           "expr":  "probe_success{job=\"service-http-health\",service=\"center-cv-ingress\"}",
+                                           "instant":  true,
+                                           "legendFormat":  "任务入口 center-cv-ingress",
+                                           "range":  false,
+                                           "refId":  "I"
+                                       },
+                                       {
+                                           "expr":  "probe_success{job=\"service-http-health\",service=\"video-transcode-service\"}",
+                                           "instant":  true,
+                                           "legendFormat":  "告警转码 video-transcode-service",
+                                           "range":  false,
+                                           "refId":  "J"
+                                       },
+                                       {
+                                           "expr":  "probe_success{job=\"service-tcp-health\"}",
+                                           "instant":  true,
+                                           "legendFormat":  "API 网关 nginx:8080",
+                                           "range":  false,
+                                           "refId":  "K"
+                                       }
+                                   ],
+                       "title":  "服务健康状态",
+                       "type":  "stat"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "none",
+                                                            "decimals":  0
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  8,
+                                       "w":  24,
+                                       "x":  0,
+                                       "y":  88
+                                   },
+                       "id":  8,
+                       "options":  {
+                                       "legend":  {
+                                                      "calcs":  [
+                                                                    "lastNotNull"
+                                                                ],
+                                                      "displayMode":  "table",
+                                                      "placement":  "right",
+                                                      "showLegend":  true
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "multi",
+                                                       "sort":  "desc"
+                                                   }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "sum(center_cv_online_tasks{worker=~\"$worker\"})",
+                                           "instant":  false,
+                                           "legendFormat":  "当前任务数",
+                                           "range":  true,
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "当前任务数",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "short",
+                                                            "min":  0
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  8,
+                                       "w":  24,
+                                       "x":  0,
+                                       "y":  96
+                                   },
+                       "id":  12,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "table",
+                                                      "placement":  "right",
+                                                      "showLegend":  true
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "multi",
+                                                       "sort":  "desc"
+                                                   }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "sum by (model) (center_cv_model_streams{worker=~\"$worker\"})",
+                                           "legendFormat":  "{{model}}",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "各模型任务数",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "short",
+                                                            "min":  0
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  8,
+                                       "w":  24,
+                                       "x":  0,
+                                       "y":  104
+                                   },
+                       "id":  16,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "table",
+                                                      "placement":  "right",
+                                                      "showLegend":  true
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "multi",
+                                                       "sort":  "desc"
+                                                   }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "sum by (type, violationType) (center_cv_task_type_tasks{worker=~\"$worker\"})",
+                                           "legendFormat":  "{{type}}({{violationType}})",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "违规类型任务数",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "description":  "规则引擎触发的每违规类型告警累计数（center_cv_alarms_total），按所选时间段聚合，统计点在转码/上报之前。",
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "none",
+                                                            "min":  0,
+                                                            "decimals":  0
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  6,
+                                       "w":  18,
+                                       "x":  0,
+                                       "y":  112
+                                   },
+                       "id":  55,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "list",
+                                                      "placement":  "bottom",
+                                                      "showLegend":  true
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "multi",
+                                                       "sort":  "desc"
+                                                   }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "sum by (type) (increase(center_cv_alarms_total{worker=~\"$worker\"}[$__rate_interval]))",
+                                           "legendFormat":  "{{type}}",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "各类型告警次数",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "none",
+                                                            "decimals":  0
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  6,
+                                       "w":  6,
+                                       "x":  18,
+                                       "y":  112
+                                   },
+                       "id":  15,
+                       "options":  {
+                                       "colorMode":  "none",
+                                       "graphMode":  "none",
+                                       "justifyMode":  "center",
+                                       "orientation":  "horizontal",
+                                       "reduceOptions":  {
+                                                             "calcs":  [
+                                                                           "lastNotNull"
+                                                                       ],
+                                                             "fields":  "",
+                                                             "values":  false
+                                                         },
+                                       "textMode":  "value",
+                                       "wideLayout":  true
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "max(center_cv_gpu_task_cap{worker=~\"$worker\"})",
+                                           "instant":  true,
+                                           "legendFormat":  "",
+                                           "range":  false,
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "GPU 单卡任务上限",
+                       "type":  "stat"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "decimals":  2,
+                                                            "min":  0,
+                                                            "unit":  "suffix:/s"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  8,
+                                       "w":  24,
+                                       "x":  0,
+                                       "y":  118
+                                   },
+                       "id":  40,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "table",
+                                                      "placement":  "right",
+                                                      "showLegend":  true
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "multi",
+                                                       "sort":  "desc"
+                                                   }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "sum(rate(center_cv_video_packets_demuxed_total{worker=~\"$worker\"}[1m]))",
+                                           "legendFormat":  "解复用速率",
+                                           "refId":  "A"
+                                       },
+                                       {
+                                           "expr":  "sum(rate(center_cv_video_packets_demux_dropped_total{worker=~\"$worker\"}[1m]))",
+                                           "legendFormat":  "解复用丢包速率",
+                                           "refId":  "G"
+                                       },
+                                       {
+                                           "expr":  "sum(rate(center_cv_video_packets_submitted_total{worker=~\"$worker\"}[1m]))",
+                                           "legendFormat":  "解码器入队速率",
+                                           "refId":  "B"
+                                       },
+                                       {
+                                           "expr":  "sum(rate(center_cv_video_frames_decoded_total{worker=~\"$worker\"}[1m]))",
+                                           "legendFormat":  "解码器出队速率",
+                                           "refId":  "C"
+                                       },
+                                       {
+                                           "expr":  "sum(rate(center_cv_video_frames_sampled_total{worker=~\"$worker\"}[1m]))",
+                                           "legendFormat":  "抽帧后速率",
+                                           "refId":  "D"
+                                       },
+                                       {
+                                           "expr":  "sum(rate(center_cv_model_inference_frames_total{worker=~\"$worker\"}[1m]))",
+                                           "legendFormat":  "推理速率",
+                                           "refId":  "E"
+                                       },
+                                       {
+                                           "expr":  "sum(rate(center_cv_model_inference_frames_dropped_total{worker=~\"$worker\"}[1m]))",
+                                           "legendFormat":  "推理丢帧速率",
+                                           "refId":  "F"
+                                       }
+                                   ],
+                       "title":  "视频 / 推理流水线每秒速率趋势",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "decimals":  2,
+                                                            "min":  0,
+                                                            "unit":  "fps"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  8,
+                                       "w":  24,
+                                       "x":  0,
+                                       "y":  126
+                                   },
+                       "id":  44,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "table",
+                                                      "placement":  "right",
+                                                      "showLegend":  true
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "multi",
+                                                       "sort":  "desc"
+                                                   }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "sum by (model) (rate(center_cv_model_inference_duration_seconds_count{worker=~\"$worker\",model!=\"unknown\"}[5m]))",
+                                           "legendFormat":  "{{model}}",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "各模型推理速率",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "decimals":  3,
+                                                            "min":  0,
+                                                            "unit":  "s"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  8,
+                                       "w":  24,
+                                       "x":  0,
+                                       "y":  134
+                                   },
+                       "id":  43,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "table",
+                                                      "placement":  "right",
+                                                      "showLegend":  true
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "multi",
+                                                       "sort":  "desc"
+                                                   }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "histogram_quantile(0.50, sum by (le, model) (rate(center_cv_model_inference_duration_seconds_bucket{worker=~\"$worker\",model!=\"unknown\"}[5m])))",
+                                           "legendFormat":  "{{model}} P50",
+                                           "refId":  "A"
+                                       },
+                                       {
+                                           "expr":  "histogram_quantile(0.95, sum by (le, model) (rate(center_cv_model_inference_duration_seconds_bucket{worker=~\"$worker\",model!=\"unknown\"}[5m])))",
+                                           "legendFormat":  "{{model}} P95",
+                                           "refId":  "B"
+                                       },
+                                       {
+                                           "expr":  "histogram_quantile(0.99, sum by (le, model) (rate(center_cv_model_inference_duration_seconds_bucket{worker=~\"$worker\",model!=\"unknown\"}[5m])))",
+                                           "legendFormat":  "{{model}} P99",
+                                           "refId":  "C"
+                                       }
+                                   ],
+                       "title":  "各模型推理耗时",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "collapsed":  false,
+                       "description":  "任务入口 Ingress 收到的 create_task HTTP 请求趋势（已接收总量与通过/拒绝判定结果）；数据来自 Prometheus，Ingress 存活状态见 Center CV 组「服务健康状态」。",
+                       "gridPos":  {
+                                       "h":  1,
+                                       "w":  24,
+                                       "x":  0,
+                                       "y":  142
+                                   },
+                       "id":  47,
+                       "panels":  [
+
+                                  ],
+                       "title":  "任务入口信息",
+                       "type":  "row"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "description":  "按时间桶展示 Ingress 收到的 create_task 请求数：折线为已接收（received）总量，堆叠柱为已通过（passed）与已拒绝（rejected）两类判定结果，柱高为已判定请求数，正常与折线基本重合，差异为在途或未判定请求；桶宽随看板时间范围自适应，首次出现的 counter 会补偿首次抓取前的突发值。",
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "decimals":  0,
+                                                            "min":  0,
+                                                            "unit":  "short",
+                                                            "custom":  {
+                                                                           "barAlignment":  0,
+                                                                           "drawStyle":  "bars",
+                                                                           "fillOpacity":  80,
+                                                                           "gradientMode":  "none",
+                                                                           "lineInterpolation":  "linear",
+                                                                           "lineWidth":  1,
+                                                                           "pointSize":  5,
+                                                                           "scaleDistribution":  {
+                                                                                                     "type":  "linear"
+                                                                                                 },
+                                                                           "showPoints":  "never",
+                                                                           "stacking":  {
+                                                                                            "group":  "A",
+                                                                                            "mode":  "normal"
+                                                                                        },
+                                                                           "thresholdsStyle":  {
+                                                                                                   "mode":  "off"
+                                                                                               }
+                                                                       }
+                                                        },
+                                           "overrides":  [
+                                                             {
+                                                                 "matcher":  {
+                                                                                 "id":  "byName",
+                                                                                 "options":  "已接收"
+                                                                             },
+                                                                 "properties":  [
+                                                                                    {
+                                                                                        "id":  "color",
+                                                                                        "value":  {
+                                                                                                      "fixedColor":  "blue",
+                                                                                                      "mode":  "fixed"
+                                                                                                  }
+                                                                                    },
+                                                                                    {
+                                                                                        "id":  "custom.drawStyle",
+                                                                                        "value":  "line"
+                                                                                    },
+                                                                                    {
+                                                                                        "id":  "custom.fillOpacity",
+                                                                                        "value":  0
+                                                                                    },
+                                                                                    {
+                                                                                        "id":  "custom.lineWidth",
+                                                                                        "value":  2
+                                                                                    },
+                                                                                    {
+                                                                                        "id":  "custom.stacking",
+                                                                                        "value":  {
+                                                                                                      "group":  "",
+                                                                                                      "mode":  "off"
+                                                                                                  }
+                                                                                    }
+                                                                                ]
+                                                             },
+                                                             {
+                                                                 "matcher":  {
+                                                                                 "id":  "byName",
+                                                                                 "options":  "已通过"
+                                                                             },
+                                                                 "properties":  [
+                                                                                    {
+                                                                                        "id":  "color",
+                                                                                        "value":  {
+                                                                                                      "fixedColor":  "green",
+                                                                                                      "mode":  "fixed"
+                                                                                                  }
+                                                                                    }
+                                                                                ]
+                                                             },
+                                                             {
+                                                                 "matcher":  {
+                                                                                 "id":  "byName",
+                                                                                 "options":  "已拒绝"
+                                                                             },
+                                                                 "properties":  [
+                                                                                    {
+                                                                                        "id":  "color",
+                                                                                        "value":  {
+                                                                                                      "fixedColor":  "red",
+                                                                                                      "mode":  "fixed"
+                                                                                                  }
+                                                                                    }
+                                                                                ]
+                                                             }
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  9,
+                                       "w":  24,
+                                       "x":  0,
+                                       "y":  143
+                                   },
+                       "id":  53,
+                       "options":  {
+                                       "legend":  {
+                                                      "calcs":  [
+                                                                    "sum",
+                                                                    "max"
+                                                                ],
+                                                      "displayMode":  "table",
+                                                      "placement":  "right",
+                                                      "showLegend":  true
+                                                  },
+                                       "tooltip":  {
+                                                       "mode":  "multi",
+                                                       "sort":  "desc"
+                                                   }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "(sum(increase(center_cv_ingress_http_requests_total{job=\"center-cv-ingress\",route=\"create_task\",result=\"received\"}[$__rate_interval])) or vector(0)) + (sum(center_cv_ingress_http_requests_total{job=\"center-cv-ingress\",route=\"create_task\",result=\"received\"} unless center_cv_ingress_http_requests_total{job=\"center-cv-ingress\",route=\"create_task\",result=\"received\"} offset $__rate_interval) or vector(0))",
+                                           "legendFormat":  "已接收",
+                                           "refId":  "A"
+                                       },
+                                       {
+                                           "expr":  "(sum(increase(center_cv_ingress_http_requests_total{job=\"center-cv-ingress\",route=\"create_task\",result=\"passed\"}[$__rate_interval])) or vector(0)) + (sum(center_cv_ingress_http_requests_total{job=\"center-cv-ingress\",route=\"create_task\",result=\"passed\"} unless center_cv_ingress_http_requests_total{job=\"center-cv-ingress\",route=\"create_task\",result=\"passed\"} offset $__rate_interval) or vector(0))",
+                                           "legendFormat":  "已通过",
+                                           "refId":  "B"
+                                       },
+                                       {
+                                           "expr":  "(sum(increase(center_cv_ingress_http_requests_total{job=\"center-cv-ingress\",route=\"create_task\",result=\"rejected\"}[$__rate_interval])) or vector(0)) + (sum(center_cv_ingress_http_requests_total{job=\"center-cv-ingress\",route=\"create_task\",result=\"rejected\"} unless center_cv_ingress_http_requests_total{job=\"center-cv-ingress\",route=\"create_task\",result=\"rejected\"} offset $__rate_interval) or vector(0))",
+                                           "legendFormat":  "已拒绝",
+                                           "refId":  "C"
+                                       }
+                                   ],
+                       "title":  "任务接入趋势",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "collapsed": false,
+                       "description": "服务就绪、消费 Worker、在途任务、已完成任务成功率、完整处理耗时与失败原因。",
+                       "gridPos": {
+                           "h": 1,
+                           "w": 24,
+                           "x": 0,
+                           "y": 152
+                       },
+                       "id": 62,
+                       "panels": [],
+                       "title": "Video Transcode 运行信息",
+                       "type": "row"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "description":  "同时展示 Prometheus 指标抓取状态与 video-transcode-service 自报就绪状态；业务就绪要求服务运行且全部 RabbitMQ worker 已连接。",
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "thresholds":  {
+                                                                               "mode":  "absolute",
+                                                                               "steps":  [
+                                                                                             {
+                                                                                                 "color":  "red",
+                                                                                                 "value":  null
+                                                                                             },
+                                                                                             {
+                                                                                                 "color":  "green",
+                                                                                                 "value":  1
+                                                                                             }
+                                                                                         ]
+                                                                           },
+                                                            "mappings":  [
+                                                                             {
+                                                                                 "type":  "value",
+                                                                                 "options":  {
+                                                                                                 "0":  {
+                                                                                                           "color":  "red",
+                                                                                                           "index":  0,
+                                                                                                           "text":  "异常"
+                                                                                                       },
+                                                                                                 "1":  {
+                                                                                                           "color":  "green",
+                                                                                                           "index":  1,
+                                                                                                           "text":  "正常"
+                                                                                                       }
+                                                                                             }
+                                                                             }
+                                                                         ]
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  5,
+                                       "w":  8,
+                                       "x":  0,
+                                       "y":  153
+                                   },
+                       "id":  63,
+                       "options":  {
+                                       "colorMode":  "value",
+                                       "graphMode":  "none",
+                                       "justifyMode":  "auto",
+                                       "orientation":  "auto",
+                                       "reduceOptions":  {
+                                                             "calcs":  [
+                                                                           "lastNotNull"
+                                                                       ],
+                                                             "fields":  "",
+                                                             "values":  false
+                                                         },
+                                       "textMode":  "value_and_name",
+                                       "wideLayout":  true
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "up{job=\"video-transcode-service\"}",
+                                           "instant":  true,
+                                           "legendFormat":  "指标采集",
+                                           "range":  false,
+                                           "refId":  "A"
+                                       },
+                                       {
+                                           "expr":  "min(video_transcode_ready{job=\"video-transcode-service\"})",
+                                           "instant":  true,
+                                           "legendFormat":  "业务就绪",
+                                           "range":  false,
+                                           "refId":  "B"
+                                       }
+                                   ],
+                       "title":  "服务与指标状态",
+                       "type":  "stat"
+                   },
+                   {
+                       "datasource": {
+                           "type": "prometheus",
+                           "uid": "prometheus"
+                       },
+                       "description": "当前已连接的消费 Worker 数，不是配置容量。部分连接丢失也可能影响就绪，完整性请结合业务就绪状态判断。",
+                       "fieldConfig": {
+                           "defaults": {
+                               "decimals": 0,
+                               "min": 0,
+                               "unit": "short",
+                               "thresholds": {
+                                   "mode": "absolute",
+                                   "steps": [
+                                       {
+                                           "color": "blue",
+                                           "value": null
+                                       }
+                                   ]
+                               }
+                           },
+                           "overrides": []
+                       },
+                       "gridPos": {
+                           "h": 5,
+                           "w": 4,
+                           "x": 8,
+                           "y": 153
+                       },
+                       "id": 64,
+                       "options": {
+                           "colorMode": "value",
+                           "graphMode": "none",
+                           "justifyMode": "auto",
+                           "orientation": "auto",
+                           "reduceOptions": {
+                               "calcs": [
+                                   "lastNotNull"
+                               ],
+                               "fields": "",
+                               "values": false
+                           },
+                           "textMode": "value_and_name",
+                           "wideLayout": true
+                       },
+                       "targets": [
+                           {
+                               "expr": "sum(video_transcode_rabbitmq_connected_workers{job=\"video-transcode-service\"})",
+                               "instant": true,
+                               "legendFormat": "Worker 数",
+                               "range": false,
+                               "refId": "A"
+                           }
+                       ],
+                       "title": "RabbitMQ 已连接 Worker",
+                       "type": "stat"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "description":  "当前正在处理的转码任务总数，是并发占用量，不是队列积压量。",
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "color":  {
+                                                                          "mode":  "fixed",
+                                                                          "fixedColor":  "blue"
+                                                                      },
+                                                            "decimals":  0,
+                                                            "min":  0,
+                                                            "unit":  "short"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  5,
+                                       "w":  4,
+                                       "x":  12,
+                                       "y":  153
+                                   },
+                       "id":  66,
+                       "options":  {
+                                       "colorMode":  "value",
+                                       "graphMode":  "none",
+                                       "justifyMode":  "auto",
+                                       "orientation":  "auto",
+                                       "reduceOptions":  {
+                                                             "calcs":  [
+                                                                           "lastNotNull"
+                                                                       ],
+                                                             "fields":  "",
+                                                             "values":  false
+                                                         },
+                                       "textMode":  "value_and_name",
+                                       "wideLayout":  true
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "sum(video_transcode_jobs_active{job=\"video-transcode-service\"})",
+                                           "instant":  true,
+                                           "legendFormat":  "活跃任务",
+                                           "range":  false,
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "处理中任务",
+                       "type":  "stat"
+                   },
+                   {
+                       "datasource": {
+                           "type": "prometheus",
+                           "uid": "prometheus"
+                       },
+                       "description": "所选时段成功完成数 /（成功完成数 + 失败完成数）；不以开始处理数作分母。无完成任务或采集缺失时显示 N/A。计数表示处理尝试，非去重告警数。",
+                       "fieldConfig": {
+                           "defaults": {
+                               "decimals": 2,
+                               "min": 0,
+                               "max": 100,
+                               "unit": "percent",
+                               "thresholds": {
+                                   "mode": "absolute",
+                                   "steps": [
+                                       {
+                                           "color": "red",
+                                           "value": null
+                                       },
+                                       {
+                                           "color": "orange",
+                                           "value": 95
+                                       },
+                                       {
+                                           "color": "green",
+                                           "value": 99
+                                       }
+                                   ]
+                               },
+                               "noValue": "N/A"
+                           },
+                           "overrides": []
+                       },
+                       "gridPos": {
+                           "h": 5,
+                           "w": 4,
+                           "x": 16,
+                           "y": 153
+                       },
+                       "id": 67,
+                       "options": {
+                           "colorMode": "value",
+                           "graphMode": "none",
+                           "justifyMode": "auto",
+                           "orientation": "auto",
+                           "reduceOptions": {
+                               "calcs": [
+                                   "lastNotNull"
+                               ],
+                               "fields": "",
+                               "values": false
+                           },
+                           "textMode": "value_and_name",
+                           "wideLayout": true
+                       },
+                       "targets": [
+                           {
+                               "expr": "100 * sum(increase(video_transcode_jobs_succeeded_total{job=\"video-transcode-service\"}[$__range])) / ((sum(increase(video_transcode_jobs_succeeded_total{job=\"video-transcode-service\"}[$__range])) + sum(increase(video_transcode_jobs_failed_total{job=\"video-transcode-service\"}[$__range]))) > 0)",
+                               "instant": true,
+                               "legendFormat": "成功率",
+                               "range": false,
+                               "refId": "A"
+                           }
+                       ],
+                       "title": "当前时段任务成功率",
+                       "type": "stat"
+                   },
+                   {
+                       "datasource": {
+                           "type": "prometheus",
+                           "uid": "prometheus"
+                       },
+                       "description": "所选时段已结束任务的累计处理耗时 / 成功与失败完成数，含转码、上传、回调及清理，不含 RabbitMQ 等待；不是纯转码耗时或 P95。无完成任务或采集缺失时显示 N/A。",
+                       "fieldConfig": {
+                           "defaults": {
+                               "color": {
+                                   "mode": "fixed",
+                                   "fixedColor": "blue"
+                               },
+                               "decimals": 2,
+                               "min": 0,
+                               "unit": "ms",
+                               "noValue": "N/A"
+                           },
+                           "overrides": []
+                       },
+                       "gridPos": {
+                           "h": 5,
+                           "w": 4,
+                           "x": 20,
+                           "y": 153
+                       },
+                       "id": 72,
+                       "options": {
+                           "colorMode": "value",
+                           "graphMode": "none",
+                           "justifyMode": "auto",
+                           "orientation": "auto",
+                           "reduceOptions": {
+                               "calcs": [
+                                   "lastNotNull"
+                               ],
+                               "fields": "",
+                               "values": false
+                           },
+                           "textMode": "value_and_name",
+                           "wideLayout": true
+                       },
+                       "targets": [
+                           {
+                               "expr": "sum(increase(video_transcode_jobs_duration_milliseconds_total{job=\"video-transcode-service\"}[$__range])) / ((sum(increase(video_transcode_jobs_succeeded_total{job=\"video-transcode-service\"}[$__range])) + sum(increase(video_transcode_jobs_failed_total{job=\"video-transcode-service\"}[$__range]))) > 0)",
+                               "instant": true,
+                               "legendFormat": "平均耗时",
+                               "range": false,
+                               "refId": "A"
+                           }
+                       ],
+                       "title": "当前时段平均任务耗时",
+                       "type": "stat"
+                   },
+                   {
+                       "datasource": {
+                           "type": "prometheus",
+                           "uid": "prometheus"
+                       },
+                       "description": "滚动窗口平均速率，折算次/分钟，非整分钟精确计数。开始处理与完成存在时间差；失败分类不穷尽（如输入文件缺失），素材 OSS 与业务上报失败可能发生于同一任务，禁止相加或堆叠。成功仅表示所有启用步骤完成。",
+                       "fieldConfig": {
+                           "defaults": {
+                               "decimals": 2,
+                               "min": 0,
+                               "unit": "none"
+                           },
+                           "overrides": []
+                       },
+                       "gridPos": {
+                           "h": 9,
+                           "w": 24,
+                           "x": 0,
+                           "y": 158
+                       },
+                       "id": 71,
+                       "options": {
+                           "legend": {
+                               "calcs": [
+                                   "lastNotNull",
+                                   "max"
+                               ],
+                               "displayMode": "table",
+                               "placement": "bottom",
+                               "showLegend": true
+                           },
+                           "tooltip": {
+                               "mode": "multi",
+                               "sort": "desc"
+                           }
+                       },
+                       "targets": [
+                           {
+                               "expr": "sum(rate(video_transcode_jobs_processed_total{job=\"video-transcode-service\"}[$__rate_interval])) * 60",
+                               "legendFormat": "开始处理",
+                               "refId": "F"
+                           },
+                           {
+                               "expr": "sum(rate(video_transcode_jobs_succeeded_total{job=\"video-transcode-service\"}[$__rate_interval])) * 60",
+                               "legendFormat": "成功",
+                               "refId": "A"
+                           },
+                           {
+                               "expr": "sum(rate(video_transcode_jobs_failed_total{job=\"video-transcode-service\"}[$__rate_interval])) * 60",
+                               "legendFormat": "失败总计",
+                               "refId": "B"
+                           },
+                           {
+                               "expr": "sum(rate(video_transcode_jobs_transcode_failed_total{job=\"video-transcode-service\"}[$__rate_interval])) * 60",
+                               "legendFormat": "转码器失败",
+                               "refId": "C"
+                           },
+                           {
+                               "expr": "sum(rate(center_alarm_jobs_alarm_failed_total{job=\"center-alarm-service\"}[$__rate_interval])) * 60",
+                               "legendFormat": "业务 OSS / 告警上报失败（上报服务）",
+                               "refId": "D"
+                           },
+                           {
+                               "expr": "sum(rate(center_alarm_jobs_material_oss_failed_total{job=\"center-alarm-service\"}[$__rate_interval])) * 60",
+                               "legendFormat": "素材 OSS 上传失败（上报服务）",
+                               "refId": "E"
+                           },
+                           {
+                               "expr": "sum(rate(video_transcode_jobs_report_publish_failed_total{job=\"video-transcode-service\"}[$__rate_interval])) * 60",
+                               "legendFormat": "转码结果发布失败",
+                               "refId": "G"
+                           }
+                       ],
+                       "title": "转码/上报任务结果与失败类型速率（次/分钟）",
+                       "type": "timeseries"
+                   },
+
+                   {
+                       "collapsed": false,
+                       "gridPos": {
+                           "h": 1,
+                           "w": 24,
+                           "x": 0,
+                           "y": 167
+                       },
+                       "id": 59,
+                       "panels": [],
+                       "title": "RabbitMQ 信息",
+                       "type": "row",
+                       "description": "各队列消息积压趋势；未消费（Ready）为等待领取，交付中（Unacked）为已交付但尚未 ACK。"
+                   },
+                   {
+                       "datasource": {
+                           "type": "prometheus",
+                           "uid": "prometheus"
+                       },
+                       "description": "Ready=等待消费者领取，Unacked=已交付但尚未 ACK，Total=两者之和。",
+                       "fieldConfig": {
+                           "defaults": {
+                               "decimals": 0,
+                               "min": 0,
+                               "unit": "short"
+                           },
+                           "overrides": []
+                       },
+                       "gridPos": {
+                           "h": 8,
+                           "w": 24,
+                           "x": 0,
+                           "y": 168
+                       },
+                       "id": 54,
+                       "options": {
+                           "legend": {
+                               "calcs": [
+                                   "lastNotNull"
+                               ],
+                               "displayMode": "table",
+                               "placement": "right",
+                               "showLegend": true
+                           },
+                           "tooltip": {
+                               "mode": "multi",
+                               "sort": "desc"
+                           }
+                       },
+                       "targets": [
+                           {
+                               "expr": "rabbitmq_queue_messages_ready{job=\"rabbitmq-per-object\",queue=~\"cv[.](task|alarm[.]transcode)\"}",
+                               "legendFormat": "{{queue}} Ready（等待）",
+                               "refId": "A"
+                           },
+                           {
+                               "expr": "rabbitmq_queue_messages_unacked{job=\"rabbitmq-per-object\",queue=~\"cv[.](task|alarm[.]transcode)\"}",
+                               "legendFormat": "{{queue}} Unacked（交付中）",
+                               "refId": "B"
+                           },
+                           {
+                               "expr": "rabbitmq_queue_messages{job=\"rabbitmq-per-object\",queue=~\"cv[.](task|alarm[.]transcode)\"}",
+                               "legendFormat": "{{queue}} Total（总量）",
+                               "refId": "C"
+                           }
+                       ],
+                       "title": "RabbitMQ 当前队列消息量",
+                       "type": "timeseries"
+                   }
+               ],
+    "refresh":  "15s",
+    "schemaVersion":  39,
+    "tags":  [
+                 "center-cv",
+                 "denglin"
+             ],
+    "templating":  {
+                       "list":  [
+                                    {
+                                        "allValue":  ".*",
+                                        "current":  {
+                                                        "selected":  true,
+                                                        "text":  "All",
+                                                        "value":  "$__all"
+                                                    },
+                                        "datasource":  {
+                                                           "type":  "prometheus",
+                                                           "uid":  "prometheus"
+                                                       },
+                                        "definition":  "label_values(up{job=\"center-cv-service\"}, worker)",
+                                        "hide":  0,
+                                        "includeAll":  true,
+                                        "label":  "Center CV Worker",
+                                        "multi":  true,
+                                        "name":  "worker",
+                                        "options":  [
+
+                                                    ],
+                                        "query":  {
+                                                      "query":  "label_values(up{job=\"center-cv-service\"}, worker)",
+                                                      "refId":  "PrometheusVariableQueryEditor-VariableQuery"
+                                                  },
+                                        "refresh":  1,
+                                        "regex":  "",
+                                        "sort":  1,
+                                        "type":  "query"
+                                    }
+                                ]
+                   },
+    "time":  {
+                 "from":  "now-1h",
+                 "to":  "now"
+             },
+    "timepicker":  {
+
+                   },
+    "timezone":  "browser",
+    "title":  "Center CV 运行状态（登临）",
+    "uid":  "center-cv-overview",
+    "version":  63,
+    "weekStart":  ""
+}

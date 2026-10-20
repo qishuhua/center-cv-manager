@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Connection, Delete, Download, Files, Lock, Monitor, Operation, Plus, Promotion, Refresh, SwitchButton, UploadFilled, User, VideoPlay } from '@element-plus/icons-vue'
+import { Connection, DataLine, Delete, Download, Files, Lock, Monitor, Operation, Plus, Promotion, Refresh, SwitchButton, UploadFilled, User, VideoPlay } from '@element-plus/icons-vue'
 import http,{eventURL} from './api'
 import ModelCatalog from './ModelCatalog.vue'
 import ModelUploadDialog from './ModelUploadDialog.vue'
@@ -12,7 +12,7 @@ const initializationDialog=ref<InstanceType<typeof InitializeCenterDialog>>()
 const initializationTask=(c:Center)=>tasks.value.find(t=>t.type==='INITIALIZE_CENTER'&&t.params?.center_id===c.id&&['PENDING','RUNNING'].includes(t.status))
 async function initializationSubmitted(task:Task){tasks.value.unshift(task);await openTask(task);await loadAll()}
 import UserManagement from './UserManagement.vue'
-import type {AlertCredential,BaseImageArchive,Center,CenterOverview,Checkout,ComposeDocument,CurrentModelVersion,EmptyModelFolder,GitCredential,HardwareInfo,ModelVersion,OSSCredential,OverviewContainer,OverviewVersion,RegistrySettings,RegistrySoftwareVersion,RegistrySourceVersions,RegistryStorage,SoftwareImage,Source,Task,UserRole,Version} from './types'
+import type {AlertCredential,BaseImageArchive,Center,CenterOverview,Checkout,ComposeDocument,CurrentModelVersion,EmptyModelFolder,GitCredential,HardwareInfo,ModelVersion,MonitoringCenterStatus,MonitoringStatus,OSSCredential,OverviewContainer,OverviewVersion,RegistrySettings,RegistrySoftwareVersion,RegistrySourceVersions,RegistryStorage,SoftwareImage,Source,Task,UserRole,Version} from './types'
 
 const YamlEditor=defineAsyncComponent(()=>import('./YamlEditor.vue'))
 
@@ -38,9 +38,11 @@ function guardAdminAction(){
 const loginForm=reactive({username:'',password:''}),passwordForm=reactive({old_password:'',new_password:'',confirm_password:''})
 const passwordDialog=ref(false),passwordSaving=ref(false)
 const centerDialog=ref(false),sourceDialog=ref(false),gitCredentialDialog=ref(false),ossCredentialDialog=ref(false),alertCredentialDialog=ref(false),modelUploadDialog=ref(false),modelUploadTarget=ref(''),logDrawer=ref(false),centerOverviewDrawer=ref(false),centerOperationDialog=ref(false),centerReleaseDialog=ref(false),composeDrawer=ref(false),hardwareDialog=ref(false)
-const centerForm=reactive<Center>({name:'',host:'',port:22,console_port:8080,username:'root',auth_type:'password',password:'',private_key:'',passphrase:'',docker_socket:'/var/run/docker.sock',accelerator:'auto',cpu_count:0,gpu_count:0,compose_file:'~/.local/share/center-manager/deploy/docker-compose.yml',description:'',wms_url:'',mis_auth:'',test_mode:false})
+const centerForm=reactive<Center>({name:'',host:'',port:22,console_port:8080,username:'root',auth_type:'password',password:'',private_key:'',passphrase:'',docker_socket:'/var/run/docker.sock',accelerator:'auto',cpu_count:0,gpu_count:0,compose_file:'~/.local/share/center-manager/deploy/docker-compose.yml',description:'',wms_url:'',mis_auth:'',mis_sort_enabled:false,test_mode:false})
 const misSortEnabled=ref(false)
-function onMisSortToggle(enabled:string|number|boolean){if(!enabled){centerForm.wms_url='';centerForm.mis_auth=''}else if(!centerForm.mis_auth){centerForm.mis_auth='20260606123a'}}
+// 开关只控制启用状态：关闭时 WMS/misAuth 原值保留（表单隐藏但提交原值），
+// 重新打开即可恢复使用，不丢失任何配置。
+function onMisSortToggle(enabled:string|number|boolean){if(enabled&&!centerForm.mis_auth)centerForm.mis_auth='20260606123a'}
 const sourceForm=reactive<Source>({name:'',repository:'',description:''})
 const gitCredential=reactive<GitCredential>({base_url:'',username:'oauth2',token:'',configured:false})
 const gitCredentialForm=reactive<GitCredential>({base_url:'',username:'oauth2',token:'',configured:false})
@@ -144,6 +146,14 @@ const fmt=(v?:string)=>v?new Date(v).toLocaleString():'-'
 const formatBytes=(value:number)=>{const units=['B','KiB','MiB','GiB','TiB'];let size=value,index=0;while(size>=1024&&index<units.length-1){size/=1024;index++}return `${size.toFixed(1)} ${units[index]}`}
 
 async function loadOverview(showError=true){overviewLoading.value=true;try{const data=await http.get('/overview');overview.value=Array.isArray(data)?data:[]}catch(e:any){if(showError)ElMessage.error(e.message)}finally{overviewLoading.value=false}}
+const monitoringStatus=ref<MonitoringStatus|null>(null),monitoringLoading=ref(false)
+async function loadMonitoringStatus(){monitoringLoading.value=true;try{monitoringStatus.value=await http.get('/monitoring/status')}catch(e:any){ElMessage.error(e.message)}finally{monitoringLoading.value=false}}
+// Grafana 与管理端同机不同端口（compose 默认 0.0.0.0:3000）；每中心仪表盘
+// uid 由 dashboard-generator 固定为 center-cv-<中心ID>。
+const grafanaBase=()=>`${window.location.protocol}//${window.location.hostname}:3000`
+function openGrafanaDashboard(site?:string){window.open(grafanaBase()+(site?`/d/center-cv-${site}`:'/dashboards'),'_blank','noopener')}
+const monitorStateText=(item:MonitoringCenterStatus)=>!item.monitored?'未纳入监控':item.up===undefined?'等待采集':item.up?'健康信号正常':'无法连接'
+const monitorStateType=(item:MonitoringCenterStatus)=>!item.monitored?'info':item.up===undefined?'warning':item.up?'success':'danger'
 const softwareOptionKey=(item:Pick<Version,'kind'|'ref'|'commit'>)=>`${item.kind}:${item.ref}:${item.commit}`
 const softwareImageKey=(item:SoftwareImage)=>`${item.ref}:${item.commit}:${item.image}`
 const centerSoftwareRows=computed<CenterSoftwareRow[]>(()=>{
@@ -266,7 +276,7 @@ async function loadAll(){loading.value=true;try{
   if(isAdmin.value){const [credentialData,ossData,alertData,registryData]=await Promise.all([http.get('/git-credential'),http.get('/oss-credential'),http.get('/alert-credential'),http.get('/registry')]);Object.assign(gitCredential,credentialData||{base_url:'',username:'oauth2',token:'',configured:false});Object.assign(ossCredential,{models_prefix:'center-models/'},ossData||{endpoint:'',bucket:'',access_key_id:'',access_key_secret:'',images_prefix:'center-images/',models_prefix:'center-models/',configured:false});Object.assign(alertCredential,alertData||{feishu_webhook:'',configured:false});Object.assign(registrySettings,{endpoint:'http://127.0.0.1:5000'},registryData||{endpoint:'http://127.0.0.1:5000',configured:false})}
   else{const flags=await http.get('/settings/status');Object.assign(gitCredential,{configured:flags.git_configured});Object.assign(ossCredential,{configured:flags.oss_configured});Object.assign(alertCredential,{configured:flags.alert_configured});Object.assign(registrySettings,{configured:flags.registry_configured})}
   if(section.value==='overview')void loadOverview(false)}catch(e:any){if(authState.authenticated)ElMessage.error(e.message)}finally{loading.value=false}}
-async function selectSection(value:string){if(!isAdmin.value&&['terminal','users'].includes(value)){guardAdminAction();return}if(value==='releases'){await openDeploy();return}if(value==='base-images'){await openBaseImages();return}if(value==='models'){await openModels();return}section.value=value;if(value==='overview'&&!overviewLoading.value)void loadOverview()}
+async function selectSection(value:string){if(!isAdmin.value&&['terminal','users'].includes(value)){guardAdminAction();return}if(value==='releases'){await openDeploy();return}if(value==='base-images'){await openBaseImages();return}if(value==='models'){await openModels();return}section.value=value;if(value==='overview'&&!overviewLoading.value)void loadOverview();if(value==='monitoring')void loadMonitoringStatus()}
 async function refreshCurrent(){await loadAll();if(section.value==='overview'&&!overview.value.length&&!overviewLoading.value)void loadOverview();if(section.value==='base-images'&&ossCredential.configured)await loadBaseImages();if(section.value==='models'&&ossCredential.configured)await loadModels();if(section.value==='releases'){await Promise.all([loadDeploymentVersions(),ossCredential.configured?loadModels():Promise.resolve()]);syncDeployItems(deployForm.source_ids)}}
 async function checkAuth(){authLoading.value=true;try{Object.assign(authState,await http.get('/auth/status'))}catch{authState.authenticated=false}finally{authLoading.value=false}}
 async function login(){authLoading.value=true;try{const status:any=await http.post('/auth/login',loginForm);Object.assign(authState,status);resetPasswordForm();if(status.must_change_password)passwordForm.old_password=loginForm.password;loginForm.password='';if(!status.must_change_password)await loadAll()}catch(e:any){ElMessage.error(e.message)}finally{authLoading.value=false}}
@@ -290,9 +300,9 @@ async function changePassword(){
 }
 async function skipPasswordChange(){authLoading.value=true;try{await http.post('/auth/skip-password-change');authState.must_change_password=false;resetPasswordForm();await loadAll()}catch(e:any){ElMessage.error(e.message)}finally{authLoading.value=false}}
 async function logout(){try{await http.post('/auth/logout')}finally{Object.assign(authState,{authenticated:false,username:'',role:'',must_change_password:false});loginForm.password='';passwordDialog.value=false;resetPasswordForm()}}
-function resetCenter(){Object.assign(centerForm,{id:undefined,name:'',host:'',port:22,console_port:8080,username:'root',auth_type:'password',password:'',private_key:'',passphrase:'',host_key:'',docker_socket:'/var/run/docker.sock',accelerator:'auto',detected_accelerator:'',cpu_count:0,gpu_count:0,compose_file:'~/.local/share/center-manager/deploy/docker-compose.yml',initialized_at:undefined,description:'',wms_url:'',mis_auth:'',test_mode:false});misSortEnabled.value=false}
-function editCenter(v?:Center){if(!guardAdminAction())return;resetCenter();if(v)Object.assign(centerForm,v);misSortEnabled.value=!!centerForm.wms_url;if(misSortEnabled.value&&!centerForm.mis_auth)centerForm.mis_auth='20260606123a';centerDialog.value=true}
-async function saveCenter(){if(!guardAdminAction())return;if(!misSortEnabled.value){centerForm.wms_url='';centerForm.mis_auth=''}try{const isNew=!centerForm.id;const path=isNew?'/centers':`/centers/${centerForm.id}`;const result:Center=isNew?await http.post(path,centerForm):await http.put(path,centerForm);centerDialog.value=false;await loadAll();ElMessage.success('中心已保存');if(isNew)await initializationDialog.value?.open(result)}catch(e:any){ElMessage.error(e.message)}}
+function resetCenter(){Object.assign(centerForm,{id:undefined,name:'',host:'',port:22,console_port:8080,username:'root',auth_type:'password',password:'',private_key:'',passphrase:'',host_key:'',docker_socket:'/var/run/docker.sock',accelerator:'auto',detected_accelerator:'',cpu_count:0,gpu_count:0,compose_file:'~/.local/share/center-manager/deploy/docker-compose.yml',initialized_at:undefined,description:'',wms_url:'',mis_auth:'',mis_sort_enabled:false,test_mode:false});misSortEnabled.value=false}
+function editCenter(v?:Center){if(!guardAdminAction())return;resetCenter();if(v)Object.assign(centerForm,v);misSortEnabled.value=!!centerForm.wms_url&&centerForm.mis_sort_enabled===true;if(misSortEnabled.value&&!centerForm.mis_auth)centerForm.mis_auth='20260606123a';centerDialog.value=true}
+async function saveCenter(){if(!guardAdminAction())return;centerForm.mis_sort_enabled=misSortEnabled.value;try{const isNew=!centerForm.id;const path=isNew?'/centers':`/centers/${centerForm.id}`;const result:Center=isNew?await http.post(path,centerForm):await http.put(path,centerForm);centerDialog.value=false;await loadAll();ElMessage.success('中心已保存');if(isNew)await initializationDialog.value?.open(result)}catch(e:any){ElMessage.error(e.message)}}
 async function removeCenter(v:Center){if(!guardAdminAction())return;await ElMessageBox.confirm(`确定删除中心“${v.name}”？`,'确认');try{await http.delete(`/centers/${v.id}`);ElMessage.success('已删除');await loadAll()}catch(e:any){ElMessage.error(e.message)}}
 async function detectCenter(v:Center){if(!v.id||hardwareDetectingId.value)return;hardwareDetectingId.value=v.id;try{ElMessage.info('正在读取中心硬件信息…');hardwareInfo.value=await http.post(`/centers/${v.id}/detect`);hardwareCenterName.value=v.name;hardwareDialog.value=true;await loadAll()}catch(e:any){ElMessage.error(e.message)}finally{hardwareDetectingId.value=''}}
 async function initializeCenter(v:Center){if(!guardAdminAction())return;const running=initializationTask(v);if(running){await openTask(running);return};await initializationDialog.value?.open(v)}
@@ -515,6 +525,7 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
       <el-menu v-model:default-active="section" @select="selectSection" class="menu">
         <el-menu-item index="overview"><el-icon><Monitor/></el-icon>总览</el-menu-item>
         <el-menu-item index="centers"><el-icon><Connection/></el-icon>中心服务器</el-menu-item>
+        <el-menu-item index="monitoring"><el-icon><DataLine/></el-icon>统一监控</el-menu-item>
         <el-menu-item index="terminal"><el-icon><Operation/></el-icon>SSH 终端</el-menu-item>
         <el-menu-item index="base-images"><el-icon><UploadFilled/></el-icon>基础镜像</el-menu-item>
         <el-menu-item index="models"><el-icon><Download/></el-icon>模型仓库</el-menu-item>
@@ -548,7 +559,22 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
 
       <template v-else-if="section==='centers'">
         <div class="toolbar"><div><p>SSH 凭据加密保存在开发机；所有中心共用一套飞书告警 Webhook。</p><el-tag :type="alertCredential.configured?'success':'warning'">{{alertCredential.configured?'飞书告警已配置':'尚未配置飞书告警'}}</el-tag></div><div><el-button :icon="Lock" @click="editAlertCredential">配置飞书告警</el-button><el-button type="primary" :icon="Plus" @click="editCenter()">添加中心</el-button></div></div>
-        <div class="cards"><div class="server-card" v-for="c in centers" :key="c.id"><div class="server-head"><div class="server-icon"><Connection/></div><div><h3>{{c.name}}</h3><p>{{c.username}}@{{c.host}}:{{c.port}}</p></div><el-tag size="small" :type="c.deployment?(c.deployment.status==='ready'?'success':c.deployment.status==='paused'?'warning':c.deployment.status==='waiting_business'?'warning':c.deployment.status==='failed'?'danger':'info'):(c.initialized_at?'success':'warning')">{{c.deployment?(c.deployment.status==='ready'?'已就绪':c.deployment.status==='paused'?'已暂停':c.deployment.status==='waiting_business'?'等待业务发布':c.deployment.status==='failed'?'初始化失败':'待初始化'):(c.initialized_at?'已初始化':'待初始化')}}</el-tag></div><p class="desc">{{c.description||'暂无说明'}}</p><div class="hardware-strip"><span><small>检测平台</small><b>{{acceleratorName(c.detected_accelerator||c.accelerator)}}</b></span><span><small>逻辑 CPU</small><b>{{c.cpu_count||'-'}}</b></span><span><small>物理 GPU</small><b>{{c.gpu_count||'-'}}</b></span></div><div class="detail"><span>最近初始化</span><code>{{fmt(c.initialized_at)}}</code></div><div class="detail"><span>访问端口</span><code>{{c.console_port||8080}}</code></div><div class="detail"><span>错分检测</span><code>{{c.wms_url?'已启用':'未启用'}}</code></div><div v-if="c.test_mode" class="detail"><span>测试模式</span><code>飞书通知静默</code></div><div class="actions center-actions"><el-button type="primary" @click="openCenterFromCard(c)">运行详情</el-button><el-button plain :loading="hardwareDetectingId===c.id" :disabled="!!hardwareDetectingId&&hardwareDetectingId!==c.id" @click="detectCenter(c)">检测硬件</el-button><el-button v-if="!c.initialized_at" type="primary" plain :loading="!!initializationTask(c)" :disabled="!!initializationTask(c)" @click="initializeCenter(c)">初始化部署</el-button><el-button @click="editCenter(c)">编辑连接</el-button><el-button type="danger" plain @click="removeCenter(c)">删除</el-button></div></div><el-empty v-if="!centers.length" description="尚未添加中心服务器"/></div>
+        <div class="cards"><div class="server-card" v-for="c in centers" :key="c.id"><div class="server-head"><div class="server-icon"><Connection/></div><div><h3>{{c.name}}</h3><p>{{c.username}}@{{c.host}}:{{c.port}}</p></div><el-tag size="small" :type="c.deployment?(c.deployment.status==='ready'?'success':c.deployment.status==='paused'?'warning':c.deployment.status==='waiting_business'?'warning':c.deployment.status==='failed'?'danger':'info'):(c.initialized_at?'success':'warning')">{{c.deployment?(c.deployment.status==='ready'?'已就绪':c.deployment.status==='paused'?'已暂停':c.deployment.status==='waiting_business'?'等待业务发布':c.deployment.status==='failed'?'初始化失败':'待初始化'):(c.initialized_at?'已初始化':'待初始化')}}</el-tag></div><p class="desc">{{c.description||'暂无说明'}}</p><div class="hardware-strip"><span><small>检测平台</small><b>{{acceleratorName(c.detected_accelerator||c.accelerator)}}</b></span><span><small>逻辑 CPU</small><b>{{c.cpu_count||'-'}}</b></span><span><small>物理 GPU</small><b>{{c.gpu_count||'-'}}</b></span></div><div class="detail"><span>最近初始化</span><code>{{fmt(c.initialized_at)}}</code></div><div class="detail"><span>访问端口</span><code>{{c.console_port||8080}}</code></div><div class="detail"><span>错分检测</span><code>{{!c.wms_url?'未启用':c.mis_sort_enabled===false?'已配置·未启用':'已启用'}}</code></div><div v-if="c.test_mode" class="detail"><span>测试模式</span><code>飞书通知静默</code></div><div class="actions center-actions"><el-button type="primary" @click="openCenterFromCard(c)">运行详情</el-button><el-button plain :loading="hardwareDetectingId===c.id" :disabled="!!hardwareDetectingId&&hardwareDetectingId!==c.id" @click="detectCenter(c)">检测硬件</el-button><el-button v-if="!c.initialized_at" type="primary" plain :loading="!!initializationTask(c)" :disabled="!!initializationTask(c)" @click="initializeCenter(c)">初始化部署</el-button><el-button @click="editCenter(c)">编辑连接</el-button><el-button type="danger" plain @click="removeCenter(c)">删除</el-button></div></div><el-empty v-if="!centers.length" description="尚未添加中心服务器"/></div>
+      </template>
+
+      <template v-else-if="section==='monitoring'">
+        <div class="toolbar"><div><p>开发机统一监控：每个中心一条健康信号与失联告警，指标和日志仍保存在中心本地，Grafana 经中心网关（SSH 主机 + 访问端口，与中心 Grafana 入口同址）直接查询。完成硬件检测的中心自动纳入；测试模式中心不探测。</p><el-tag :type="monitoringStatus?.stack_online?'success':'warning'">{{monitoringStatus?.stack_online?'监控栈运行中':'监控栈未启动或不可达'}}</el-tag></div><div><el-button :icon="Refresh" :loading="monitoringLoading" @click="loadMonitoringStatus">刷新状态</el-button><el-button type="primary" @click="openGrafanaDashboard()">打开 Grafana</el-button></div></div>
+        <el-alert v-if="monitoringStatus?.error&&!monitoringStatus.stack_online" :title="monitoringStatus.error" type="warning" :closable="false" show-icon style="margin-bottom:16px"/>
+        <div class="cards" v-loading="monitoringLoading">
+          <div class="server-card" v-for="item in monitoringStatus?.centers||[]" :key="item.center_id">
+            <div class="server-head"><div class="server-icon"><DataLine/></div><div><h3>{{item.name}}</h3><p>{{item.target||item.reason}}</p></div><el-tag size="small" :type="monitorStateType(item)">{{monitorStateText(item)}}</el-tag></div>
+            <div class="detail"><span>拉取地址</span><code>{{item.target||'-'}}</code></div>
+            <div class="detail"><span>失联告警</span><code>{{!item.monitored?'-':item.test_mode?'静默（测试模式）':'开启（连续 3 分钟失联通知飞书）'}}</code></div>
+            <div v-if="!item.monitored&&item.reason" class="detail"><span>未纳入原因</span><code>{{item.reason}}</code></div>
+            <div class="actions center-actions"><el-button type="primary" :disabled="!item.monitored" @click="openGrafanaDashboard(item.site)">查看仪表盘</el-button></div>
+          </div>
+          <el-empty v-if="monitoringStatus&&!monitoringStatus.centers.length&&!monitoringLoading" description="尚未登记中心服务器"/>
+        </div>
       </template>
 
       <template v-else-if="section==='terminal'">
@@ -621,10 +647,10 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
       <el-form-item label="Docker Socket"><el-input v-model="centerForm.docker_socket"/></el-form-item>
       <el-form-item label="加速卡类型"><el-select v-model="centerForm.accelerator" style="width:100%"><el-option label="自动识别（推荐）" value="auto"/><el-option label="NVIDIA" value="nvidia"/><el-option label="登临" value="denglin"/><el-option label="仅 CPU" value="cpu"/></el-select></el-form-item>
       <el-form-item label="测试模式"><el-switch v-model="centerForm.test_mode"/><div class="form-tip">开启后该中心进入测试模式：软件/模型/统一发布的开始与结束、初始化开始与结果、暂停/恢复、模型固定/解绑等管理端飞书通知全部静默；中心侧监控告警不受影响。</div></el-form-item>
-      <el-form-item label="错分检测"><el-switch v-model="misSortEnabled" @change="onMisSortToggle"/><div class="form-tip">开关仅控制 ingress 摄像机配置主动轮询（错分实时任务来源）；落格核验服务始终部署，未开启时使用模板默认 WMS 参数。需在软件仓库发布 chute-verification-service 与新版 center-cv-ingress 镜像。配置修改后需在模块管理中整体发布 business 模块生效。</div></el-form-item>
+      <el-form-item label="错分检测"><el-switch v-model="misSortEnabled" @change="onMisSortToggle"/><div class="form-tip">开关仅控制 ingress 摄像机配置主动轮询（错分实时任务来源）；关闭后 WMS 地址与鉴权保留，重新打开即可恢复。落格核验服务始终部署，未启用时使用模板默认 WMS 参数。需在软件仓库发布 chute-verification-service 与新版 center-cv-ingress 镜像。配置修改后需在模块管理中整体发布 business 模块生效。</div></el-form-item>
       <template v-if="misSortEnabled">
         <el-form-item label="WMS 服务地址"><el-input v-model="centerForm.wms_url" placeholder="请输入 WMS 服务基地址，含协议、主机和端口，不含路径"/><div class="form-tip">WMS 基础地址，仅协议、主机和端口；具体接口路径由服务自动拼接。</div></el-form-item>
-        <el-form-item label="WMS 鉴权 misAuth"><el-input v-model="centerForm.mis_auth" type="password" show-password placeholder="留空使用默认 20260606123a"/><div class="form-tip">落格核验与 ingress 轮询共用的 misAuth 请求头，已预填公开约定默认值，站点不同时再修改。</div></el-form-item>
+        <el-form-item label="WMS 鉴权 misAuth"><el-input v-model="centerForm.mis_auth" placeholder="留空使用默认 20260606123a"/><div class="form-tip">落格核验与 ingress 轮询共用的 misAuth 请求头，已预填公开约定默认值，站点不同时再修改。</div></el-form-item>
       </template>
       <el-form-item :label="centerForm.deployment?'部署目录锚点':'Compose 文件'"><el-input v-model="centerForm.compose_file" placeholder="例如 ~/.local/share/center-manager/deploy/docker-compose.yml"/><div class="form-tip">{{centerForm.deployment?'模块化中心此路径仅作部署目录锚点，实际入口为部署目录下各模块的 compose.yml + module.env，修改需谨慎。':'默认使用 SSH 用户家目录；初始化后会保存解析出的绝对路径。文件已存在时只导入，不会自动覆盖。'}}</div></el-form-item>
       <el-form-item label="说明"><el-input v-model="centerForm.description" type="textarea"/></el-form-item>

@@ -1,0 +1,43 @@
+global:
+  resolve_timeout: 5m
+
+templates:
+  - /etc/alertmanager/templates/*.tmpl
+
+route:
+  receiver: feishu
+  group_by: [alertname, site, instance, vhost, queue, service]
+  group_wait: 0s
+  group_interval: 1m
+  repeat_interval: 1m
+  routes:
+    - receiver: feishu
+      matchers:
+        - alertname="BusinessContainerRestartDetected"
+      group_by: [alertname, site, name]
+      group_wait: 0s
+      group_interval: 15s
+      repeat_interval: 4h
+    - receiver: feishu
+      matchers:
+        - alertname="BusinessContainerOomKilled"
+      group_by: [alertname, site, name]
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 4h
+  labels:
+    server_name: "Center CV 统一监控"
+    keyword: "服务器告警"
+
+receivers:
+  - name: feishu
+    webhook_configs:
+      # webhook 取自管理端「飞书告警」凭据（secret.Cipher 加密入库），由 API
+      # 渲染到 center-monitor-secrets 卷；变更后 API 自动对容器发 SIGHUP 重载。
+      - url_file: /monitor-config/feishu-webhook-url
+        send_resolved: true
+        max_alerts: 0
+        timeout: 30s
+        http_config:
+          follow_redirects: false
+        payload: '{{ template "feishu.payload" . }}'

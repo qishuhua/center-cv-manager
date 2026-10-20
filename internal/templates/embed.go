@@ -218,11 +218,12 @@ type RenderOptions struct {
 	WorkerEnv          map[string]string
 	ServerName         string
 	FeishuWebhook      string
-	// WMSURL/MisAuth 为错分检测配置：WMSURL 非空时 business 模块
-	// 在 module.env 写入两个服务共用的取值；机构编码不配置，
-	// 两服务用 Compose 插值默认值。
-	WMSURL string
-	MisAuth string
+	// WMSURL/MisAuth 为错分检测配置：启用（WMSURL 非空且 MisSortEnabled）
+	// 时 business 模块在 module.env 写入两个服务共用的取值；关闭时配置值
+	// 保留在中心记录，模块回落 Compose 插值默认值。机构编码不配置。
+	WMSURL         string
+	MisAuth        string
+	MisSortEnabled bool
 }
 
 // Render 使用统一配置渲染部署模板。WorkerEnv 会写入公共锚点，确保所有 Worker 一致。

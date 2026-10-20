@@ -1,0 +1,13 @@
+groups:
+  - name: center-federation
+    rules:
+      # 测试模式中心由管理端直接不写入 targets（完全不探测），规则无需
+      # 再按 test 标签排除。
+      - alert: CenterMetricsUnavailable
+        expr: up{job="federate-centers"} == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: '{{ $labels.site_name }}指标接口不可用'
+          description: '已连续 3 分钟无法访问 {{ $labels.site_name }}（{{ $labels.instance }}）的 Prometheus 指标接口。'

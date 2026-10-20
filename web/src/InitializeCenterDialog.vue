@@ -6,10 +6,12 @@ import type {Center, Source, ModelVersion, RegistrySoftwareVersion, RegistrySour
 const emit=defineEmits<{task:[task:Task]}>()
 const visible=ref(false), loading=ref(false), submitting=ref(false), center=ref<Center>()
 const sources=ref<Source[]>([]), models=ref<ModelVersion[]>([]), modelKeys=ref<string[]>([])
+const deployModels=ref(true)
 const registryVersions=ref<RegistrySourceVersions[]>([]), selected=reactive<Record<string,string>>({})
 const error=ref('')
 const modelNames=computed(()=>[...new Set(models.value.map(m=>m.model))])
 function chooseModel(name:string,value:string){modelKeys.value=modelKeys.value.filter(k=>!models.value.some(m=>m.model===name&&m.manifest_key===k));if(value)modelKeys.value.push(value)}
+function onDeployModelsToggle(enabled:string|number|boolean){if(!enabled)modelKeys.value=[]}
 // 中心只认镜像版本与模型版本：业务软件从镜像仓库已发布版本中选择
 const versionsFor=(id:string)=>registryVersions.value.find(item=>item.source_id===id)?.versions||[]
 const versionKey=(v:RegistrySoftwareVersion)=>`${v.ref}:${v.commit}`
@@ -17,7 +19,7 @@ const versionLabel=(v:RegistrySoftwareVersion)=>`${v.version} · ${v.platforms.m
 function defaultVersions(){for(const item of registryVersions.value){if(!item.source_id||selected[item.source_id])continue;const latest=item.versions[0];if(latest)selected[item.source_id]=versionKey(latest)}}
 function defaultModels(){const names=[...new Set(models.value.map(m=>m.model))];for(const name of names){const latest=models.value.filter(m=>m.model===name).sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||''))[0];if(latest&&!modelKeys.value.includes(latest.manifest_key))modelKeys.value.push(latest.manifest_key)}}
 async function open(value:Center){
- center.value=value;visible.value=true;loading.value=true;error.value='';modelKeys.value=[]
+ center.value=value;visible.value=true;loading.value=true;error.value='';modelKeys.value=[];deployModels.value=true
  sources.value=[];models.value=[];registryVersions.value=[]
  Object.keys(selected).forEach(id=>delete selected[id])
  await nextTick()
@@ -35,8 +37,9 @@ async function open(value:Center){
 async function submit(){
  if(submitting.value)return
  const items=sources.value.flatMap(s=>{const v=versionsFor(s.id!).find(v=>versionKey(v)===selected[s.id!]);return v?[{source_id:s.id,ref:v.ref,commit:v.commit}]:[]})
- const model_selections=models.value.filter(m=>modelKeys.value.includes(m.manifest_key)).map(m=>({manifest_key:m.manifest_key,manifest_digest:m.manifest_digest}))
- if(!items.length||!model_selections.length){ElMessage.warning('请选择业务镜像版本和模型版本');return}
+ const model_selections=deployModels.value?models.value.filter(m=>modelKeys.value.includes(m.manifest_key)).map(m=>({manifest_key:m.manifest_key,manifest_digest:m.manifest_digest})):[]
+ if(!items.length){ElMessage.warning('请选择业务镜像版本');return}
+ if(deployModels.value&&!model_selections.length){ElMessage.warning('已勾选部署模型，请选择模型版本；不需要部署模型时取消勾选即可');return}
  submitting.value=true;error.value=''
  try{const task:Task=await http.post(`/centers/${center.value!.id}/initialize`,{items,model_selections});visible.value=false;emit('task',task)}catch(e:any){error.value=e.message}finally{submitting.value=false}
 }
@@ -45,7 +48,7 @@ defineExpose({open})
 <template>
  <el-dialog v-model="visible" :title="`${center?.name||''} · 初始化部署`" width="900px" :close-on-click-modal="false" :close-on-press-escape="!submitting" :show-close="!submitting" append-to-body>
   <div v-loading="loading">
-   <el-alert title="先选择业务镜像版本和模型版本。确认后自动检测硬件、准备配置与基础镜像、从镜像仓库分发业务镜像并部署全部服务。" type="info" :closable="false"/>
+   <el-alert title="先选择业务镜像版本；模型为可选——勾选「部署模型」并选择版本后随初始化一起发布，不勾选则初始化停在等待业务发布，之后发布模型再经初始化入口继续完成网关与监控。确认后自动检测硬件、准备配置与基础镜像、从镜像仓库分发业务镜像并部署全部服务。" type="info" :closable="false"/>
    <el-alert v-if="error" :title="error" type="error" :closable="false"/>
    <h3>业务镜像版本</h3>
    <el-empty v-if="!loading&&!sources.length" description="请先在软件仓库中添加业务软件"/>
@@ -58,9 +61,10 @@ defineExpose({open})
      <span v-else class="form-tip">镜像仓库暂无该软件的已发布版本</span>
     </el-form-item>
    </el-form>
-   <h3>模型版本</h3>
+   <h3><el-checkbox v-model="deployModels" @change="onDeployModelsToggle">部署模型</el-checkbox></h3>
    <el-empty v-if="!loading&&!models.length" description="请先在模型仓库中上传模型版本"/>
-   <el-form label-width="160px" :disabled="submitting">
+   <el-form label-width="160px" :disabled="submitting||!deployModels">
+    <span v-if="!deployModels" class="form-tip">未勾选时本次初始化不部署模型：业务服务启动后中心停在「等待业务发布」，发布模型时在版本发布页选择该中心，完成后经初始化入口继续失败步骤即可。</span>
     <el-form-item v-for="name in modelNames" :key="name" :label="name">
      <el-select :model-value="modelKeys.find(k=>models.some(m=>m.model===name&&m.manifest_key===k))||''" clearable placeholder="选择模型版本" style="width:100%" @update:model-value="(value:string)=>chooseModel(name,value)">
       <el-option v-for="m in models.filter(m=>m.model===name)" :key="m.manifest_key" :value="m.manifest_key" :label="m.version"/>
@@ -68,6 +72,6 @@ defineExpose({open})
     </el-form-item>
    </el-form>
   </div>
-  <template #footer><el-button :disabled="submitting" @click="visible=false">取消</el-button><el-button type="primary" :loading="submitting" :disabled="loading||!sources.length||!models.length" @click="submit">开始初始化部署</el-button></template>
+  <template #footer><el-button :disabled="submitting" @click="visible=false">取消</el-button><el-button type="primary" :loading="submitting" :disabled="loading||!sources.length||(deployModels&&!models.length)" @click="submit">开始初始化部署</el-button></template>
  </el-dialog>
 </template>
