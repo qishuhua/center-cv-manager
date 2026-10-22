@@ -139,6 +139,17 @@ func SplitLegacy(c domain.Center, resolved string) (MigrationPlan, error) {
 			m.DependsOn = append(m.DependsOn, dep)
 		}
 		sort.Strings(m.DependsOn)
+		// 网关独立于业务（与默认部署同口径）：反代不构成模块级依赖，服务级
+		// depends_on 已在上面从目标 Compose 摘除，这里不再记入模块依赖。
+		if m.ID == "gateway" {
+			kept := m.DependsOn[:0]
+			for _, dep := range m.DependsOn {
+				if dep != "business" {
+					kept = append(kept, dep)
+				}
+			}
+			m.DependsOn = kept
+		}
 		sort.Strings(m.InitServices)
 		sort.Strings(m.ModelServices)
 		candidate := map[string]any{"name": m.Project, "services": group}

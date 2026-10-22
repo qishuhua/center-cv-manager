@@ -161,6 +161,9 @@ func (s *Service) Save(input domain.Center) (domain.Center, error) {
 		if old.Deployment == nil && (input.WMSURL != "" || input.MisAuth != "") {
 			return domain.Center{}, fmt.Errorf("旧中心（未模块化）不支持错分检测配置")
 		}
+		if old.Deployment == nil && input.DebugLogEnabled {
+			return domain.Center{}, fmt.Errorf("旧中心（未模块化）不支持 Debug 模式")
+		}
 		input.CreatedAt = old.CreatedAt
 		input.Deployment = old.Deployment
 		if old.Deployment != nil && input.ComposeFile != old.ComposeFile {

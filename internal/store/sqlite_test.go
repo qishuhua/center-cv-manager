@@ -71,6 +71,73 @@ func TestGitCredentialSchemaUpgradeAndTimeRoundTrip(t *testing.T) {
 	}
 }
 
+func TestGatewayIndependentMigration(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "gateway.db")
+	st, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	center := domain.Center{ID: "center-1", Name: "测试中心", Host: "192.0.2.1", Port: 22, Username: "root", AuthType: "password", Password: "encrypted", CreatedAt: now, UpdatedAt: now,
+		Deployment: &domain.Deployment{Root: "/home/root/deploy", Status: "ready", Modules: []domain.ComposeModule{
+			{ID: "infra", Name: "中间件", Project: "center-cv-infra", Enabled: true},
+			{ID: "business", Name: "业务", Project: "center-cv-business", Enabled: true, DependsOn: []string{"infra"}},
+			{ID: "gateway", Name: "网关", Project: "center-cv-gateway", Enabled: true, DependsOn: []string{"business"}},
+		}}}
+	if err = st.SaveCenter(center); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+	// 模拟升级前的库：摘掉迁移标记后重开，迁移应重写存量 deployment_json。
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec(`DELETE FROM schema_migrations WHERE name='gateway_independent_v1'`); err != nil {
+		db.Close()
+		t.Fatal(err)
+	}
+	db.Close()
+	st2, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st2.Close()
+	loaded, err := st2.GetCenter(center.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range loaded.Deployment.Modules {
+		if m.ID == "gateway" && len(m.DependsOn) != 0 {
+			t.Fatalf("网关应独立于业务，depends_on 应清空: %+v", m)
+		}
+		if m.ID == "business" && (len(m.DependsOn) != 1 || m.DependsOn[0] != "infra") {
+			t.Fatalf("其它模块依赖不应被改动: %+v", m)
+		}
+	}
+	// 幂等：再次重开不报错、数据不变。
+	st2.Close()
+	st3, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st3.Close()
+	if again, err := st3.GetCenter(center.ID); err != nil {
+		t.Fatal(err)
+	} else if g, _ := modularFind(again, "gateway"); len(g.DependsOn) != 0 {
+		t.Fatalf("重复迁移不应改动数据: %+v", g)
+	}
+}
+
+func modularFind(c domain.Center, id string) (domain.ComposeModule, bool) {
+	for _, m := range c.Deployment.Modules {
+		if m.ID == id {
+			return m, true
+		}
+	}
+	return domain.ComposeModule{}, false
+}
+
 func TestCenterTimeRoundTrip(t *testing.T) {
 	st, err := Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
@@ -127,6 +194,9 @@ func TestCenterRuntimeSchemaUpgrade(t *testing.T) {
 	if !loaded.MisSortEnabled {
 		t.Fatal("错分检测开关迁移默认值应为启用（1），由 wms_url 是否非空决定实际生效")
 	}
+	if loaded.DebugLogEnabled {
+		t.Fatal("Debug 模式开关迁移默认值应为关闭（0）")
+	}
 	loaded.WMSURL, loaded.MisAuth = "http://10.21.61.48:31995", "auth"
 	loaded.TestMode = true
 	if err = st.SaveCenter(loaded); err != nil {
@@ -153,14 +223,21 @@ func TestCenterRuntimeSchemaUpgrade(t *testing.T) {
 	}
 	reloaded.MisSortEnabled = true
 	if !reloaded.TestMode {
-		t.Fatal("测试模式字段回读应为 true")
+		t.Fatal("告警控制字段回读应为 true")
 	}
 	reloaded.TestMode = false
 	if err = st.SaveCenter(reloaded); err != nil {
 		t.Fatal(err)
 	}
 	if again, err := st.GetCenter("legacy-center"); err != nil || again.TestMode {
-		t.Fatal("测试模式字段应支持关闭回写")
+		t.Fatal("告警控制字段应支持关闭回写")
+	}
+	reloaded.DebugLogEnabled = true
+	if err = st.SaveCenter(reloaded); err != nil {
+		t.Fatal(err)
+	}
+	if again, err := st.GetCenter("legacy-center"); err != nil || !again.DebugLogEnabled {
+		t.Fatal("Debug 模式开关应支持开启回写")
 	}
 }
 

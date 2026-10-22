@@ -16,12 +16,13 @@ import (
 
 const chuteReadyURL = "http://127.0.0.1:8091/readyz"
 
-// ApplyBusinessWMS 把中心的错分检测配置（wms_url/mis_auth）幂等同步
-// 到远端 business 模块：module.env 维护三个托管变量（机构编码不再配置，
-// 两服务用 Compose 插值默认值），compose.yml 增删错分审核服务块并补齐
-// ingress 轮询插值行。写入只置 ConfigChanged 等待整体发布生效，
+// ApplyBusinessSettings 把中心的业务模块托管设置幂等同步到远端：
+// module.env 维护两组托管变量——错分检测（wms_url/mis_auth，机构编码不再
+// 配置，两服务用 Compose 插值默认值）与 Debug 模式（LOG_LEVEL=debug），
+// compose.yml 增删错分审核服务块、补齐 ingress 轮询插值行与 Worker 公共
+// 环境锚点的 LOG_LEVEL 插值行。写入只置 ConfigChanged 等待整体发布生效，
 // 不会启动或停止容器；调用方需先持久化中心字段。legacy 中心不支持。
-func (s *Service) ApplyBusinessWMS(ctx context.Context, centerID string) error {
+func (s *Service) ApplyBusinessSettings(ctx context.Context, centerID string) error {
 	return centerlock.Within(ctx, centerID, func(ctx context.Context) error {
 		remote, c, err := s.connect(centerID)
 		if err != nil {
@@ -29,7 +30,7 @@ func (s *Service) ApplyBusinessWMS(ctx context.Context, centerID string) error {
 		}
 		defer remote.Close()
 		if c.Deployment == nil {
-			return fmt.Errorf("旧中心（未模块化）不支持错分检测")
+			return fmt.Errorf("旧中心（未模块化）不支持错分检测与 Debug 模式")
 		}
 		// 初始化未开始或重置后的中心没有远端模块文件；下次初始化渲染会
 		// 直接带上当前配置，无需在此同步。
@@ -61,9 +62,11 @@ func (s *Service) ApplyBusinessWMS(ctx context.Context, centerID string) error {
 		if newCompose, err = templates.EnsureIngressPollEnv(newCompose); err != nil {
 			return err
 		}
+		newCompose = templates.EnsureWorkerLogLevelEnv(newCompose)
 		newEnv := templates.ApplyMisSortModuleEnv(oldEnv, templates.MisSortOptions{
 			Enabled: enabled, WMSURL: c.WMSURL, MisAuth: c.MisAuth,
 		})
+		newEnv = templates.ApplyLogLevelModuleEnv(newEnv, c.DebugLogEnabled)
 		composeChanged := newCompose != oldCompose
 		envChanged := newEnv != oldEnv
 		if composeChanged || envChanged {

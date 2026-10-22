@@ -7,6 +7,9 @@ x-worker-environment: &worker-environment
   # Keep task ingress and alarm publishers on the same priority mapping.
   RABBITMQ_REALTIME_PRIORITY: ${RABBITMQ_REALTIME_PRIORITY:-5}
   RABBITMQ_PLAYBACK_PRIORITY: ${RABBITMQ_PLAYBACK_PRIORITY:-1}
+  # 业务日志等级：中心「Debug 模式」开关托管 module.env 的 LOG_LEVEL，
+  # 未写入时回落这里的默认值 info。
+  LOG_LEVEL: ${LOG_LEVEL:-info}
 
 x-worker-common: &worker-common
   image: center-cv-service:nvidia

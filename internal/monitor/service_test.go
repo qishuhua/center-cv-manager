@@ -69,7 +69,7 @@ func TestSyncRendersTargets(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(groups) != 2 {
-		t.Fatalf("期望渲染 2 个中心（测试模式与 auto 未检测都不纳入），实际 %d：%s", len(groups), raw)
+		t.Fatalf("期望渲染 2 个中心（告警控制与 auto 未检测都不纳入），实际 %d：%s", len(groups), raw)
 	}
 	first := groups[0]
 	if len(first.Targets) != 1 || first.Targets[0] != "zhengzhou.example:8080" {
@@ -90,7 +90,7 @@ func TestSyncRendersTargets(t *testing.T) {
 	}
 	for _, group := range groups {
 		if group.Labels["site_name"] == "测试中心" {
-			t.Error("测试模式中心不应写入监控清单")
+			t.Error("告警控制中心不应写入监控清单")
 		}
 	}
 
@@ -183,7 +183,7 @@ func TestStatusMergesUpSignals(t *testing.T) {
 		t.Errorf("重庆中心应离线: %+v", second)
 	}
 	if third := byName["测试中心"]; third.Monitored || third.Reason == "" {
-		t.Errorf("测试模式中心应显示未纳入与原因: %+v", third)
+		t.Errorf("告警控制中心应显示未纳入与原因: %+v", third)
 	}
 }
 

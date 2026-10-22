@@ -12,6 +12,9 @@ type ModulePlan struct {
 	Action   string   `json:"action"`
 	Services []string `json:"services"`
 	Revision string   `json:"revision"`
+	// Dependents 是 stop 时仍在运行（healthy）且依赖此模块的模块名，供前端
+	// 确认框提示"停止后这些模块会异常"；不再据此硬性拦截。
+	Dependents []string `json:"dependents,omitempty"`
 }
 
 func (s *Service) PlanModule(ctx context.Context, id, moduleID, action string, services []string) (ModulePlan, error) {
@@ -49,5 +52,17 @@ func (s *Service) PlanModule(ctx context.Context, id, moduleID, action string, s
 	if err = modular.CheckOwnership(ctx, remote, m, cfg); err != nil {
 		return ModulePlan{}, err
 	}
-	return ModulePlan{ModuleID: moduleID, Action: action, Services: services, Revision: modular.PlanRevision(m, raw)}, nil
+	dependents := []string{}
+	if action == "stop" && c.Deployment != nil {
+		for _, other := range c.Deployment.Modules {
+			if other.Enabled && other.ID != moduleID && other.Status == "healthy" {
+				for _, dep := range other.DependsOn {
+					if dep == moduleID {
+						dependents = append(dependents, other.Name)
+					}
+				}
+			}
+		}
+	}
+	return ModulePlan{ModuleID: moduleID, Action: action, Services: services, Revision: modular.PlanRevision(m, raw), Dependents: dependents}, nil
 }

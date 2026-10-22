@@ -99,6 +99,7 @@ func RenderModules(platform string, opts RenderOptions) (map[string]string, erro
 		stub := "# Module-specific Compose variables\n"
 		if id == "business" {
 			stub = ApplyMisSortModuleEnv(stub, MisSortOptions{Enabled: opts.WMSURL != "" && opts.MisSortEnabled, WMSURL: opts.WMSURL, MisAuth: opts.MisAuth})
+			stub = ApplyLogLevelModuleEnv(stub, opts.DebugLogEnabled)
 		}
 		files[id+"/module.env"] = stub
 	}

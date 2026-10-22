@@ -436,6 +436,10 @@ func (s *Service) ListComposePublications(ctx context.Context, id string) ([]dom
 	}
 	defer r.Close()
 	for i := range files {
+		// Status 在下方被发布状态（published/unpublished/unknown）覆盖，先把
+		// deployment 记录里的模块运行状态回填到独立字段，供前端展示运行
+		// 状态并判断单模块 启动/暂停/重启 按钮。
+		files[i].RuntimeStatus = files[i].Status
 		p, e := s.composePublishPlan(ctx, r, c, files[i].ID)
 		if e != nil {
 			files[i].Status = "unknown"

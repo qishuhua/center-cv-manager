@@ -40,7 +40,8 @@ func NewDeployment(composeFile string, workers int) *domain.Deployment {
 			// 操作范围时过滤该探活（remote.go），未启用的中心不受影响。
 			m.ReadyURLs = append(m.ReadyURLs, "http://127.0.0.1:8091/readyz")
 		case "gateway":
-			m.DependsOn = []string{"business"}
+			// 网关独立于业务：仅反代、不构成启动/就绪依赖（业务停止时网关
+			// 502 属预期调试场景）。存量中心的旧依赖由 store 一次性迁移摘除。
 		case "monitoring":
 			m.ReadyURLs = []string{"http://127.0.0.1:9090/prometheus/-/ready", "http://127.0.0.1:3000/grafana/api/health"}
 		}

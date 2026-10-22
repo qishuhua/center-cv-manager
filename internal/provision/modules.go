@@ -418,17 +418,8 @@ func (s *Service) ModuleAction(ctx context.Context, centerID, moduleID, action s
 	if revision == "" || revision != plan.Revision {
 		return fmt.Errorf("模块配置已变化，请重新生成操作计划")
 	}
-	if action == "stop" {
-		for _, other := range c.Deployment.Modules {
-			if other.Enabled && other.Status == "healthy" {
-				for _, dep := range other.DependsOn {
-					if dep == moduleID {
-						return fmt.Errorf("请先停止依赖模块 %s", other.Name)
-					}
-				}
-			}
-		}
-	}
+	// 停止不再硬性拦截依赖方（网关只是反代业务、停业务让它 502 属可接受的
+	// 调试场景）；运行中依赖方清单由 PlanModule 返回，前端确认框提示后果。
 	if moduleID == "monitoring" && c.InitializedAt == nil && action != "stop" {
 		for _, other := range c.Deployment.Modules {
 			if other.Enabled && other.ID != "monitoring" {
@@ -484,6 +475,8 @@ func (s *Service) applyModule(ctx context.Context, remote *sshx.DockerClient, c 
 	if action != "deploy" && action != "restart" && action != "stop" {
 		return fmt.Errorf("不支持的模块操作")
 	}
+	// defer 执行时 services 可能已被展开为全量清单，整模块操作标记需提前捕获。
+	wholeModule := len(services) == 0
 	defer func() {
 		for i := range c.Deployment.Modules {
 			if c.Deployment.Modules[i].ID == m.ID {
@@ -495,6 +488,16 @@ func (s *Service) applyModule(ctx context.Context, remote *sshx.DockerClient, c 
 				}
 				m.UpdatedAt = time.Now()
 				c.Deployment.Modules[i] = m
+			}
+		}
+		if result == nil && wholeModule {
+			// 逐模块手动启停后对齐中心级状态：全部启停到位时与整体暂停/
+			// 恢复同口径，避免中心状态停留在 ready/paused 失真（部分模块
+			// 运行的中间状态不改动，仍由对应入口收尾）。
+			if c.Deployment.Status == "ready" && allEnabledModules(c.Deployment, "stopped") {
+				c.Deployment.Status = "paused"
+			} else if c.Deployment.Status == "paused" && allEnabledModules(c.Deployment, "healthy") {
+				c.Deployment.Status = "ready"
 			}
 		}
 		if e := s.centers.UpdateDeployment(c.ID, c.Deployment); result == nil {
@@ -640,6 +643,17 @@ func (s *Service) applyModule(ctx context.Context, remote *sshx.DockerClient, c 
 	}
 	r.Message("模块 " + m.Name + " 已就绪")
 	return nil
+}
+
+// allEnabledModules 报告启用模块是否全部处于指定状态（禁用模块不参与判断），
+// 用于逐模块手动启停后与中心级 ready/paused 状态对齐。
+func allEnabledModules(d *domain.Deployment, status string) bool {
+	for _, m := range d.Modules {
+		if m.Enabled && m.Status != status {
+			return false
+		}
+	}
+	return true
 }
 
 func guardModuleFile(ctx context.Context, remote *sshx.DockerClient, c domain.Center, m domain.ComposeModule, target string) error {

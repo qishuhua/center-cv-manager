@@ -246,19 +246,19 @@ func (s *Server) saveCenter(c *gin.Context) {
 		fail(c, 400, e)
 		return
 	}
-	// 错分检测配置同步到远端 business 模块（module.env + Compose）：保存即
-	// 幂等同步，不比较新旧值——远端文件无变化时只读比对、零写入，而上次
-	// 同步失败的中心（记录已更新、远端仍旧值）在任意一次保存时自动重试，
-	// 避免漂移被后续"值未变化"的保存掩盖。初始化前/重置后的中心等初始
-	// 化渲染时带上。
+	// 业务模块托管设置（错分检测、Debug 模式）同步到远端 business 模块
+	//（module.env + Compose）：保存即幂等同步，不比较新旧值——远端文件
+	// 无变化时只读比对、零写入，而上次同步失败的中心（记录已更新、远端
+	// 仍旧值）在任意一次保存时自动重试，避免漂移被后续"值未变化"的保存
+	// 掩盖。初始化前/重置后的中心等初始化渲染时带上。
 	if old.ID != "" && old.Deployment != nil && out.Deployment != nil {
 		status := out.Deployment.Status
 		if status != "preparing" && status != "reset" {
 			ctx, cancel := context.WithTimeout(c.Request.Context(), 45*time.Second)
 			defer cancel()
-			if syncErr := s.provisioning.ApplyBusinessWMS(ctx, out.ID); syncErr != nil {
-				log.Printf("错分检测配置同步失败 center=%s(%s): %v", out.ID, out.Name, syncErr)
-				fail(c, 500, fmt.Errorf("中心已保存，但错分检测配置同步失败: %w", syncErr))
+			if syncErr := s.provisioning.ApplyBusinessSettings(ctx, out.ID); syncErr != nil {
+				log.Printf("业务模块托管设置同步失败 center=%s(%s): %v", out.ID, out.Name, syncErr)
+				fail(c, 500, fmt.Errorf("中心已保存，但业务模块托管设置同步失败: %w", syncErr))
 				return
 			}
 		}
@@ -1145,7 +1145,7 @@ func (s *Server) releaseModels(c *gin.Context) {
 		encodedItems, _ := json.Marshal(resolvedItems)
 		versionsText := strings.Join(versions, "、")
 		jobs = append(jobs, modelReleaseJob{centerID: centerID, centerName: center.Name, testMode: center.TestMode, items: resolvedItems, encoded: string(encodedItems), versionsText: versionsText})
-		// 测试模式中心不进入发布通知名单。
+		// 告警控制中心不进入发布通知名单。
 		if !center.TestMode {
 			centerLines = append(centerLines, center.Name+"："+versionsText)
 		}
@@ -1600,7 +1600,7 @@ func (s *Server) release(c *gin.Context) {
 		encodedModelItems, _ := json.Marshal(centerModelItems)
 		job := releaseJob{center: center, modelItems: centerModelItems, encoded: string(encodedModelItems), versionsText: strings.Join(allVersions, "、")}
 		jobs = append(jobs, job)
-		// 测试模式中心不进入发布通知名单。
+		// 告警控制中心不进入发布通知名单。
 		if !center.TestMode {
 			centerLines = append(centerLines, center.Name+"："+job.versionsText)
 		}

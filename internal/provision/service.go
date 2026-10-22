@@ -219,6 +219,7 @@ func (s *Service) Initialize(ctx context.Context, centerID string, r Reporter) e
 			Workers: workers, CPUSets: cpuSets, ModelsRoot: modelsRoot, LogsRoot: logsRoot, MediaResourcesRoot: mediaResourcesRoot,
 			ServerName: stored.Name, FeishuWebhook: alertConfig.FeishuWebhook,
 			WMSURL: stored.WMSURL, MisAuth: stored.MisAuth, MisSortEnabled: stored.MisSortEnabled,
+			DebugLogEnabled: stored.DebugLogEnabled,
 		}, r)
 	}
 	if err = templates.Render(mode, root, templates.RenderOptions{

@@ -203,7 +203,7 @@ func (s *Server) releaseCenterSoftware(c *gin.Context) {
 	centerID, centerName := center.ID, center.Name
 	versions := softwareVersionText(src.Name, ref, commit)
 	// 与统一发布一致：开始/结束向飞书群发送通知（尽力而为，不影响任务）；
-	// 测试模式中心完全静默。
+	// 告警控制中心完全静默。
 	var notifier *releaseNotifier
 	if !center.TestMode {
 		notifier = newReleaseNotifier(s.alerts, releaseOperator(c), []string{centerName + "：" + versions})

@@ -59,6 +59,21 @@ async function publish(m:ComposeModule) {
   emit('task',task)
  }catch(e:any){if(e!=='cancel'&&e!=='close')ElMessage.error(e.message||String(e))}finally{busy.value=false}
 }
+// 单模块调试操作：stop 是 compose stop（容器保留，随时可启动恢复），与整体
+// 暂停中心的 down（移除容器）不同；启动/重启走模块 actions，任务类型 MODULE_OPERATION。
+const operateLabels:Record<string,string>={stop:'暂停',deploy:'启动',restart:'重启'}
+const operateTips:Record<string,string>={stop:'将停止此模块的全部服务：容器保留不删除，数据卷、镜像与配置不动，随时可点「启动」恢复。依赖此模块的运行中模块需先停止。',deploy:'将启动此模块的全部服务并等待就绪；其依赖模块未就绪会失败，请按依赖顺序先启动依赖模块。',restart:'将重启此模块的全部常驻服务（跳过一次性初始化服务）。'}
+async function operate(m:ComposeModule, action:'stop'|'deploy'|'restart'){
+ if(!guardAdmin())return
+ busy.value=true
+ try{
+  const plan:any=await http.post(`${base.value}/${encodeURIComponent(m.id)}/plan`,{action})
+  const dependents=Array.isArray(plan.dependents)&&plan.dependents.length?`\n⚠ 运行中的模块 ${plan.dependents.join('、')} 依赖此模块，停止后其服务会异常（如网关外部访问 502），不会自动停止它们。`:''
+  await ElMessageBox.confirm(`模块：${m.name}（${m.project}）\n服务：${plan.services.join(', ')}\n${operateTips[action]}${dependents}`,`模块${operateLabels[action]}`,{type:action==='stop'?'warning':'primary',confirmButtonText:`确认${operateLabels[action]}`,cancelButtonText:'取消',closeOnClickModal:false})
+  const task:Task=await http.post(`${base.value}/${encodeURIComponent(m.id)}/actions`,{action,revision:plan.revision})
+  emit('task',task)
+ }catch(e:any){if(e!=='cancel'&&e!=='close')ElMessage.error(e.message||String(e))}finally{busy.value=false}
+}
 let refreshTimer:number|undefined,disposed=false
 async function pollChanges(){
  const currentBase=base.value
@@ -75,12 +90,13 @@ watch(()=>props.center,load)
 
 <template>
   <section class="detail-section" v-loading="busy">
-    <div class="module-toolbar"><div><h3>Compose 配置列表</h3><small>通过 SSH 或编辑器修改配置，刷新检测变化后点击重新发布。采用新内置模板请重置并重新初始化。</small></div><el-button @click="load">刷新</el-button></div>
+    <div class="module-toolbar"><div><h3>Compose 配置列表</h3><small>通过 SSH 或编辑器修改配置，刷新检测变化后点击重新发布；模块化中心可单独暂停、启动、重启各模块，便于调试。采用新内置模板请重置并重新初始化。</small></div><el-button @click="load">刷新</el-button></div>
     <el-table :data="modules">
       <el-table-column label="模块" min-width="140"><template #default="{row}"><strong>{{row.name}}</strong><div><small>{{row.project}}</small></div></template></el-table-column>
       <el-table-column label="配置" min-width="220"><template #default="{row}"><code>{{row.compose_file}}</code></template></el-table-column>
       <el-table-column label="发布状态" width="160"><template #default="{row}"><el-tooltip :content="row.error||statusNames[row.status]||row.status||'未登记模块'"><el-tag :type="row.status==='published'?'success':row.status==='unpublished'?'warning':row.status==='unknown'?'danger':'info'">{{row.enabled?(statusNames[row.status]||row.status||'原有配置'):'已禁用'}}</el-tag></el-tooltip></template></el-table-column>
-      <el-table-column label="操作" width="180"><template #default="{row}"><el-button link @click="edit(row)">编辑</el-button><el-button type="primary" link :disabled="!row.enabled || busy || row.status==='unknown'" @click="publish(row)">{{row.status==='unpublished'?'重新发布':'发布'}}</el-button></template></el-table-column>
+      <el-table-column v-if="center.deployment" label="运行状态" width="110"><template #default="{row}"><el-tag :type="row.runtime_status==='healthy'?'success':row.runtime_status==='partial'||row.runtime_status==='starting'?'warning':row.runtime_status==='failed'?'danger':'info'">{{statusNames[row.runtime_status]||row.runtime_status||'未知'}}</el-tag></template></el-table-column>
+      <el-table-column label="操作" :width="center.deployment?270:180"><template #default="{row}"><el-button link @click="edit(row)">编辑</el-button><el-button type="primary" link :disabled="!row.enabled || busy || row.status==='unknown'" @click="publish(row)">{{row.status==='unpublished'?'重新发布':'发布'}}</el-button><template v-if="center.deployment"><el-button v-if="row.runtime_status==='healthy'||row.runtime_status==='partial'" type="warning" link :disabled="!row.enabled || busy" @click="operate(row,'stop')">暂停</el-button><el-button v-if="row.runtime_status==='stopped'||row.runtime_status==='failed'" type="success" link :disabled="!row.enabled || busy" @click="operate(row,'deploy')">启动</el-button><el-button v-if="row.runtime_status==='healthy'||row.runtime_status==='partial'" link :disabled="!row.enabled || busy" @click="operate(row,'restart')">重启</el-button></template></template></el-table-column>
     </el-table>
   </section>
   <el-drawer v-model="editor" size="80%" :title="`${selected?.name||''} · 配置文件`" append-to-body>

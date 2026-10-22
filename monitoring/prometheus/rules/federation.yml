@@ -1,7 +1,7 @@
 groups:
   - name: center-federation
     rules:
-      # 测试模式中心由管理端直接不写入 targets（完全不探测），规则无需
+      # 告警控制中心由管理端直接不写入 targets（完全不探测），规则无需
       # 再按 test 标签排除。
       - alert: CenterMetricsUnavailable
         expr: up{job="federate-centers"} == 0

@@ -30,9 +30,13 @@ type Center struct {
 	// MisSortEnabled 是错分检测的启用开关；关闭时 WMSURL/MisAuth 原值保留，
 	// 重新开启后直接恢复使用。启用判定 = WMSURL 非空且本开关为 true。
 	MisSortEnabled bool `json:"mis_sort_enabled,omitempty"`
-	TestMode       bool `json:"test_mode,omitempty"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	// DebugLogEnabled 开启后业务 Worker（center-cv-service）日志等级改为
+	// debug（module.env 托管 LOG_LEVEL）；关闭移除托管值，回落 Compose
+	// 插值默认 info。仅模块化中心支持。
+	DebugLogEnabled bool      `json:"debug_log_enabled,omitempty"`
+	TestMode        bool      `json:"test_mode,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 // Deployment keeps center paths independent of any individual Compose entry.
@@ -70,6 +74,10 @@ type ComposeModule struct {
 	ReadyURLs       []string  `json:"ready_urls"`
 	Timeout         int       `json:"timeout"`
 	Status          string    `json:"status"`
+	// RuntimeStatus 是模块运行状态（healthy/partial/starting/stopped/failed），
+	// 仅由 Compose 列表接口从 deployment 记录回填（该接口的 Status 语义是
+	// 发布状态 published/unpublished/unknown），持久化时恒为空、不入库。
+	RuntimeStatus   string    `json:"runtime_status,omitempty"`
 	Error           string    `json:"error,omitempty"`
 	Revision        string    `json:"revision"`
 	AppliedRevision string    `json:"applied_revision"`

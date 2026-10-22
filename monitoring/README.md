@@ -27,10 +27,10 @@
 - **API 渲染（动态）**：管理端 Go 后端（`internal/monitor`）把下列文件渲染到
   `center-monitor-targets` / `center-monitor-secrets` 两个卷，监控容器只读挂载：
   - `targets/centers.json` — 从中心表渲染；中心记录任何变更（登记、编辑、
-    删除、硬件检测、初始化、重置、测试模式开关）后由 center.Service 的
+    删除、硬件检测、初始化、重置、告警控制开关）后由 center.Service 的
     变更钩子自动更新。`site` 用中心 ID 前 8 位短标识（Grafana uid 40 字符
     上限），`gpu_vendor` 取检测平台（仅 nvidia/denglin 纳入监控），
-    **测试模式中心完全不写入清单**（不探测、无仪表盘，关闭后自动恢复）。
+    **告警控制中心完全不写入清单**（不探测、无仪表盘，关闭后自动恢复）。
   - `secrets/feishu-webhook-url` — 取自「飞书告警」全局凭据（解密落盘）；变更后
     API 自动向 alertmanager 容器发 SIGHUP 重载。
   - `secrets/center-logs-password` — 与中心网关 `grafana-logs.htpasswd` 对应的
