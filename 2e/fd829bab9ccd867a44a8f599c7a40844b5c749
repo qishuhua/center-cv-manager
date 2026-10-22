@@ -1,0 +1,148 @@
+internal/provision/service.go
+  s_e61ccdfffb7e27::t_e7831674bba556 222
+internal/templates/modules/business/compose.nvidia.yml
+  s_5203c5b2b3e256::t_2dd79eb4cda284 10
+  s_e61ccdfffb7e27::t_127cd1d486d885 11-12
+internal/api/center_notify.go
+  s_5203c5b2b3e256::t_388500199adfc1 10-11
+internal/domain/models.go
+  s_5203c5b2b3e256::t_d4e72a82731073 77-80
+  s_e61ccdfffb7e27::t_8051f94409e806 33-35
+  s_e61ccdfffb7e27::t_415fd8c961b81f 36-39
+web/src/App.vue
+  s_5203c5b2b3e256::t_0217e2525e6701 546
+  s_e61ccdfffb7e27::t_2f44b55caef94a 41
+  s_5203c5b2b3e256::t_12a769dc694bf9 677
+  s_5203c5b2b3e256::t_453b2c71b33879 688
+  s_5203c5b2b3e256::t_3b447a292f63f8 542
+  s_e61ccdfffb7e27::t_acfb3e43f72032 292
+  s_5203c5b2b3e256::t_87b81204304d19 552
+  s_5203c5b2b3e256::t_b77e2483ffe4da 629-630
+web/src/types.ts
+  s_e61ccdfffb7e27::t_8c1c4ffba6b269 3
+  s_5203c5b2b3e256::t_0deaebcadf5654 37
+internal/store/sqlite_test.go
+  s_e61ccdfffb7e27::t_03fec0fe9efbd6 235-239
+  s_5203c5b2b3e256::t_06888eeecd0601 240
+  s_e61ccdfffb7e27::t_c9b38aec1ac9b5 197,199,234
+  s_5203c5b2b3e256::t_f10bffff846703 233
+  s_5203c5b2b3e256::t_0b28650d28efc7 198
+  s_5203c5b2b3e256::t_11dd16ef04bf20 226
+  s_5203c5b2b3e256::t_45815cad985889 74-140
+web/src/ModuleManager.vue
+  s_5203c5b2b3e256::t_b41364b7864d87 62-70,73-76
+  s_5203c5b2b3e256::t_fc7ee92ffbf311 93
+  s_5203c5b2b3e256::t_0f4d764015a91c 98-99
+  s_5203c5b2b3e256::t_81d362ac66f010 71-72
+internal/monitor/service_test.go
+  s_5203c5b2b3e256::t_f22155b1c7b169 72
+  s_5203c5b2b3e256::t_fcc7d43935af6e 186
+  s_5203c5b2b3e256::t_3fe43875af1cfb 93
+internal/provision/wms.go
+  s_5203c5b2b3e256::t_1266699308e233 33
+  s_e61ccdfffb7e27::t_6d8371742ddade 19-20,22-23,25
+  s_5203c5b2b3e256::t_bec30e0ed1a16c 21
+  s_e61ccdfffb7e27::t_ee1ed125cef1f1 65,69
+monitoring/prometheus/rules/federation.yml
+  s_5203c5b2b3e256::t_55f5be1cf8b0af 4
+internal/monitor/service.go
+  s_5203c5b2b3e256::t_d47831d37573c8 205
+  s_5203c5b2b3e256::t_db70ca5a6c87a2 81-82
+  s_5203c5b2b3e256::t_ab75305f386e91 61
+internal/modular/config.go
+  s_5203c5b2b3e256::t_a87b4deaefc684 43-44
+CLAUDE.md
+  s_5203c5b2b3e256::t_dd1085accf0a7c 85
+  s_5203c5b2b3e256::t_6733a608506028 82
+  s_5203c5b2b3e256::t_c1125bcc8d9f31 68
+  s_5203c5b2b3e256::t_0b600cd6aded29 54
+internal/provision/module_plan.go
+  s_5203c5b2b3e256::t_69632a27ac0537 56
+  s_5203c5b2b3e256::t_64690d51a2704b 15-17
+  s_5203c5b2b3e256::t_4735fec1cc4472 55,57-67
+internal/api/software_publish.go
+  s_5203c5b2b3e256::t_d4e78f2b5f1eed 206
+internal/api/server.go
+  s_5203c5b2b3e256::t_fba81e607e12cc 249
+  s_5203c5b2b3e256::t_41a5103aa64399 1148,1603
+  s_e61ccdfffb7e27::t_09344080b5c7d9 250-253,259-261
+web/nginx.conf
+  s_a1d2ac3010b4d1::t_7c8b57aa0ae40a 33-39
+internal/templates/loglevel_test.go
+  s_e61ccdfffb7e27::t_df49ab1ebf56f2 1-17,19-27,29-30,32-110
+  s_5203c5b2b3e256::t_6db47af70d8c31 18
+  s_5203c5b2b3e256::t_57c303d8501612 28
+  s_5203c5b2b3e256::t_5fbcd521af1d22 31
+monitoring/README.md
+  s_5203c5b2b3e256::t_9d11886a75c3aa 33
+  s_5203c5b2b3e256::t_08bd7dc6023a73 30
+internal/templates/modules/business/compose.denglin.yml
+  s_5203c5b2b3e256::t_ecbbb72b41fb9f 10
+  s_e61ccdfffb7e27::t_13b80823cefab2 11-12
+internal/center/service.go
+  s_e61ccdfffb7e27::t_2483f1f432a8f3 164,166
+  s_5203c5b2b3e256::t_6114e92028058a 165
+internal/provision/migration.go
+  s_5203c5b2b3e256::t_73b550e859b782 142-152
+internal/store/sqlite.go
+  s_e61ccdfffb7e27::t_82d6cd4af66a9c 131
+  s_e61ccdfffb7e27::t_8d2922e83c4919 90
+  s_5203c5b2b3e256::t_286db99470f55e 130
+  s_5203c5b2b3e256::t_f737827818b707 153-231
+  s_e61ccdfffb7e27::t_d10ae50c490b2a 321
+  s_e61ccdfffb7e27::t_d0ab8fd5ceaa02 301
+  s_5203c5b2b3e256::t_a89525ef960b46 146-149
+  s_e61ccdfffb7e27::t_15ebf5321e1d6c 290
+  s_e61ccdfffb7e27::t_868c52e3fa652c 342
+internal/templates/loglevel.go
+  s_5203c5b2b3e256::t_41e36c46227d36 16
+  s_e61ccdfffb7e27::t_852491aec7d4f5 1-4,7-9,12-15,17-96
+  s_5203c5b2b3e256::t_4f133ad36254a1 5-6
+  s_5203c5b2b3e256::t_4fd9b24ac271a4 10-11
+internal/templates/modules.go
+  s_e61ccdfffb7e27::t_90a774f0252524 102
+internal/templates/embed.go
+  s_e61ccdfffb7e27::t_97e05165317d24 227-229
+internal/provision/compose_publish.go
+  s_5203c5b2b3e256::t_1dd6fce7816dab 439-442
+internal/provision/modules_test.go
+  s_5203c5b2b3e256::t_5086481784b299 1-33
+internal/provision/modules.go
+  s_5203c5b2b3e256::t_eadc15255292d2 648-658
+  s_5203c5b2b3e256::t_4a22fc0bf8ad0a 493
+  s_5203c5b2b3e256::t_a37b98b78deec1 478-479
+  s_5203c5b2b3e256::t_e8295802b14f28 494-502
+  s_5203c5b2b3e256::t_be1ae78b86d870 421-422
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "2efd829bab9ccd867a44a8f599c7a40844b5c749",
+  "prompts": {},
+  "sessions": {
+    "s_5203c5b2b3e256": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cc962483-8acb-4ba6-ac79-44d07fbf2bee",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_a1d2ac3010b4d1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "04ab398e-f58b-4be5-8bfa-52251dda2670",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_e61ccdfffb7e27": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c7a9b650-1988-47ba-87a8-1be672167117",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
