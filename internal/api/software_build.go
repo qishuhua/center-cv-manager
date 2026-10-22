@@ -88,6 +88,11 @@ func (s *Server) centerSoftwareImages(c *gin.Context) {
 
 // deleteCenterSoftwareImage 删除中心上由本管理端构建的业务镜像。
 // 只允许删除带来源标签的软件镜像；被任何容器（含已停止）引用的镜像拒绝删除。
+// 删除按镜像 ID force 执行：分发链路按 digest 拉取后 retag，镜像 ID 除本地
+// 发布标签外还挂着拉取产生的 digest 引用（同内容多版本标签同样叠加引用），
+// 非 force 删除会被 daemon 以 referenced in multiple repositories 拒绝。
+// 前置校验已排除非本管理端镜像与容器占用，force 只解除本镜像自身的全部
+// 引用，不影响其他镜像。
 func (s *Server) deleteCenterSoftwareImage(c *gin.Context) {
 	var in struct {
 		ID string `json:"id"`
@@ -128,7 +133,7 @@ func (s *Server) deleteCenterSoftwareImage(c *gin.Context) {
 			return
 		}
 	}
-	if _, e = remote.Client.ImageRemove(ctx, inspect.ID, image.RemoveOptions{Force: false, PruneChildren: false}); e != nil {
+	if _, e = remote.Client.ImageRemove(ctx, inspect.ID, image.RemoveOptions{Force: true, PruneChildren: false}); e != nil {
 		fail(c, 400, e)
 		return
 	}

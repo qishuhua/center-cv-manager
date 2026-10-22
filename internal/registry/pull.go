@@ -49,6 +49,13 @@ func PullAndTag(ctx context.Context, docker *client.Client, forwardAddr string, 
 			return fmt.Errorf("镜像 %s 的实际 digest 与镜像仓库不一致", item.LocalTag)
 		}
 		r.Logf("%s 已就绪（%s）", item.LocalTag, shortDigest(item.Digest))
+		// 摘除按 digest 拉取产生的引用：retag 后已无用途，留着会让镜像 ID
+		// 长期挂多个引用，删除镜像时被 daemon 以 referenced in multiple
+		// repositories 拒绝。镜像仍被本地发布标签引用，此步只是 untag；
+		// 失败仅记日志，不影响发布结果。
+		if _, err := docker.ImageRemove(ctx, reference, image.RemoveOptions{}); err != nil {
+			r.Logf("清理拉取引用 %s 失败（不影响发布）: %v", reference, err)
+		}
 	}
 	return nil
 }

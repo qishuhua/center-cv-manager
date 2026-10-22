@@ -71,7 +71,7 @@ const sourcePublishDialog=reactive<SourcePublishDialog>({visible:false,source:nu
 const centerRegistryVersions=ref<RegistrySourceVersions[]>([]),centerRegistryError=ref('')
 const centerSoftwareSelections=reactive<Record<string,string>>({})
 const imageManageDialog=reactive<ImageManageDialog>({visible:false,loading:false,images:[],deleting:''})
-const centerVersionApplying=ref(''),centerPinBusy=ref('')
+const centerVersionApplying=ref(''),centerVersionApplyingCenter=ref(''),centerPinBusy=ref('')
 const centerReleaseTask=ref<Task|null>(null),centerReleaseLogs=ref<string[]>([]),centerReleaseTitle=ref(''),centerReleaseStage=ref(''),centerReleaseProgress=ref(0),centerReleaseMessage=ref(''),centerReleaseError=ref('')
 let centerReleaseWorkflowID=0
 const centerOperationSubmitting=ref(false)
@@ -178,12 +178,19 @@ const centerModelRows=computed<CenterModelRow[]>(()=>{
   return [...byModel.values()].sort((a,b)=>a.model.localeCompare(b.model))
 })
 const centerModelSetPinned=computed(()=>deployedCenterModels.value.some(item=>item.pinned))
+// 版本切换/模型发布是长任务（发布对话框可「转到后台」）：进行中状态只属于
+// 发起它的中心，其他中心详情页的按钮不应显示切换中。
+const centerVersionApplyingHere=computed(()=>centerVersionApplyingCenter.value&&centerVersionApplyingCenter.value===activeCenterOverview.value?.center.id?centerVersionApplying.value:'')
 function centerModelCompatible(item:ModelVersion){const accelerator=activeCenterOverview.value?.accelerator||activeCenterOverview.value?.center.detected_accelerator||activeCenterOverview.value?.center.accelerator;return item.formats.some(format=>format.platform==='onnx'||format.platform===accelerator)}
 function modelFormatSummary(item:ModelVersion){return item.formats.map(format=>format.hardware_profile?`${format.platform}-${format.hardware_profile}`:format.platform).join(' / ')}
 function selectedCenterModel(row:CenterModelRow){return models.value.find(item=>item.manifest_key===centerModelSelections[row.model])}
 function selectedCenterModelCompatible(row:CenterModelRow){const selected=selectedCenterModel(row);return !!selected&&centerModelCompatible(selected)}
 const changedCenterModelRows=computed(()=>centerModelRows.value.filter(row=>{const target=selectedCenterModel(row);return !!target&&target.manifest_digest!==row.current?.manifest_digest}))
-const hasCenterVersionChanges=computed(()=>changedCenterModelRows.value.length>0)
+// 软件版本与模型版本同口径：选择与运行版本不同即待发布变更，多个软件
+// 累计到底部发布条，与模型变更合并成一个统一发布任务。
+function selectedCenterSoftwareVersion(row:CenterSoftwareRow){if(!row.source?.id)return undefined;const entry=centerRegistryBySource.value[row.source.id];return entry?.versions.find(item=>item.version===centerSoftwareSelections[row.key])}
+const changedCenterSoftwareRows=computed(()=>centerSoftwareRows.value.filter(row=>{const selected=selectedCenterSoftwareVersion(row);return !!selected&&!row.current.some(item=>item.version===selected.ref&&(!item.commit||!selected.commit||item.commit===selected.commit))}))
+const hasCenterVersionChanges=computed(()=>changedCenterSoftwareRows.value.length>0||changedCenterModelRows.value.length>0)
 const centerVersionChangesBlocked=computed(()=>changedCenterModelRows.value.some(row=>!selectedCenterModelCompatible(row))||(centerModelSetPinned.value&&changedCenterModelRows.value.length>0))
 function syncCenterVersionSelections(){
   for(const row of centerModelRows.value){const currentMatch=row.current?row.options.find(item=>item.manifest_digest===row.current!.manifest_digest):undefined;const selected=row.options.find(item=>item.manifest_key===centerModelSelections[row.model]&&centerModelCompatible(item));centerModelSelections[row.model]=currentMatch?.manifest_key||selected?.manifest_key||''}
@@ -199,24 +206,6 @@ function syncCenterSoftwareSelections(){
   }
 }
 function registryVersionLabel(item:RegistrySoftwareVersion){return `${item.version} · ${item.platforms.map(tag=>tag.platform==='shared'?'通用':tag.platform).join('/')} · ${fmt(item.created_at)}`}
-async function submitCenterSoftwareRelease(row:CenterSoftwareRow){
-  if(!guardAdminAction()||!row.source?.id)return
-  const centerID=activeCenterOverview.value?.center.id
-  const entry=centerRegistryBySource.value[row.source.id]
-  const selected=entry?.versions.find(item=>item.version===centerSoftwareSelections[row.key])
-  const platformTag=selected?.platforms.find(tag=>tag.platform===centerSoftwarePlatform.value||tag.platform==='shared')
-  if(!centerID||!entry||!selected||!platformTag)return
-  const running=row.current.some(item=>item.version===selected.ref&&(!item.commit||item.commit===selected.commit))
-  try{
-    await ElMessageBox.confirm(`将把 ${row.source.name} 切换到 ${selected.version}${running?'（与当前运行版本相同，仍会重建服务）':''}，中心经反向隧道拉取镜像并重建对应服务，服务会短暂中断。是否继续？`,'确认切换版本',{type:'warning',confirmButtonText:'确认切换',cancelButtonText:'取消',closeOnClickModal:false})
-    centerVersionApplying.value='publish'
-    const workflowID=beginCenterRelease(`切换 ${row.source.name}:${selected.version}`,'创建发布任务')
-    const task:Task=await http.post(`/centers/${centerID}/software/release`,{repository:entry.repository,tag:platformTag.tag})
-    const released=await followCenterReleaseTask(task,'切换版本',0,100,workflowID);requireReleaseSuccess(released)
-    centerReleaseProgress.value=100;centerReleaseMessage.value=`${row.source.name} 已切换到 ${selected.version}`;ElMessage.success(centerReleaseMessage.value)
-    await Promise.all([refreshActiveCenterOverview(),loadCenterRegistryVersions()])
-  }catch(e:any){if(e!=='cancel'&&e!=='close'){centerReleaseError.value=e.message||String(e);centerReleaseMessage.value=centerReleaseError.value;ElMessage.error(centerReleaseError.value)}}finally{centerVersionApplying.value=''}
-}
 async function loadCenterVersionOptions(){if(ossCredential.configured)await loadModels();else models.value=[];syncCenterVersionSelections()}
 async function refreshActiveCenterOverview(){if(!activeCenterOverview.value?.center.id)return;centerOverviewLoading.value=true;try{activeCenterOverview.value=await http.get(`/centers/${activeCenterOverview.value.center.id}/overview`);syncCenterVersionSelections()}catch(e:any){ElMessage.error(e.message)}finally{centerOverviewLoading.value=false}}
 async function refreshCenterManagement(){await Promise.all([refreshActiveCenterOverview(),loadCenterVersionOptions(),registrySettings.configured?loadCenterRegistryVersions():Promise.resolve()]);syncCenterVersionSelections();syncCenterSoftwareSelections()}
@@ -384,45 +373,36 @@ async function followCenterReleaseTask(task:Task,stage:string,start:number,end:n
   throw new Error('发布流程已停止')
 }
 function requireReleaseSuccess(task:Task){if(task.status!=='SUCCESS')throw new Error(task.error||task.message||`任务状态异常：${task.status}`)}
+// applyCenterVersionChanges 把中心详情页累计的软件与模型变更合成一个统一
+// 发布任务（单中心）：软件经反向隧道按 digest 分发镜像并重建映射服务，
+// 模型随后同步/校验；只选软件或只选模型时即对应纯软件/纯模型发布。
 async function applyCenterVersionChanges(){if(!guardAdminAction())return;
-  const centerID=activeCenterOverview.value?.center.id,modelRows=changedCenterModelRows.value
-  if(!centerID||!modelRows.length)return
+  const centerID=activeCenterOverview.value?.center.id,softwareRows=changedCenterSoftwareRows.value,modelRows=changedCenterModelRows.value
+  if(!centerID||(!softwareRows.length&&!modelRows.length))return
   if(centerVersionChangesBlocked.value){ElMessage.warning(centerModelSetPinned.value?'当前模型版本组已固定，请先整体解绑':'所选模型版本与中心平台不兼容');return}
+  const items=softwareRows.map(row=>{const selected=selectedCenterSoftwareVersion(row)!;return {source_id:row.source!.id,ref:selected.ref,commit:selected.commit||''}})
   const modelSelections=modelRows.map(row=>{const target=selectedCenterModel(row)!;return {manifest_key:target.manifest_key,manifest_digest:target.manifest_digest}})
-  const summary=`${modelSelections.length} 个模型版本`
+  const parts=[];if(items.length)parts.push(`${items.length} 个软件版本`);if(modelSelections.length)parts.push(`${modelSelections.length} 个模型版本`)
+  const summary=parts.join('、')
+  const detail=softwareRows.map(row=>`${row.source!.name}→${selectedCenterSoftwareVersion(row)!.version}`).join('、')
   try{
-    await ElMessageBox.confirm(`将发布 ${summary}，随后仅重启使用模型的服务以加载模型，服务会短暂中断。是否继续？`,'确认发布版本',{type:'warning',confirmButtonText:'确认发布',cancelButtonText:'取消',closeOnClickModal:false})
-    centerVersionApplying.value='all'
+    await ElMessageBox.confirm(`将发布 ${summary}${detail?`（${detail}）`:''}，软件经反向隧道拉取镜像并重建对应服务${modelSelections.length&&!items.length?'，模型随后同步并仅重启使用模型的服务':''}，服务会短暂中断。是否继续？`,'确认发布版本',{type:'warning',confirmButtonText:'确认发布',cancelButtonText:'取消',closeOnClickModal:false})
+    centerVersionApplying.value='publish'
+    centerVersionApplyingCenter.value=centerID
     const workflowID=beginCenterRelease(`发布 ${summary}`,'统一发布预检')
-    prepareCenterReleaseStage('统一发布预检',5,'正在检查中心模型版本和硬件兼容性')
-    const payload={center_ids:[centerID],items:[],model_selections:modelSelections}
+    prepareCenterReleaseStage('统一发布预检',5,'正在检查中心 Compose、软件镜像、模型版本与硬件兼容性')
+    const payload={center_ids:[centerID],items,model_selections:modelSelections}
     const plans:DeploymentPlan[]=await http.post('/releases/plan',payload)
-    const plan=plans[0];if(!plan?.ready)throw new Error(plan?.error||plan?.missing_services?.join('；')||'中心不满足发布条件')
-    centerReleaseMessage.value='预检通过，正在创建模型发布任务'
+    const plan=plans[0];if(!plan?.ready)throw new Error(plan?.error||plan?.missing_services?.join('；')||plan?.missing_images?.join('；')||'中心不满足发布条件')
+    centerReleaseMessage.value=plan.build_required?'预检提示中心缺少镜像，将从镜像仓库分发':'预检通过，正在创建统一发布任务'
     const created:Task[]=await http.post('/releases',payload)
     if(!created.length)throw new Error('没有创建版本发布任务')
     deploymentTasks.value=created
     const released=await followCenterReleaseTask(created[0],`发布 ${summary}`,12,100,workflowID);requireReleaseSuccess(released)
     centerReleaseProgress.value=100;centerReleaseMessage.value=`${summary}已发布到该中心`;ElMessage.success(centerReleaseMessage.value)
-    await Promise.all([refreshActiveCenterOverview(),refreshTasks()])
-  }catch(e:any){if(e!=='cancel'&&e!=='close'){centerReleaseError.value=e.message||String(e);centerReleaseMessage.value=centerReleaseError.value;ElMessage.error(centerReleaseError.value)}}finally{centerVersionApplying.value=''}
-}
-// 单软件发布：走统一发布端点（单中心单项）。built_image 表示所选为该中心
-// 已构建的镜像：跳过远端 ref 实时复核，镜像存在性由预检把关。
-async function publishSoftwareToCenter(item:DeployItem,workflowID:number){
-  const centerID=activeCenterOverview.value!.center.id!
-  const title=`发布 ${sources.value.find(v=>v.id===item.source_id)?.name||item.ref}:${item.ref}`
-  prepareCenterReleaseStage('统一发布预检',5,'正在检查中心 Compose、软件镜像与发布条件')
-  const payload={center_ids:[centerID],items:[{...item,built_image:true}],model_selections:[]}
-  const plans:DeploymentPlan[]=await http.post('/releases/plan',payload)
-  const plan=plans[0];if(!plan?.ready)throw new Error(plan?.error||plan?.missing_services?.join('；')||plan?.missing_images?.join('；')||'中心不满足发布条件')
-  centerReleaseMessage.value=plan.build_required?'预检提示中心缺少镜像，将从镜像仓库分发':'预检通过，正在创建统一发布任务'
-  const created:Task[]=await http.post('/releases',payload)
-  if(!created.length)throw new Error('没有创建版本发布任务')
-  deploymentTasks.value=created
-  const released=await followCenterReleaseTask(created[0],title,12,100,workflowID);requireReleaseSuccess(released)
-  centerReleaseProgress.value=100;centerReleaseMessage.value=`${title}已发布到该中心`;ElMessage.success(centerReleaseMessage.value)
-  await Promise.all([refreshActiveCenterOverview(),refreshTasks()])
+    if(activeCenterOverview.value?.center.id===centerID)await Promise.all([refreshActiveCenterOverview(),loadCenterRegistryVersions()])
+    await refreshTasks()
+  }catch(e:any){if(e!=='cancel'&&e!=='close'){centerReleaseError.value=e.message||String(e);centerReleaseMessage.value=centerReleaseError.value;ElMessage.error(centerReleaseError.value)}}finally{centerVersionApplying.value='';centerVersionApplyingCenter.value=''}
 }
 async function openSourcePublish(source:Source){if(!guardAdminAction()||!source.id)return;sourcePublishDialog.source=source;sourcePublishDialog.selectedKey='';sourcePublishDialog.visible=true;sourcePublishDialog.loading=true;try{await loadGitVersions(source.id)}finally{sourcePublishDialog.loading=false}}
 const sourceVersionsDialog=reactive<{visible:boolean;source:Source|null;loading:boolean;deleting:string}>({visible:false,source:null,loading:false,deleting:''})
@@ -709,7 +689,7 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
         </template>
         <ModuleManager v-if="activeCenterOverview.center.deployment?.status!=='reset'" :key="activeCenterOverview.center.id" :center="activeCenterOverview.center" :active="centerOverviewDrawer" :admin="isAdmin" @task="openTask" @changed="refreshCenterManagement" @legacy-edit="(file:string)=>openCompose(activeCenterOverview!.center,file)"/>
         <section class="detail-section">
-          <div class="detail-section-title"><div><h3>软件版本</h3><p>可切换版本来自镜像仓库并按本机显卡平台（{{acceleratorName(centerSoftwarePlatform||'auto')}}）过滤；切换后中心经反向隧道拉取镜像并重建服务。新版本在「软件仓库」页构建发布。</p></div><el-button v-if="isAdmin" :icon="Delete" @click="openImageManage">管理镜像</el-button></div>
+          <div class="detail-section-title"><div><h3>软件版本</h3><p>可切换版本来自镜像仓库并按本机显卡平台（{{acceleratorName(centerSoftwarePlatform||'auto')}}）过滤；可选择多个软件版本，在底部与模型版本变更合并为一次发布。新版本在「软件仓库」页构建发布。</p></div><el-button v-if="isAdmin" :icon="Delete" @click="openImageManage">管理镜像</el-button></div>
           <el-alert v-if="centerRegistryError" :title="centerRegistryError" type="warning" :closable="false" show-icon/>
           <el-table :data="centerSoftwareRows" class="center-version-table" empty-text="尚未配置软件仓库，且中心没有可识别的已部署软件">
             <el-table-column label="软件" min-width="170"><template #default="{row}"><strong>{{row.source?.name||row.current[0]?.source_name}}</strong><small v-if="row.source&&centerRegistryBySource[row.source.id!]?.versions.length" class="table-subtitle">镜像仓库 {{centerRegistryBySource[row.source.id!].versions.length}} 个版本</small><small v-else-if="row.source" class="table-subtitle">镜像仓库暂无该软件版本</small><small v-else class="table-subtitle">仅在中心检测到，软件仓库已被移除或未配置</small></template></el-table-column>
@@ -720,7 +700,6 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
               </el-select>
               <span v-else class="muted">-</span>
             </template></el-table-column>
-            <el-table-column v-if="isAdmin" label="操作" width="120" fixed="right"><template #default="{row}"><el-button v-if="row.source&&centerRegistryBySource[row.source.id!]?.versions.length" type="primary" link :loading="centerVersionApplying==='publish'" @click="submitCenterSoftwareRelease(row)">切换并运行</el-button><span v-else class="muted">-</span></template></el-table-column>
           </el-table>
         </section>
         <section class="detail-section">
@@ -734,7 +713,7 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
             <el-table-column label="OSS 可发布版本" min-width="420"><template #default="{row}"><el-select v-model="centerModelSelections[row.model]" filterable placeholder="选择 OSS 模型版本" style="width:100%"><el-option v-for="item in row.options" :key="item.manifest_key" :disabled="!centerModelCompatible(item)" :label="`${item.version} · ${modelFormatSummary(item)}${centerModelCompatible(item)?'':' · 平台不兼容'}`" :value="item.manifest_key"/></el-select></template></el-table-column>
           </el-table>
         </section>
-        <div v-if="hasCenterVersionChanges" class="center-version-publish-bar"><span>已选择变更：{{changedCenterModelRows.length}} 个模型版本</span><el-tooltip :disabled="!centerVersionChangesBlocked" :content="centerModelSetPinned?'模型版本组已固定，请先整体解绑':'所选模型版本与中心平台不兼容'"><span><el-button type="primary" size="large" :loading="centerVersionApplying==='all'" :disabled="!!centerVersionApplying||centerVersionChangesBlocked" @click="applyCenterVersionChanges">发布</el-button></span></el-tooltip></div>
+        <div v-if="hasCenterVersionChanges" class="center-version-publish-bar"><span>已选择变更：{{changedCenterSoftwareRows.length}} 个软件版本、{{changedCenterModelRows.length}} 个模型版本</span><el-tooltip :disabled="!centerVersionChangesBlocked" :content="centerModelSetPinned?'模型版本组已固定，请先整体解绑':'所选模型版本与中心平台不兼容'"><span><el-button type="primary" size="large" :loading="centerVersionApplyingHere==='publish'" :disabled="!!centerVersionApplyingHere||centerVersionChangesBlocked" @click="applyCenterVersionChanges">{{changedCenterSoftwareRows.length?'切换并发布':'发布'}}</el-button></span></el-tooltip></div>
         <section class="detail-section"><h3>运行中的容器</h3><el-table :data="activeCenterOverview.containers" empty-text="当前没有运行中的容器"><el-table-column label="容器" min-width="170"><template #default="{row}"><strong>{{(row.names||[]).join(', ')||row.id.slice(0,12)}}</strong></template></el-table-column><el-table-column prop="image" label="镜像" min-width="240"><template #default="{row}"><code>{{row.image}}</code></template></el-table-column><el-table-column prop="status" label="Docker 状态" min-width="180"/><el-table-column v-if="isAdmin" label="操作" width="90" align="center"><template #default="{row}"><el-button size="small" type="primary" plain :icon="Refresh" :loading="centerOperationSubmitting" @click="restartContainer(row)">重启</el-button></template></el-table-column></el-table></section>
       </template>
     </div>
