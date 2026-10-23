@@ -1,0 +1,61 @@
+internal/store/sqlite.go
+  s_f1f7cf30f59647::t_1f9ddf5cd93409 344
+  s_f1f7cf30f59647::t_de8327735de003 292
+  s_f1f7cf30f59647::t_ecde5cf0a0499a 132-133
+  s_f1f7cf30f59647::t_535e7ada7d7b7a 303
+  s_f1f7cf30f59647::t_85d5d1e55bd446 90
+  s_f1f7cf30f59647::t_a5254a0750e41b 323
+internal/provision/wms.go
+  s_f1f7cf30f59647::t_e96eb58a703579 20-25
+  s_f1f7cf30f59647::t_c904fa872a6a21 72
+  s_f1f7cf30f59647::t_cf0acdd007623a 67
+  s_f1f7cf30f59647::t_b620b4aa2cfc03 34
+internal/templates/loglevel.go
+  s_f1f7cf30f59647::t_487ba3c9648969 48,50-58
+  s_f1f7cf30f59647::t_c7d608e98df258 83,100
+internal/templates/modules/business/compose.denglin.yml
+  s_f1f7cf30f59647::t_33777d71f48a73 13-15
+internal/provision/service.go
+  s_f1f7cf30f59647::t_984353b2e1ae2f 222
+web/src/types.ts
+  s_f1f7cf30f59647::t_5b925c6edd29d4 3
+CLAUDE.md
+  s_f1f7cf30f59647::t_b5291f72cd5ac3 85
+internal/templates/saveimage.go
+  s_f1f7cf30f59647::t_ba1a5d8e475fc1 1-51
+internal/center/service.go
+  s_f1f7cf30f59647::t_914b8d8ac43f2b 167-169
+internal/domain/models.go
+  s_f1f7cf30f59647::t_f6fccf631a64a5 36-40
+web/src/App.vue
+  s_f1f7cf30f59647::t_bbdc409502658e 292
+  s_f1f7cf30f59647::t_e730b318131cb8 41
+  s_f1f7cf30f59647::t_775e44f65ddd6f 631
+internal/templates/embed.go
+  s_f1f7cf30f59647::t_dd3b31dbd313e1 230-232
+internal/templates/saveimage_test.go
+  s_f1f7cf30f59647::t_c853208e5b32a2 1-110
+internal/store/sqlite_test.go
+  s_f1f7cf30f59647::t_ed1b8de614d65b 245-251
+  s_f1f7cf30f59647::t_bb15bf88f4de51 200-202
+internal/templates/modules/business/compose.nvidia.yml
+  s_f1f7cf30f59647::t_132b909ab336ab 13-15
+internal/templates/modules.go
+  s_f1f7cf30f59647::t_c7ad3e78815ff2 103
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "75238f0f022a632d89237d3af6fffb49435884ae",
+  "prompts": {},
+  "sessions": {
+    "s_f1f7cf30f59647": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d93f9a33-7899-418f-a5bb-b5ccde11f858",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
