@@ -45,10 +45,17 @@ func ApplyLogLevelModuleEnv(env string, debug bool) string {
 
 // EnsureWorkerLogLevelEnv 幂等保证 business Compose 的 Worker 公共环境锚点
 // 含 LOG_LEVEL 插值行（只增不删）：渲染模板已内置该行，本函数服务于模板
-// 更新前已初始化中心的存量 Compose。已存在任意形式的 LOG_LEVEL 条目（含
-// 手工硬编码）一律不动；锚点缺失（异常布局）时原样返回，等待整体校验
-// 暴露问题。插入缩进取锚点内既有条目的实际缩进（回落模板 2 空格）。
+// 更新前已初始化中心的存量 Compose。
 func EnsureWorkerLogLevelEnv(compose string) string {
+	return ensureWorkerEnvEntry(compose, "LOG_LEVEL", workerLogLevelLine)
+}
+
+// ensureWorkerEnvEntry 幂等保证 business Compose 的 Worker 公共环境锚点含
+// 指定变量的插值行（只增不删，供 LOG_LEVEL/存图等托管开关共用）：已存在
+// 任意形式的该变量条目（含手工硬编码）一律不动；锚点缺失（异常布局）时
+// 原样返回，等待整体校验暴露问题。插入缩进取锚点内既有条目的实际缩进
+// （回落模板 2 空格）。
+func ensureWorkerEnvEntry(compose, key, entry string) string {
 	lines := strings.Split(strings.ReplaceAll(compose, "\r\n", "\n"), "\n")
 	header := -1
 	for i, line := range lines {
@@ -73,7 +80,7 @@ func EnsureWorkerLogLevelEnv(compose string) string {
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		if strings.HasPrefix(trimmed, "LOG_LEVEL:") {
+		if strings.HasPrefix(trimmed, key+":") {
 			return strings.Join(lines, "\n")
 		}
 		if entryIndent < 0 {
@@ -90,7 +97,7 @@ func EnsureWorkerLogLevelEnv(compose string) string {
 	}
 	out := make([]string, 0, len(lines)+1)
 	out = append(out, lines[:insertAt]...)
-	out = append(out, strings.Repeat(" ", entryIndent)+workerLogLevelLine)
+	out = append(out, strings.Repeat(" ", entryIndent)+entry)
 	out = append(out, lines[insertAt:]...)
 	return strings.Join(out, "\n")
 }

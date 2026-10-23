@@ -227,6 +227,9 @@ type RenderOptions struct {
 	// DebugLogEnabled 开启时 business 模块在 module.env 托管 LOG_LEVEL=debug
 	//（Worker 公共环境锚点插值兜底 info），关闭回落默认值。
 	DebugLogEnabled bool
+	// SaveImageEnabled 开启时 business 模块在 module.env 托管
+	// CV_SAVE_DEBUG_IMAGE=1（Worker 公共环境锚点插值兜底 0），关闭回落默认值。
+	SaveImageEnabled bool
 }
 
 // Render 使用统一配置渲染部署模板。WorkerEnv 会写入公共锚点，确保所有 Worker 一致。

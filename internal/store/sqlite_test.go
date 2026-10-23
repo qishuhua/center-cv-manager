@@ -197,6 +197,9 @@ func TestCenterRuntimeSchemaUpgrade(t *testing.T) {
 	if loaded.DebugLogEnabled {
 		t.Fatal("Debug 模式开关迁移默认值应为关闭（0）")
 	}
+	if loaded.SaveImageEnabled {
+		t.Fatal("存图开关迁移默认值应为关闭（0）")
+	}
 	loaded.WMSURL, loaded.MisAuth = "http://10.21.61.48:31995", "auth"
 	loaded.TestMode = true
 	if err = st.SaveCenter(loaded); err != nil {
@@ -238,6 +241,13 @@ func TestCenterRuntimeSchemaUpgrade(t *testing.T) {
 	}
 	if again, err := st.GetCenter("legacy-center"); err != nil || !again.DebugLogEnabled {
 		t.Fatal("Debug 模式开关应支持开启回写")
+	}
+	reloaded.SaveImageEnabled = true
+	if err = st.SaveCenter(reloaded); err != nil {
+		t.Fatal(err)
+	}
+	if again, err := st.GetCenter("legacy-center"); err != nil || !again.SaveImageEnabled {
+		t.Fatal("存图开关应支持开启回写")
 	}
 }
 

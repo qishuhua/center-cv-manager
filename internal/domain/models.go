@@ -33,7 +33,11 @@ type Center struct {
 	// DebugLogEnabled 开启后业务 Worker（center-cv-service）日志等级改为
 	// debug（module.env 托管 LOG_LEVEL）；关闭移除托管值，回落 Compose
 	// 插值默认 info。仅模块化中心支持。
-	DebugLogEnabled bool      `json:"debug_log_enabled,omitempty"`
+	DebugLogEnabled bool `json:"debug_log_enabled,omitempty"`
+	// SaveImageEnabled 开启后业务 Worker（center-cv-service）每轮推理保存
+	// 调试图片（module.env 托管 CV_SAVE_DEBUG_IMAGE）；关闭移除托管值，
+	// 回落 Compose 插值默认 0（不存图）。仅模块化中心支持。
+	SaveImageEnabled bool      `json:"save_image_enabled,omitempty"`
 	TestMode        bool      `json:"test_mode,omitempty"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
