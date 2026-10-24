@@ -1,0 +1,88 @@
+internal/templates/chute_test.go
+  s_01eb2189c56296::t_ede598417ebe6b 47,54,180,304-308,312-322,324-326,329,332,335-338,340-357,359-362
+  s_01eb2189c56296::t_4f6f91ffd84676 23-25
+  s_01eb2189c56296::t_252556e4a35617 33
+  s_01eb2189c56296::t_446dbccd201fd7 34
+  s_01eb2189c56296::t_65b5e9db7528a4 179
+  s_01eb2189c56296::t_cdfc9630ea8991 181
+  s_b02010f3f82ea2::t_b1f467be2ebf2a 27,153,384-403,406-410,412-415,417-419,421-423,425-427,429-431
+internal/provision/wms.go
+  s_01eb2189c56296::t_c8afe2437cda0f 64-65
+  s_01eb2189c56296::t_ba33eb49d9bb72 20-22
+  s_01eb2189c56296::t_caebd8b745690b 23-25
+  s_01eb2189c56296::t_ec40dc73527a12 63
+  s_01eb2189c56296::t_aeb0bb3d9b1dbb 66-67
+  s_01eb2189c56296::t_afe11a25cab706 69,74
+internal/templates/loglevel_test.go
+  s_01eb2189c56296::t_85d2314c00bfe6 9
+internal/templates/modules/business/compose.denglin.yml
+  s_01eb2189c56296::t_e6897668a96703 135-137,139-140,165-166,169-175,214
+  s_01eb2189c56296::t_75c5d8e3c50141 133-134
+  s_01eb2189c56296::t_938be911891558 138
+  s_01eb2189c56296::t_a1ac33324e74f0 215
+internal/templates/modules/business/compose.nvidia.yml
+  s_01eb2189c56296::t_06e60121326ec8 135-137,139-140,165-166,169-175,214
+  s_01eb2189c56296::t_b18b793028aa5b 133-134
+  s_01eb2189c56296::t_86e433ff029f51 138
+  s_01eb2189c56296::t_72f40a8d83de94 215
+internal/templates/chute.go
+  s_01eb2189c56296::t_e1cb3e2aa1cf6e 46-47,50-56
+  s_01eb2189c56296::t_abe51a481d98af 154-155
+  s_01eb2189c56296::t_2387dd08bb7fad 386-407,409,411,445,456,460,463-467,495,535
+  s_01eb2189c56296::t_952a669a7f9c13 496
+  s_01eb2189c56296::t_187846843691ff 532-534
+  s_01eb2189c56296::t_0246a29c338be0 536-538
+  s_b02010f3f82ea2::t_227b4e18cb6223 10,31,475,481,501-502,519,531,539-572
+internal/templates/compose/docker-compose.denglin.yml
+  s_01eb2189c56296::t_86b2d043a5cfe8 84
+  s_be2c5172d1728a::t_6cab58db7d6cdc 185-192
+internal/templates/embed.go
+  s_01eb2189c56296::t_4a0bc4e0f48fe9 44
+  s_01eb2189c56296::t_df39cb48516075 91-92,94-95
+internal/templates/directory_test.go
+  s_01eb2189c56296::t_b949feb3590838 17
+Dockerfile
+  s_01eb2189c56296::t_adc139c73d943d 32-33
+CLAUDE.md
+  s_01eb2189c56296::t_55b9a4d5d9720b 84
+  s_01eb2189c56296::t_03413bca5a49a9 47
+  s_01eb2189c56296::t_07eec8c48bf306 73
+web/src/App.vue
+  s_01eb2189c56296::t_521b0cc62ca967 635
+  s_01eb2189c56296::t_416057074d8375 632
+internal/templates/compose/docker-compose.nvidia.yml
+  s_01eb2189c56296::t_86b2d043a5cfe8 84
+  s_be2c5172d1728a::t_91dbf6f4a79d8c 186-193
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "f673638027b4cee3c3c21c8c9797e57ab2db917c",
+  "prompts": {},
+  "sessions": {
+    "s_01eb2189c56296": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "15bab2f7-bc99-45fa-9262-a15e348dcc23",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_b02010f3f82ea2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a169a2-fafc-7d41-aaed-462f2184bd46",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_be2c5172d1728a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dad5dafc-4a55-45ef-8126-7f061abda848",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
