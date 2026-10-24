@@ -130,19 +130,20 @@ services:
         soft: 65535
         hard: 65535
     environment:
+      CV_CAMERA_POLL_ENABLED: ${CV_CAMERA_POLL_ENABLED:-0}
+      CV_WMS_URL: ${CV_WMS_URL:-http://10.21.61.48:31995}
+      CV_MIS_AUTH: ${CV_MIS_AUTH:-20260606123a}
+      CV_CAMERA_CONFIG_PATH: ${CV_CAMERA_CONFIG_PATH:-/missort/api/cameraConfig/query}
+      CV_CAMERA_POLL_INTERVAL_SECONDS: ${CV_CAMERA_POLL_INTERVAL_SECONDS:-300}
+      CV_CAMERA_CONFIG_TIMEOUT_MS: ${CV_CAMERA_CONFIG_TIMEOUT_MS:-5000}
+      CHUTE_VERIFICATION_URL: ${CHUTE_VERIFICATION_URL:-http://127.0.0.1:8091}
+      CV_DEVICE_SYNC_INTERVAL_SECONDS: ${CV_DEVICE_SYNC_INTERVAL_SECONDS:-5}
       # Priority mapping is shared with worker alarm publishers.
       RABBITMQ_REALTIME_PRIORITY: ${RABBITMQ_REALTIME_PRIORITY:-5}
       RABBITMQ_PLAYBACK_PRIORITY: ${RABBITMQ_PLAYBACK_PRIORITY:-1}
       RABBITMQ_DEFAULT_VHOST: /
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
-      # 错分检测轮询：开关与取值都来自 module.env（中心 WMS 配置）。
-      # 未启用时解析为 0/空串，ingress 关闭轮询并忽略其余取值。
-      CV_CAMERA_POLL_ENABLED: ${CV_CAMERA_POLL_ENABLED:-0}
-      CV_WMS_URL: ${CV_WMS_URL:-}
-      CV_MIS_AUTH: ${CV_MIS_AUTH:-}
-      CV_ORGAN_CODE: ${CV_ORGAN_CODE:-}
-      CV_CAMERA_POLL_INTERVAL_SECONDS: ${CV_CAMERA_POLL_INTERVAL_SECONDS:-300}
     volumes:
       - /data/logs:/data/logs
     healthcheck:
@@ -161,12 +162,17 @@ services:
     restart: unless-stopped
     network_mode: host
     environment:
-      # 错分审核：只做两路落格事件匹配与结果发送，始终部署；module.env 提供
-      # 取值（开启错分检测时），未配置时使用这里的默认值。
+      # 错分审核：两路落格事件匹配与结果发送，经 RabbitMQ 收发；始终部署，
+      # module.env 提供共享鉴权；结果由 alarm-service 上报。
       CV_LISTEN_HOST: 127.0.0.1
-      CV_ORGAN_CODE: ${CV_ORGAN_CODE:-637101}
       CV_MIS_AUTH: ${CV_MIS_AUTH:-20260606123a}
-      CV_WMS_URL: ${CV_WMS_URL:-http://10.21.61.48:31995}
+      # RabbitMQ 连接与任务优先级映射：新版镜像启动即校验连接变量，取值与
+      # ingress/Worker 一致（infra RabbitMQ 为 guest@/）。
+      RABBITMQ_DEFAULT_VHOST: /
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_REALTIME_PRIORITY: ${RABBITMQ_REALTIME_PRIORITY:-5}
+      RABBITMQ_PLAYBACK_PRIORITY: ${RABBITMQ_PLAYBACK_PRIORITY:-1}
     volumes:
       - /data/logs:/data/logs
     healthcheck:
@@ -205,6 +211,8 @@ services:
     restart: unless-stopped
     network_mode: host
     environment:
+      CV_WMS_URL: ${CV_WMS_URL:-http://10.21.61.48:31995}
+      CV_MIS_AUTH: ${CV_MIS_AUTH:-20260606123a}
       # 转码结果上报拆分服务：消费 cv.alarm.report，素材直传 OSS + 业务告警回调。
       # 上报凭据沿用镜像内置默认；与转码共享 /data/media-resources。
       CV_HTTP_HOST: 127.0.0.1

@@ -29,7 +29,8 @@ RUN apk add --no-cache ca-certificates git openssh-client tzdata \
 WORKDIR /app
 COPY --from=go-builder /out/center-cv-manager /usr/local/bin/center-cv-manager
 COPY internal/templates/compose/ /app/templates/compose/
-COPY internal/templates/nginx/ /app/templates/nginx/
+# nginx 配置唯一源文件在 modules/gateway/nginx/，legacy 渲染直接复用，
+# 镜像内不再有独立的 templates/nginx/ 目录。
 COPY internal/templates/monitoring/ /app/templates/monitoring/
 COPY internal/templates/secrets/ /app/templates/secrets/
 COPY internal/templates/modules/ /app/templates/modules/

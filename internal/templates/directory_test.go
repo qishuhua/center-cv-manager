@@ -14,7 +14,7 @@ func TestDirectoryResources(t *testing.T) {
 	if err := SetDirectory(root); err == nil {
 		t.Fatal("expected incomplete template directory to be rejected")
 	}
-	for _, name := range []string{"compose", "nginx", "monitoring", "secrets", "modules"} {
+	for _, name := range []string{"compose", "monitoring", "secrets", "modules"} {
 		if err := os.Mkdir(filepath.Join(root, name), 0755); err != nil {
 			t.Fatal(err)
 		}

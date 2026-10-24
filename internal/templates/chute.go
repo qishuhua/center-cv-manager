@@ -7,10 +7,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// 错分检测（WMS）共享边界：chute-verification-service 只做两路落格事件审核，
-// 摄像机配置轮询收口在 center-cv-ingress。两侧取值统一来自 business 模块
-// module.env 中的 CV_WMS_URL / CV_MIS_AUTH，路径由各服务自拼；机构编码
-// 不做配置，两服务各用 Compose 插值默认值（chute 637101）。
+// Ingress polls WMS; chute verifies events; alarm-service reports results.
 
 // MisSortOptions 描述中心的错分检测配置，用于维护 business 模块 module.env。
 type MisSortOptions struct {
@@ -24,7 +21,6 @@ const ChuteServiceName = "chute-verification-service"
 
 const (
 	chuteInsertAnchor = "video-transcode-service"
-	ingressServiceKey = "center-cv-ingress"
 	// module.env 中由中心 WMS 设置托管的变量，启用时按此顺序写入。
 	misSortEnvMarker = "# 错分检测（WMS）配置：由中心 WMS 设置维护，修改请回中心编辑"
 )
@@ -32,7 +28,7 @@ const (
 // ChuteServiceBlock 返回错分审核服务的标准 Compose 块（含结尾空行）。
 // logsRoot 为空时使用 /data/logs 占位，渲染路径随后由 renderHostMounts
 // 重写为实际日志目录；事后应用路径传入实际 LogsRoot。服务始终部署，
-// WMS 取值用插值默认兜底（与两份 business 模板保持一致）。
+// 共享鉴权用插值默认兜底（与两份 business 模板保持一致）。
 func ChuteServiceBlock(logsRoot string) string {
 	if logsRoot == "" {
 		logsRoot = "/data/logs"
@@ -47,12 +43,17 @@ func ChuteServiceBlock(logsRoot string) string {
 		"    restart: unless-stopped",
 		"    network_mode: host",
 		"    environment:",
-		"      # 错分审核：只做两路落格事件匹配与结果发送，始终部署；module.env 提供",
-		"      # 取值（开启错分检测时），未配置时使用这里的默认值。",
+		"      # 错分审核：两路落格事件匹配与结果发送，经 RabbitMQ 收发；始终部署，",
+		"      # module.env 提供共享鉴权；结果由 alarm-service 上报。",
 		"      CV_LISTEN_HOST: 127.0.0.1",
-		"      CV_ORGAN_CODE: ${CV_ORGAN_CODE:-637101}",
 		"      CV_MIS_AUTH: ${CV_MIS_AUTH:-20260606123a}",
-		"      CV_WMS_URL: ${CV_WMS_URL:-http://10.21.61.48:31995}",
+		"      # RabbitMQ 连接与任务优先级映射：新版镜像启动即校验连接变量，",
+		"      # 取值与 ingress/Worker 一致（infra RabbitMQ 为 guest@/）。",
+		"      RABBITMQ_DEFAULT_VHOST: /",
+		"      RABBITMQ_DEFAULT_USER: guest",
+		"      RABBITMQ_DEFAULT_PASS: guest",
+		"      RABBITMQ_REALTIME_PRIORITY: ${RABBITMQ_REALTIME_PRIORITY:-5}",
+		"      RABBITMQ_PLAYBACK_PRIORITY: ${RABBITMQ_PLAYBACK_PRIORITY:-1}",
 		"    volumes:",
 		"      - " + logsRoot + ":/data/logs",
 		"    healthcheck:",
@@ -150,8 +151,8 @@ func reindentTo(lines []string, indent int) []string {
 	return out
 }
 
-// ApplyChuteService 幂等保证 business Compose 中存在错分审核服务块（服务始终
-// 部署，是否开启错分检测只影响 ingress 轮询）：不存在才插入标准块；已存在
+// ApplyChuteService 幂等保证 business Compose 中存在错分审核服务块（错分任务
+// 由 chute 承担、服务始终部署）：不存在才插入标准块；已存在
 // （含手工添加、或发布流程已改写 image/labels 的块）一律不动，永不剔除。
 // 幂等判定优先经 YAML 看 services 段是否已含该服务（任意缩进与书写形态），
 // 解析失败的文件退回头行文本判定。插入点按可靠性依次选择：
@@ -300,14 +301,6 @@ func servicesSectionEnd(lines []string) (int, int) {
 	return len(lines), first
 }
 
-var ingressPollEnvLines = []string{
-	"      CV_CAMERA_POLL_ENABLED: ${CV_CAMERA_POLL_ENABLED:-0}",
-	"      CV_WMS_URL: ${CV_WMS_URL:-}",
-	"      CV_MIS_AUTH: ${CV_MIS_AUTH:-}",
-	"      CV_ORGAN_CODE: ${CV_ORGAN_CODE:-}",
-	"      CV_CAMERA_POLL_INTERVAL_SECONDS: ${CV_CAMERA_POLL_INTERVAL_SECONDS:-300}",
-}
-
 const (
 	chuteUpstreamMarker     = "upstream chute_backend"
 	chuteLocationMarker     = "location /fall-events/"
@@ -390,18 +383,32 @@ func insertBefore(lines []string, at int, block []string) []string {
 	return out
 }
 
-// EnsureIngressPollEnv 在 center-cv-ingress 的 environment 段内幂等补齐
-// 错分检测轮询插值行（只增不删）。渲染模板已内置这些行，本函数服务于
-// 模板更新前已初始化中心的存量 Compose。老版本模板可能没有 ingress 服务
-// ——轮询收口在新版 ingress，无服务即无轮询可配，静默跳过、待重新初始化
-// 后自然带上，不阻断 WMS 同步；服务存在但缺 environment 段时自动补段。
-// environment 行与插值条目的缩进都从文件实际内容推导（既有子条目的缩进
-// 优先），手写或重排过的 Compose 不再因缩进差异被静默跳过或补错位。
-func EnsureIngressPollEnv(compose string) (string, error) {
+// chuteRabbitMQEnvLines 是 chute 服务块必须具备的 RabbitMQ 连接与优先级
+// 插值行（与 ChuteServiceBlock、两份 business 模板保持一致）。
+var chuteRabbitMQEnvLines = []string{
+	"      RABBITMQ_DEFAULT_VHOST: /",
+	"      RABBITMQ_DEFAULT_USER: guest",
+	"      RABBITMQ_DEFAULT_PASS: guest",
+	"      RABBITMQ_REALTIME_PRIORITY: ${RABBITMQ_REALTIME_PRIORITY:-5}",
+	"      RABBITMQ_PLAYBACK_PRIORITY: ${RABBITMQ_PLAYBACK_PRIORITY:-1}",
+}
+
+// EnsureChuteRabbitMQEnv 幂等保证 chute 服务块的 environment 含 RabbitMQ
+// 连接插值行（只增不删）：新版 chute 镜像启动即校验连接变量，缺失会崩溃
+// 循环。渲染模板已内置这些行，本函数服务于模板更新前已初始化中心的存量
+// Compose；没有 chute 服务时原样跳过（ApplyChuteService 插入的标准块自带，
+// 或等待重新初始化）。environment 行与插值条目的缩进都从文件实际内容推导
+// （既有子条目的缩进优先），手写或重排过的 Compose 不会因缩进差异被静默
+// 跳过或补错位；服务存在但缺 environment 段时自动补段。
+func EnsureChuteRabbitMQEnv(compose string) string {
+	return ensureServiceEnv(compose, ChuteServiceName, chuteRabbitMQEnvLines)
+}
+
+func ensureServiceEnv(compose, service string, entries []string) string {
 	lines := strings.Split(compose, "\n")
-	start := serviceHeaderAt(lines, ingressServiceKey)
+	start := serviceHeaderAt(lines, service)
 	if start < 0 {
-		return compose, nil
+		return compose
 	}
 	hdr := lineIndent(lines[start])
 	end := serviceBlockEnd(lines, start)
@@ -435,7 +442,7 @@ func EnsureIngressPollEnv(compose string) (string, error) {
 				present[trimmed[:idx]] = true
 			}
 		}
-		return ensureEnvEntries(lines, envEnd, entryIndent, present)
+		return ensureChuteEnvEntries(lines, envEnd, entryIndent, present, entries)
 	}
 	// 服务块内没有 environment 段：在服务头行之后补一段，字段缩进取块内
 	// 既有字段的实际缩进（无字段行回落模板步长）。
@@ -446,18 +453,18 @@ func EnsureIngressPollEnv(compose string) (string, error) {
 			break
 		}
 	}
-	out := make([]string, 0, len(lines)+len(ingressPollEnvLines)+1)
+	out := make([]string, 0, len(lines)+len(entries)+1)
 	out = append(out, lines[:start+1]...)
 	out = append(out, strings.Repeat(" ", fieldIndent)+"environment:")
 	out = append(out, lines[start+1:]...)
-	return ensureEnvEntries(out, start+2, fieldIndent+2, present)
+	return ensureChuteEnvEntries(out, start+2, fieldIndent+2, present, entries)
 }
 
-// ensureEnvEntries 把缺失的轮询插值行按 entryIndent 插到 at 行之前，
-// 已存在的键（present）只增不删。
-func ensureEnvEntries(lines []string, at, entryIndent int, present map[string]bool) (string, error) {
-	missing := make([]string, 0, len(ingressPollEnvLines))
-	for _, want := range ingressPollEnvLines {
+// ensureChuteEnvEntries 把缺失的环境插值行按 entryIndent 插到 at 行
+// 之前，已存在的键（present）只增不删。
+func ensureChuteEnvEntries(lines []string, at, entryIndent int, present map[string]bool, entries []string) string {
+	missing := make([]string, 0, len(entries))
+	for _, want := range entries {
 		trimmed := strings.TrimSpace(want)
 		key := trimmed[:strings.Index(trimmed, ":")]
 		if !present[key] {
@@ -465,13 +472,13 @@ func ensureEnvEntries(lines []string, at, entryIndent int, present map[string]bo
 		}
 	}
 	if len(missing) == 0 {
-		return strings.Join(lines, "\n"), nil
+		return strings.Join(lines, "\n")
 	}
 	out := make([]string, 0, len(lines)+len(missing))
 	out = append(out, lines[:at]...)
 	out = append(out, reindentTo(missing, entryIndent)...)
 	out = append(out, lines[at:]...)
-	return strings.Join(out, "\n"), nil
+	return strings.Join(out, "\n")
 }
 
 func envKeyOf(line string) string {
@@ -485,16 +492,14 @@ func envKeyOf(line string) string {
 	return line[:idx]
 }
 
-// ApplyMisSortModuleEnv 幂等维护 module.env 中由中心 WMS 设置托管的变量：
-// 启用时写入三个变量，关闭时移除；用户自行添加的其它行与注释保持不动。
-// CV_ORGAN_CODE 已不再配置，但仍按托管变量清理旧版本写入的存量行，
-// 让两服务回落 Compose 插值默认值。
+// ApplyMisSortModuleEnv manages WMS credentials and the ingress polling switch.
+// Disabled polling falls back to 0; obsolete organ codes are removed.
 func ApplyMisSortModuleEnv(env string, opts MisSortOptions) string {
 	managed := map[string]bool{
-		"CV_CAMERA_POLL_ENABLED": true,
 		"CV_WMS_URL":             true,
-		"CV_ORGAN_CODE":          true,
 		"CV_MIS_AUTH":            true,
+		"CV_ORGAN_CODE":          true,
+		"CV_CAMERA_POLL_ENABLED": true,
 	}
 	lines := strings.Split(env, "\n")
 	kept := make([]string, 0, len(lines))
@@ -510,9 +515,8 @@ func ApplyMisSortModuleEnv(env string, opts MisSortOptions) string {
 	result := strings.TrimRight(strings.Join(kept, "\n"), "\n ")
 	if opts.Enabled {
 		block := misSortEnvMarker + "\n" +
-			"CV_CAMERA_POLL_ENABLED=1\n" +
 			"CV_WMS_URL=" + opts.WMSURL + "\n" +
-			"CV_MIS_AUTH=" + opts.MisAuth
+			"CV_MIS_AUTH=" + opts.MisAuth + "\nCV_CAMERA_POLL_ENABLED=1"
 		if result == "" {
 			result = block
 		} else {
@@ -523,4 +527,46 @@ func ApplyMisSortModuleEnv(env string, opts MisSortOptions) string {
 		result = "# Module-specific Compose variables"
 	}
 	return result + "\n"
+}
+
+// EnsureIngressPollEnv fills missing environment entries without replacing existing values.
+func EnsureIngressPollEnv(compose string) string {
+	return ensureServiceEnv(compose, "center-cv-ingress", []string{
+		"      CV_CAMERA_POLL_ENABLED: ${CV_CAMERA_POLL_ENABLED:-0}",
+		"      CV_WMS_URL: ${CV_WMS_URL:-http://10.21.61.48:31995}",
+		"      CV_MIS_AUTH: ${CV_MIS_AUTH:-20260606123a}",
+		"      CV_CAMERA_CONFIG_PATH: ${CV_CAMERA_CONFIG_PATH:-/missort/api/cameraConfig/query}",
+		"      CV_CAMERA_POLL_INTERVAL_SECONDS: ${CV_CAMERA_POLL_INTERVAL_SECONDS:-300}",
+		"      CV_CAMERA_CONFIG_TIMEOUT_MS: ${CV_CAMERA_CONFIG_TIMEOUT_MS:-5000}",
+		"      CHUTE_VERIFICATION_URL: ${CHUTE_VERIFICATION_URL:-http://127.0.0.1:8091}",
+		"      CV_DEVICE_SYNC_INTERVAL_SECONDS: ${CV_DEVICE_SYNC_INTERVAL_SECONDS:-5}",
+	})
+}
+
+// EnsureAlarmWMSEnv fills missing environment entries without replacing existing values.
+func EnsureAlarmWMSEnv(compose string) string {
+	return ensureServiceEnv(compose, "center-alarm-service", []string{
+		"      CV_WMS_URL: ${CV_WMS_URL:-http://10.21.61.48:31995}",
+		"      CV_MIS_AUTH: ${CV_MIS_AUTH:-20260606123a}",
+	})
+}
+
+// RemoveChutePollingEnv removes obsolete mapping entries from the verification service.
+func RemoveChutePollingEnv(compose string) string {
+	lines := strings.Split(compose, "\n")
+	start := serviceHeaderAt(lines, ChuteServiceName)
+	if start < 0 {
+		return compose
+	}
+	end := serviceBlockEnd(lines, start)
+	out := append([]string{}, lines[:start+1]...)
+	for _, line := range lines[start+1 : end] {
+		key, _, ok := strings.Cut(strings.TrimSpace(line), ":")
+		if ok && (key == "CV_WMS_URL" || key == "CV_ORGAN_CODE" || strings.HasPrefix(key, "CV_CAMERA_") || strings.HasPrefix(key, "CV_TASK_INGRESS_")) {
+			continue
+		}
+		out = append(out, line)
+	}
+	out = append(out, lines[end:]...)
+	return strings.Join(out, "\n")
 }

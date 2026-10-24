@@ -3,14 +3,14 @@
 groups:
   - name: gpu-resources
     rules:
-      - alert: NvidiaGpuUtilHigh
-        expr: (DCGM_FI_DEV_GPU_UTIL{job="nvidia-dcgm"} > 99) and (DCGM_FI_DEV_GPU_UTIL{job="nvidia-dcgm"} <= 100)
-        for: 30m
-        labels:
-          severity: warning
-        annotations:
-          summary: NVIDIA GPU SM 利用率持续偏高
-          description: 'GPU {{ $labels.gpu }} SM 利用率 {{ printf "%.1f" $value }}%，超过 99% 持续 30 分钟。'
+      # - alert: NvidiaGpuUtilHigh
+      #   expr: (DCGM_FI_DEV_GPU_UTIL{job="nvidia-dcgm"} > 99) and (DCGM_FI_DEV_GPU_UTIL{job="nvidia-dcgm"} <= 100)
+      #   for: 30m
+      #   labels:
+      #     severity: warning
+      #   annotations:
+      #     summary: NVIDIA GPU SM 利用率持续偏高
+      #     description: 'GPU {{ $labels.gpu }} SM 利用率 {{ printf "%.1f" $value }}%，超过 99% 持续 30 分钟。'
 
       - alert: NvidiaGpuDecoderUtilHigh
         expr: (DCGM_FI_DEV_DEC_UTIL{job="nvidia-dcgm"} > 99) and (DCGM_FI_DEV_DEC_UTIL{job="nvidia-dcgm"} <= 100)

@@ -41,7 +41,7 @@ func SetDirectory(dir string) error {
 	if err != nil {
 		return err
 	}
-	for _, name := range []string{"compose", "nginx", "monitoring", "secrets", "modules"} {
+	for _, name := range []string{"compose", "monitoring", "secrets", "modules"} {
 		info, err := os.Stat(filepath.Join(root, name))
 		if err != nil {
 			return fmt.Errorf("读取模板目录 %s: %w", name, err)
@@ -68,14 +68,6 @@ func composeForMode(mode string) string {
 	return fmt.Sprintf("docker-compose.%s.yml", mode)
 }
 
-// nginxForMode 返回指定模式的 nginx 配置文件名。
-func nginxForMode(mode string) string {
-	if mode == "business" {
-		return "nginx.conf"
-	}
-	return "nginx.full.conf"
-}
-
 // prometheusForMode 返回指定模式的 prometheus 配置文件名。
 func prometheusForMode(mode string) string {
 	if mode == "tensorrt" {
@@ -96,11 +88,11 @@ func SpecsForMode(mode string) ([]FileSpec, error) {
 		TargetPath: composeForMode(mode),
 	})
 
-	// 2. nginx 配置
-	nginxName := nginxForMode(mode)
+	// 2. nginx 配置：与模块化 gateway 共用同一份源文件（物理唯一，避免
+	// 双份内容漂移），legacy 落地为 nginx/nginx.conf 供 compose 相对挂载。
 	specs = append(specs, FileSpec{
-		EmbedPath:  filepath.Join("nginx", nginxName),
-		TargetPath: filepath.Join("nginx", nginxName),
+		EmbedPath:  filepath.Join("modules", "gateway", "nginx", "nginx.conf"),
+		TargetPath: filepath.Join("nginx", "nginx.conf"),
 	})
 
 	// 3. nginx Basic Auth 凭据文件（nginx.conf 的 /elasticsearch/ 反代依赖它，缺失会导致 nginx 启动失败）

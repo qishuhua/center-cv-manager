@@ -20,14 +20,18 @@ func TestRenderModulesChuteAlwaysPresent(t *testing.T) {
 	if !strings.Contains(compose, "chute-verification-service:") || !strings.Contains(compose, "${CV_WMS_URL:-http://10.21.61.48:31995}") {
 		t.Fatal("错分审核服务应无条件渲染并带插值默认值")
 	}
+	if !strings.Contains(compose, "RABBITMQ_DEFAULT_VHOST: /") {
+		t.Fatal("chute 服务应带 RabbitMQ 连接环境（新版镜像启动即校验）")
+	}
 	if !strings.Contains(compose, "CV_CAMERA_POLL_ENABLED: ${CV_CAMERA_POLL_ENABLED:-0}") {
-		t.Fatal("ingress 轮询插值行缺失")
+		t.Fatal("ingress 应包含默认关闭的轮询插值")
 	}
 	if strings.Contains(env, "CV_WMS_URL=") || !strings.HasPrefix(env, "# Module-specific Compose variables") {
 		t.Fatal("未开启错分检测时 module.env 应为注释桩")
 	}
 
-	// 开启错分检测：块不变，module.env 写入轮询开关与两项取值（机构编码不配置）。
+	// 开启错分检测：块不变，module.env 写入 WMS、共享鉴权与轮询开关
+	//（机构编码不配置）。
 	base.WMSURL, base.MisAuth, base.MisSortEnabled = "http://10.21.61.48:31995", "20260606123a", true
 	files, err = RenderModules("denglin", base)
 	if err != nil {
@@ -38,16 +42,16 @@ func TestRenderModulesChuteAlwaysPresent(t *testing.T) {
 		t.Fatal("配置 WMS 后错分审核服务应在")
 	}
 	for _, line := range []string{
-		"CV_CAMERA_POLL_ENABLED=1",
 		"CV_WMS_URL=http://10.21.61.48:31995",
 		"CV_MIS_AUTH=20260606123a",
+		"CV_CAMERA_POLL_ENABLED=1",
 	} {
 		if !strings.Contains(env, line) {
 			t.Fatalf("module.env 缺少 %s", line)
 		}
 	}
 	if strings.Contains(env, "CV_ORGAN_CODE=") {
-		t.Fatal("机构编码不再配置，module.env 不应写 CV_ORGAN_CODE")
+		t.Fatal("机构编码不再配置，module.env 不应写入")
 	}
 
 	// 配置保留但开关关闭：module.env 同样回落注释桩（wms_url 留存于中心
@@ -146,7 +150,7 @@ func TestApplyMisSortModuleEnv(t *testing.T) {
 }
 
 // TestMisSortSyncOnLegacyCompose 模拟模板演进前初始化的极老中心 business
-// Compose（无转码服务、无 ingress），错分同步的三步模板操作必须全部成功
+// Compose（无转码服务、无 ingress），错分同步的模板操作必须全部成功
 // 且幂等——WMS 配置同步不应被任何模板版本差异阻断。
 func TestMisSortSyncOnLegacyCompose(t *testing.T) {
 	legacy := strings.Join([]string{
@@ -163,10 +167,6 @@ func TestMisSortSyncOnLegacyCompose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("老 Compose 添加 chute 服务失败: %v", err)
 	}
-	compose, err = EnsureIngressPollEnv(compose)
-	if err != nil {
-		t.Fatalf("老 Compose 补轮询插值失败: %v", err)
-	}
 	chuteIdx := strings.Index(compose, "  chute-verification-service:")
 	networksIdx := strings.Index(compose, "\nnetworks:")
 	if chuteIdx < 0 || networksIdx < chuteIdx {
@@ -176,12 +176,12 @@ func TestMisSortSyncOnLegacyCompose(t *testing.T) {
 	if !strings.Contains(env, "CV_WMS_URL=http://h:1") {
 		t.Fatal("module.env 应写入 WMS 取值")
 	}
+	if !strings.Contains(env, "CV_CAMERA_POLL_ENABLED=1") {
+		t.Fatal("启用时应写入轮询开关")
+	}
 	// 全链路幂等。
 	if again, err := ApplyChuteService(compose, "/srv/logs"); err != nil || again != compose {
 		t.Fatal("chute 服务应用应幂等")
-	}
-	if again, err := EnsureIngressPollEnv(compose); err != nil || again != compose {
-		t.Fatal("轮询插值应用应幂等")
 	}
 	if again := ApplyMisSortModuleEnv(env, MisSortOptions{Enabled: true, WMSURL: "http://h:1", MisAuth: "a"}); again != env {
 		t.Fatal("module.env 应用应幂等")
@@ -301,54 +301,66 @@ func TestApplyChuteServiceNonStandardIndent(t *testing.T) {
 	}
 }
 
-// TestEnsureIngressPollEnvNonStandardIndent 验证轮询插值补齐对非 2 空格
-// 缩进的 ingress 服务同样生效（此前按 2/4/6 空格精确匹配会静默跳过）。
-func TestEnsureIngressPollEnvNonStandardIndent(t *testing.T) {
+// TestEnsureChuteRabbitMQEnv 验证存量 chute 服务块的 RabbitMQ 连接插值行
+// 幂等补齐（只增不删）：模板渲染结果已含全部行（跳过）、老块缺行补齐、
+// 非 2 空格缩进同样生效、没有 chute 服务原样跳过。
+func TestEnsureChuteRabbitMQEnv(t *testing.T) {
+	files, err := RenderModules("nvidia", RenderOptions{Workers: 2, CPUSets: []string{"2,4"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	compose := files["business/compose.yml"]
+	if patched := EnsureChuteRabbitMQEnv(compose); patched != compose {
+		t.Fatal("模板渲染结果应已包含全部 RabbitMQ 插值行")
+	}
+	// 模板演进前初始化的存量块：剥掉 RabbitMQ 行后补齐并幂等。
+	stale := strings.ReplaceAll(compose, "      RABBITMQ_DEFAULT_VHOST: /\n", "")
+	stale = strings.ReplaceAll(stale, "      RABBITMQ_DEFAULT_USER: guest\n", "")
+	stale = strings.ReplaceAll(stale, "      RABBITMQ_DEFAULT_PASS: guest\n", "")
+	stale = strings.ReplaceAll(stale, "      RABBITMQ_REALTIME_PRIORITY: ${RABBITMQ_REALTIME_PRIORITY:-5}\n", "")
+	stale = strings.ReplaceAll(stale, "      RABBITMQ_PLAYBACK_PRIORITY: ${RABBITMQ_PLAYBACK_PRIORITY:-1}\n", "")
+	patched := EnsureChuteRabbitMQEnv(stale)
+	for _, want := range []string{
+		"      RABBITMQ_DEFAULT_VHOST: /",
+		"      RABBITMQ_DEFAULT_PASS: guest",
+		"      RABBITMQ_PLAYBACK_PRIORITY: ${RABBITMQ_PLAYBACK_PRIORITY:-1}",
+	} {
+		if !strings.Contains(patched, want) {
+			t.Fatalf("缺失的插值行应被补齐（缺 %s）:\n%s", want, patched)
+		}
+	}
+	if again := EnsureChuteRabbitMQEnv(patched); again != patched {
+		t.Fatal("补齐后应幂等")
+	}
+	// 已存在的键（如手工改过的凭据）只增不删。
+	custom := strings.ReplaceAll(patched, "RABBITMQ_DEFAULT_USER: guest", "RABBITMQ_DEFAULT_USER: admin")
+	if out := EnsureChuteRabbitMQEnv(custom); !strings.Contains(out, "RABBITMQ_DEFAULT_USER: admin") || strings.Count(out, "RABBITMQ_DEFAULT_USER:") != 1 {
+		t.Fatalf("已存在的变量不应被改动:\n%s", out)
+	}
+	// 非 2 空格缩进的手写块：按实际缩进补齐并保持合法 YAML。
 	wide := strings.Join([]string{
 		"services:",
-		"    center-cv-ingress:",
-		"        image: center-cv-ingress:latest",
+		"    chute-verification-service:",
+		"        image: chute-verification-service:latest",
 		"        environment:",
-		"            CV_ORGAN_CODE: 637101",
+		"            CV_LISTEN_HOST: 127.0.0.1",
 		"",
 		"networks:",
 		"    default:",
 		"",
 	}, "\n")
-	patched, err := EnsureIngressPollEnv(wide)
-	if err != nil {
-		t.Fatal(err)
+	wide = EnsureChuteRabbitMQEnv(wide)
+	if !strings.Contains(wide, "            RABBITMQ_DEFAULT_VHOST: /") {
+		t.Fatalf("插值行应按 12 空格缩进补齐:\n%s", wide)
 	}
-	for _, want := range []string{
-		"            CV_CAMERA_POLL_ENABLED: ${CV_CAMERA_POLL_ENABLED:-0}",
-		"            CV_WMS_URL: ${CV_WMS_URL:-}",
-	} {
-		if !strings.Contains(patched, want) {
-			t.Fatalf("插值行应按 8 空格缩进补齐（缺 %s）:\n%s", want, patched)
-		}
+	if again := EnsureChuteRabbitMQEnv(wide); again != wide {
+		t.Fatal("非标准缩进补齐后应幂等")
 	}
-	if strings.Count(patched, "CV_ORGAN_CODE:") != 1 {
-		t.Fatalf("已存在的变量不应被改动:\n%s", patched)
+	assertValidYAML(t, wide)
+	// 没有 chute 服务：原样跳过，不报错。
+	if out := EnsureChuteRabbitMQEnv("services:\n  other:\n    image: x\n"); out != "services:\n  other:\n    image: x\n" {
+		t.Fatal("缺少 chute 服务应原样跳过")
 	}
-	if again, err := EnsureIngressPollEnv(patched); err != nil || again != patched {
-		t.Fatal("补齐后应幂等")
-	}
-	assertValidYAML(t, patched)
-
-	// 无 environment 段：按实际缩进自动补段（字段在 8 空格，条目在 10）。
-	bare := "services:\n    center-cv-ingress:\n        image: x\n"
-	patched, err = EnsureIngressPollEnv(bare)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(patched, "        environment:") ||
-		!strings.Contains(patched, "          CV_CAMERA_POLL_ENABLED: ${CV_CAMERA_POLL_ENABLED:-0}") {
-		t.Fatalf("无 environment 段时应按块内字段缩进补段:\n%s", patched)
-	}
-	if again, err := EnsureIngressPollEnv(patched); err != nil || again != patched {
-		t.Fatal("补段后应幂等")
-	}
-	assertValidYAML(t, patched)
 }
 
 func assertChuteInServices(t *testing.T, compose string) {
@@ -369,48 +381,53 @@ func assertValidYAML(t *testing.T, compose string) map[string]any {
 	return services
 }
 
-func TestEnsureIngressPollEnv(t *testing.T) {
-	files, err := RenderModules("nvidia", RenderOptions{Workers: 2, CPUSets: []string{"2,4"}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	compose := files["business/compose.yml"]
-	if patched, err := EnsureIngressPollEnv(compose); err != nil || patched != compose {
-		t.Fatal("模板渲染结果应已包含全部插值行")
-	}
-	stripped := strings.Split(compose, "\n")
-	kept := []string{}
-	for _, line := range stripped {
-		if strings.HasPrefix(line, "      CV_CAMERA_POLL_ENABLED:") {
-			continue
+func TestPollingMigration(t *testing.T) {
+	for _, platform := range []string{"nvidia", "denglin"} {
+		files, err := RenderModules(platform, RenderOptions{Workers: 1, CPUSets: []string{"2,4"}})
+		if err != nil {
+			t.Fatal(err)
 		}
-		kept = append(kept, line)
+		compose := files["business/compose.yml"]
+		services := assertValidYAML(t, compose)
+		for _, name := range []string{"center-cv-ingress", "center-alarm-service"} {
+			env := services[name].(map[string]any)["environment"].(map[string]any)
+			if env["CV_WMS_URL"] == nil || env["CV_MIS_AUTH"] == nil {
+				t.Fatalf("%s missing WMS settings", name)
+			}
+		}
+		chute := services[ChuteServiceName].(map[string]any)["environment"].(map[string]any)
+		if chute["CV_WMS_URL"] != nil || chute["CV_ORGAN_CODE"] != nil || chute["CV_CAMERA_POLL_ENABLED"] != nil {
+			t.Fatal("obsolete chute settings")
+		}
+		if EnsureIngressPollEnv(compose) != compose || EnsureAlarmWMSEnv(compose) != compose {
+			t.Fatal("templates must already contain migration entries")
+		}
 	}
-	patched, err := EnsureIngressPollEnv(strings.Join(kept, "\n"))
-	if err != nil {
-		t.Fatal(err)
+	stale := "services:\n    center-cv-ingress:\n        image: custom\n        environment:\n            CV_WMS_URL: http://custom\n    chute-verification-service:\n        environment:\n            CV_CAMERA_POLL_ENABLED: 1\n            CV_WMS_URL: http://old\n            CV_MIS_AUTH: custom\n    center-alarm-service:\n        image: custom\n"
+	migrate := func(s string) string { return EnsureAlarmWMSEnv(EnsureIngressPollEnv(RemoveChutePollingEnv(s))) }
+	patched := migrate(stale)
+	if migrate(patched) != patched {
+		t.Fatal("migration must be idempotent")
 	}
-	if !strings.Contains(patched, "CV_CAMERA_POLL_ENABLED: ${CV_CAMERA_POLL_ENABLED:-0}") {
-		t.Fatal("缺失的插值行应被补齐")
+	services := assertValidYAML(t, patched)
+	ingress := services["center-cv-ingress"].(map[string]any)["environment"].(map[string]any)
+	if ingress["CV_WMS_URL"] != "http://custom" {
+		t.Fatal("custom WMS must be preserved")
 	}
-	if again, err := EnsureIngressPollEnv(patched); err != nil || again != patched {
-		t.Fatal("补齐后应幂等")
+	chute := services[ChuteServiceName].(map[string]any)["environment"].(map[string]any)
+	if chute["CV_CAMERA_POLL_ENABLED"] != nil || chute["CV_MIS_AUTH"] != "custom" {
+		t.Fatal("chute migration failed")
 	}
-	// 老版本模板没有 ingress 服务：静默跳过（无服务即无轮询可配），
-	// 原样返回不报错、不阻断 WMS 同步。
-	if skipped, err := EnsureIngressPollEnv("services:\n  other:\n    image: x\n"); err != nil || skipped != "services:\n  other:\n    image: x\n" {
-		t.Fatal("缺少 ingress 服务应原样跳过")
+	missing := "services:\n  other:\n    image: x\n"
+	if migrate(missing) != missing {
+		t.Fatal("missing services must be skipped")
 	}
-	// 有 ingress 服务但没有 environment 段：自动补段并插入全部插值行。
-	bare := "services:\n  center-cv-ingress:\n    image: center-cv-ingress:latest\n"
-	patched, err = EnsureIngressPollEnv(bare)
-	if err != nil {
-		t.Fatal(err)
+	enabled := ApplyMisSortModuleEnv("CUSTOM=keep\nCV_CAMERA_POLL_ENABLED=0\n", MisSortOptions{Enabled: true, WMSURL: "http://wms", MisAuth: "auth"})
+	if strings.Count(enabled, "CV_CAMERA_POLL_ENABLED=") != 1 || !strings.Contains(enabled, "CV_CAMERA_POLL_ENABLED=1") {
+		t.Fatal("enable must replace stale switch")
 	}
-	if !strings.Contains(patched, "    environment:") || !strings.Contains(patched, "CV_CAMERA_POLL_ENABLED: ${CV_CAMERA_POLL_ENABLED:-0}") {
-		t.Fatalf("无 environment 段时应自动补段:\n%s", patched)
-	}
-	if again, err := EnsureIngressPollEnv(patched); err != nil || again != patched {
-		t.Fatal("补段后应幂等")
+	disabled := ApplyMisSortModuleEnv(enabled, MisSortOptions{})
+	if strings.Contains(disabled, "CV_CAMERA_POLL_ENABLED=") || !strings.Contains(disabled, "CUSTOM=keep") {
+		t.Fatal("disable must remove managed switch only")
 	}
 }

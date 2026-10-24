@@ -17,12 +17,12 @@ import (
 const chuteReadyURL = "http://127.0.0.1:8091/readyz"
 
 // ApplyBusinessSettings 把中心的业务模块托管设置幂等同步到远端：
-// module.env 维护三组托管变量——错分检测（wms_url/mis_auth，机构编码不再
-// 配置，两服务用 Compose 插值默认值）、Debug 模式（LOG_LEVEL=debug）与
-// 存图（CV_SAVE_DEBUG_IMAGE=1），compose.yml 增删错分审核服务块、补齐
-// ingress 轮询插值行与 Worker 公共环境锚点的 LOG_LEVEL/CV_SAVE_DEBUG_IMAGE
-// 插值行。写入只置 ConfigChanged 等待整体发布生效，不会启动或停止容器；
-// 调用方需先持久化中心字段。legacy 中心不支持。
+// module.env 维护三组托管变量——错分检测（WMS 地址、共享鉴权、ingress 轮询开关）、
+// Debug 模式（LOG_LEVEL=debug）与存图（CV_SAVE_DEBUG_IMAGE=1），
+// compose.yml 增删错分审核服务块、补齐其 RabbitMQ 连接插值行与 Worker
+// 公共环境锚点的 LOG_LEVEL/CV_SAVE_DEBUG_IMAGE 插值行。写入只置
+// ConfigChanged 等待整体发布生效，不会启动或停止容器；调用方需先持久化
+// 中心字段。legacy 中心不支持。
 func (s *Service) ApplyBusinessSettings(ctx context.Context, centerID string) error {
 	return centerlock.Within(ctx, centerID, func(ctx context.Context) error {
 		remote, c, err := s.connect(centerID)
@@ -60,16 +60,18 @@ func (s *Service) ApplyBusinessSettings(ctx context.Context, centerID string) er
 		if err != nil {
 			return err
 		}
-		if newCompose, err = templates.EnsureIngressPollEnv(newCompose); err != nil {
-			return err
-		}
+		// 新版 chute 镜像启动即校验 RabbitMQ 连接变量，存量块只增不删补齐。
+		newCompose = templates.EnsureChuteRabbitMQEnv(newCompose)
+		newCompose = templates.RemoveChutePollingEnv(newCompose)
+		newCompose = templates.EnsureIngressPollEnv(newCompose)
+		newCompose = templates.EnsureAlarmWMSEnv(newCompose)
 		newCompose = templates.EnsureWorkerLogLevelEnv(newCompose)
-	newCompose = templates.EnsureWorkerSaveImageEnv(newCompose)
+		newCompose = templates.EnsureWorkerSaveImageEnv(newCompose)
 		newEnv := templates.ApplyMisSortModuleEnv(oldEnv, templates.MisSortOptions{
 			Enabled: enabled, WMSURL: c.WMSURL, MisAuth: c.MisAuth,
 		})
 		newEnv = templates.ApplyLogLevelModuleEnv(newEnv, c.DebugLogEnabled)
-	newEnv = templates.ApplySaveImageModuleEnv(newEnv, c.SaveImageEnabled)
+		newEnv = templates.ApplySaveImageModuleEnv(newEnv, c.SaveImageEnabled)
 		composeChanged := newCompose != oldCompose
 		envChanged := newEnv != oldEnv
 		if composeChanged || envChanged {

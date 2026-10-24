@@ -6,7 +6,7 @@ import (
 )
 
 func TestApplyLogLevelModuleEnv(t *testing.T) {
-	base := "# Module-specific Compose variables\nRABBITMQ_REALTIME_PRIORITY=5\n\n" + misSortEnvMarker + "\nCV_CAMERA_POLL_ENABLED=1\nCV_WMS_URL=http://wms\nCV_MIS_AUTH=auth\n"
+	base := "# Module-specific Compose variables\nRABBITMQ_REALTIME_PRIORITY=5\n\n" + misSortEnvMarker + "\nCV_WMS_URL=http://wms\nCV_MIS_AUTH=auth\n"
 
 	// 开启调试：追加托管块，既有行（含错分检测托管块）不动。
 	on := ApplyLogLevelModuleEnv(base, true)

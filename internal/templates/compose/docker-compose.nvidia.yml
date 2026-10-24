@@ -81,7 +81,7 @@ services:
     restart: unless-stopped
     network_mode: host
     volumes:
-      - ./nginx/nginx.full.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./secrets/grafana-logs.htpasswd:/etc/nginx/secrets/grafana-logs.htpasswd:ro
     depends_on:
       center-cv-ingress:
@@ -183,6 +183,14 @@ services:
         soft: 65535
         hard: 65535
     environment:
+      CV_CAMERA_POLL_ENABLED: ${CV_CAMERA_POLL_ENABLED:-0}
+      CV_WMS_URL: ${CV_WMS_URL:-http://10.21.61.48:31995}
+      CV_MIS_AUTH: ${CV_MIS_AUTH:-20260606123a}
+      CV_CAMERA_CONFIG_PATH: ${CV_CAMERA_CONFIG_PATH:-/missort/api/cameraConfig/query}
+      CV_CAMERA_POLL_INTERVAL_SECONDS: ${CV_CAMERA_POLL_INTERVAL_SECONDS:-300}
+      CV_CAMERA_CONFIG_TIMEOUT_MS: ${CV_CAMERA_CONFIG_TIMEOUT_MS:-5000}
+      CHUTE_VERIFICATION_URL: ${CHUTE_VERIFICATION_URL:-http://127.0.0.1:8091}
+      CV_DEVICE_SYNC_INTERVAL_SECONDS: ${CV_DEVICE_SYNC_INTERVAL_SECONDS:-5}
       # Priority mapping is shared with worker alarm publishers.
       RABBITMQ_REALTIME_PRIORITY: ${RABBITMQ_REALTIME_PRIORITY:-5}
       RABBITMQ_PLAYBACK_PRIORITY: ${RABBITMQ_PLAYBACK_PRIORITY:-1}
