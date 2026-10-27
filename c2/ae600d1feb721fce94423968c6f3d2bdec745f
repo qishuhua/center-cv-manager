@@ -1,0 +1,111 @@
+internal/templates/modules/business/compose.denglin.yml
+  s_2f24e9005de2b1::t_6b76635981e520 178-185
+  s_2f24e9005de2b1::t_aa3ca8a9922e7c 139-141,148,152
+  s_2f24e9005de2b1::t_2a5601bd9383e8 149-151
+  s_2f24e9005de2b1::t_58f5f28a4771a6 10,13-15
+  s_2f24e9005de2b1::t_868c0a2da82ce8 11-12
+internal/api/software_build_test.go
+  s_2f24e9005de2b1::t_cb43a01a2f18c3 49-50,62-76
+  s_2f24e9005de2b1::t_8a0a3956a5e9fc 77
+web/src/App.vue
+  s_2f24e9005de2b1::t_c7bf5cfaabd000 73
+  s_2f24e9005de2b1::t_035ef33f4fb9dd 440-441,444,453-465
+  s_2f24e9005de2b1::t_f73701b2853eb0 646
+  s_2f24e9005de2b1::t_cc5cd9a940f98a 764-766,774,776
+  s_2f24e9005de2b1::t_f767ad26551ada 24
+  s_2f24e9005de2b1::t_fb3bec9df9a81c 466
+internal/templates/modules/business/compose.nvidia.yml
+  s_2f24e9005de2b1::t_0a2d2b0f29f30f 11-12
+  s_2f24e9005de2b1::t_61567af87dc217 139-141,148,152
+  s_2f24e9005de2b1::t_ad89590d596f43 10,13-15
+  s_2f24e9005de2b1::t_0a92bf537565e9 149-151
+  s_2f24e9005de2b1::t_8a33a18fd37d45 178-185
+internal/modular/remote_test.go
+  s_2f24e9005de2b1::t_d0a36e659a1e87 75,77-78,80-81
+internal/templates/monitoring/alerting/rules/services.yml
+  s_2f24e9005de2b1::t_e9bcc55366387b 66
+  s_2f24e9005de2b1::t_30601d02825530 38
+internal/api/software_build.go
+  s_2f24e9005de2b1::t_ddb6249a65cb79 188-192,194
+  s_2f24e9005de2b1::t_b787599f82c16b 89-92,100-101,103-113,134-148,150-152,154-156,158-161,163,166-176,179-184,187,193,195-204
+  s_2f24e9005de2b1::t_55188612160a9b 149,153,157,162
+internal/templates/modules_test.go
+  s_2f24e9005de2b1::t_d9d3f8ec1acdc5 51
+  s_2f24e9005de2b1::t_9de9804bf23052 52-53
+CLAUDE.md
+  s_2f24e9005de2b1::t_a1486d1af5a5c8 67
+  s_2f24e9005de2b1::t_e3e0160acc2a1b 84
+  s_2f24e9005de2b1::t_a37406fbb293cb 73
+internal/modular/config.go
+  s_2f24e9005de2b1::t_84d6cf785adb2c 38-39
+  s_2f24e9005de2b1::t_123b2e8a630e7d 40
+  s_2f24e9005de2b1::t_49a1ba969ae2c5 41
+internal/templates/missort_test.go
+  s_2f24e9005de2b1::t_e57a035c1459ec 13
+  s_2f24e9005de2b1::t_26292ba5f0cb00 25-29
+  s_2f24e9005de2b1::t_e0125e016962e1 113-114,116-117,120,123
+  s_2f24e9005de2b1::t_bc9a91565d2af8 128,136-141,160,163,166,170,174,178,187,191
+  s_2f24e9005de2b1::t_c1eb06db063a41 14
+  s_2f24e9005de2b1::t_fd83115e6e1f0b 22-24
+  s_2f24e9005de2b1::t_22b83c90412c29 30
+  s_2f24e9005de2b1::t_0bbed2d6ffa65b 112
+  s_2f24e9005de2b1::t_378f8446266f7d 121-122
+  s_2f24e9005de2b1::t_d783a509e7f7b0 124-127
+  s_2f24e9005de2b1::t_cc810d020c140d 129
+  s_2f24e9005de2b1::t_0a955489e3ad02 142-144
+  s_2f24e9005de2b1::t_4d6f795dc6502e 161-162
+  s_2f24e9005de2b1::t_c57e9c4cacaaf4 164-165
+  s_2f24e9005de2b1::t_571c0d1e7c786c 167-169
+  s_2f24e9005de2b1::t_08ba8679be8156 171-173
+  s_2f24e9005de2b1::t_f115009c35e304 175-177
+  s_2f24e9005de2b1::t_d2b01610b36fc5 179-181,184-186
+  s_2f24e9005de2b1::t_f34743690d52e8 188-190
+  s_2f24e9005de2b1::t_c74224c8497d06 192-194
+  s_2f24e9005de2b1::t_f67757a6ce47fb 10,20-21,36-37,101-104,145,148,182-183,195-196
+internal/templates/modules/gateway/nginx/nginx.conf
+  s_2f24e9005de2b1::t_ff17836f737727 85-91,96
+internal/templates/missort.go
+  s_2f24e9005de2b1::t_568bf9f887d20c 3,10-11
+  s_2f24e9005de2b1::t_f22a5498f9a4ea 5
+  s_2f24e9005de2b1::t_662d7cee1e828e 224-225
+  s_2f24e9005de2b1::t_d761b3537e335b 74-78
+  s_2f24e9005de2b1::t_3e5df883204fd3 118,133,136-138
+  s_2f24e9005de2b1::t_48164e52933323 231-241
+  s_2f24e9005de2b1::t_6ce85ae11af08d 6-9
+  s_2f24e9005de2b1::t_c52ce5d365745a 79
+  s_2f24e9005de2b1::t_9d658ee0230fbb 223
+  s_2f24e9005de2b1::t_978737cf6b547d 226-230
+  s_2f24e9005de2b1::t_5d44fb26d137f0 168-172,208-210,219
+internal/provision/wms.go
+  s_2f24e9005de2b1::t_1c595556297608 16
+  s_2f24e9005de2b1::t_369d6a01b34376 121
+  s_2f24e9005de2b1::t_2c2677be21e540 17-19
+  s_2f24e9005de2b1::t_38fc0cdf56079b 85,89
+  s_2f24e9005de2b1::t_d37a9a5dc6462f 97
+  s_2f24e9005de2b1::t_aec1ea1b1145a8 57
+  s_2f24e9005de2b1::t_4e7f37145f4dd9 20-22
+  s_2f24e9005de2b1::t_3f45dff45037bd 58
+  s_2f24e9005de2b1::t_67e06b35fd9f34 56
+internal/templates/modules/monitoring/alerting/rules/services.yml
+  s_2f24e9005de2b1::t_1b01b45b403204 66
+  s_2f24e9005de2b1::t_d323de552f5e33 38
+internal/center/service.go
+  s_2f24e9005de2b1::t_bd383de7443d08 145
+  s_2f24e9005de2b1::t_65f0479cbd390f 144
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "c2ae600d1feb721fce94423968c6f3d2bdec745f",
+  "prompts": {},
+  "sessions": {
+    "s_2f24e9005de2b1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7df16b56-7854-4848-ac13-5b6834bbfa5e",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
