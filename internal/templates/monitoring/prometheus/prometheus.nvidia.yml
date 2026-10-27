@@ -131,8 +131,6 @@ scrape_configs:
         labels: {name: "center-cv-service-7"}
       - targets: ["http://127.0.0.1:8090/readyz"]
         labels: {name: "center-cv-ingress"}
-      - targets: ["http://127.0.0.1:8091/readyz"]
-        labels: {name: "chute-verification-service"}
       - targets: ["http://127.0.0.1:8092/readyz"]
         labels: {name: "video-transcode-service"}
     relabel_configs:

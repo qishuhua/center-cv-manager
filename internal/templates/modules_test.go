@@ -48,18 +48,9 @@ func TestIndependentModuleTemplates(t *testing.T) {
 					}
 				}
 				if id == "business" {
-					// 2 workers + ingress + chute（始终部署）+ transcode + alarm。
-					if len(services) != 6 {
-						t.Fatalf("expected 2 workers + ingress + chute + transcode + alarm, got %d", len(services))
-					}
-					alarm := services["center-alarm-service"].(map[string]any)
-					labels, ok := alarm["labels"].(map[string]any)
-					if !ok || labels["com.center-manager.image.repository"] != "center-alarm-service" {
-						t.Fatal("center-alarm-service must carry its repository label")
-					}
-					chute := services["chute-verification-service"].(map[string]any)
-					if chuteLabels, ok := chute["labels"].(map[string]any); !ok || chuteLabels["com.center-manager.image.repository"] != "chute-verification-service" {
-						t.Fatal("chute-verification-service must carry its repository label")
+					// 2 workers + ingress + transcode。
+					if len(services) != 4 {
+						t.Fatalf("expected 2 workers + ingress + transcode, got %d", len(services))
 					}
 					if !strings.Contains(files[id+"/compose.yml"], "/home/test/data/models") {
 						t.Fatal("model mount not rendered")

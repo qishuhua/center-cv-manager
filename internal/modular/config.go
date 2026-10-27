@@ -35,10 +35,10 @@ func NewDeployment(composeFile string, workers int) *domain.Deployment {
 				m.ModelServices = append(m.ModelServices, fmt.Sprintf("center-cv-service-%d", i))
 				m.ReadyURLs = append(m.ReadyURLs, fmt.Sprintf("http://127.0.0.1:%d/api/readyz", 8181+i))
 			}
-			m.ReadyURLs = append(m.ReadyURLs, "http://127.0.0.1:8090/readyz", "http://127.0.0.1:8092/readyz", "http://127.0.0.1:8093/readyz")
-			// 错分审核服务按中心 WMS 配置条件部署；Wait 会在服务不在本次
-			// 操作范围时过滤该探活（remote.go），未启用的中心不受影响。
-			m.ReadyURLs = append(m.ReadyURLs, "http://127.0.0.1:8091/readyz")
+			// ingress（8090）/transcode（8092）就绪探活。错分检测由 ingress
+			// 计划落格 ZeroMQ + Worker 本地核验承接，告警上报由 transcode
+			// 直接完成。
+			m.ReadyURLs = append(m.ReadyURLs, "http://127.0.0.1:8090/readyz", "http://127.0.0.1:8092/readyz")
 		case "gateway":
 			// 网关独立于业务：仅反代、不构成启动/就绪依赖（业务停止时网关
 			// 502 属预期调试场景）。存量中心的旧依赖由 store 一次性迁移摘除。
@@ -259,12 +259,8 @@ func ReadyURLsForServices(m domain.ComposeModule, services []string) []string {
 		switch name {
 		case "center-cv-ingress":
 			ports["8090"] = true
-		case "chute-verification-service":
-			ports["8091"] = true
 		case "video-transcode-service":
 			ports["8092"] = true
-		case "center-alarm-service":
-			ports["8093"] = true
 		default:
 			if strings.HasPrefix(name, "center-cv-service-") {
 				if index, err := strconv.Atoi(strings.TrimPrefix(name, "center-cv-service-")); err == nil {

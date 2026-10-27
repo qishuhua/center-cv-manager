@@ -26,19 +26,6 @@ filebeat.inputs:
     fields_under_root: true
 
   - type: filestream
-    id: chute-verification-service-business-logs-v1
-    enabled: true
-    paths:
-      - /data/logs/chute-verification-service.log
-      - /data/logs/chute-verification-service.*.log
-      - /data/logs/chute-verification-service-*.log
-      - /data/logs/chute-verification-service-*.*.log
-    fields:
-      service.name: chute-verification-service
-      event.dataset: chute-verification-service
-    fields_under_root: true
-
-  - type: filestream
     id: video-transcode-service-business-logs-v1
     enabled: true
     paths:
@@ -49,21 +36,6 @@ filebeat.inputs:
     fields:
       service.name: video-transcode-service
       event.dataset: video-transcode-service
-    fields_under_root: true
-
-  - type: filestream
-    id: center-alarm-service-business-logs-v1
-    enabled: true
-    paths:
-      # 主日志文件无扩展名（与转码服务同款 spdlog 行为），需显式列出。
-      - /data/logs/center-alarm-service
-      - /data/logs/center-alarm-service.log
-      - /data/logs/center-alarm-service.*.log
-      - /data/logs/center-alarm-service-*.log
-      - /data/logs/center-alarm-service-*.*.log
-    fields:
-      service.name: center-alarm-service
-      event.dataset: center-alarm-service
     fields_under_root: true
 
 processors:

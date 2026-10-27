@@ -21,7 +21,7 @@ interface ModelReleasePlan {ready:boolean;error?:string;action:'blocked'|'skip'|
 interface DeploymentPlan {service_mappings?:Record<string,string[]>;center:Center;ready:boolean;build_required:boolean;error?:string;images:Record<string,string>;missing_images:string[];missing_services:string[];model_plan:ModelReleasePlan}
 interface CenterSoftwareRow {key:string;source?:Source;current:OverviewVersion[]}
 interface SourcePublishDialog {visible:boolean;source:Source|null;selectedKey:string;loading:boolean}
-interface ImageManageDialog {visible:boolean;loading:boolean;images:SoftwareImage[];deleting:string}
+interface ImageManageDialog {visible:boolean;loading:boolean;images:SoftwareImage[];selected:SoftwareImage[];deleting:string}
 interface CenterModelRow {model:string;current?:CurrentModelVersion;options:ModelVersion[]}
 
 const section=ref('overview'),loading=ref(false),centers=ref<Center[]>([]),sources=ref<Source[]>([]),tasks=ref<Task[]>([])
@@ -70,7 +70,7 @@ const centerModelSelections=reactive<Record<string,string>>({})
 const sourcePublishDialog=reactive<SourcePublishDialog>({visible:false,source:null,selectedKey:'',loading:false})
 const centerRegistryVersions=ref<RegistrySourceVersions[]>([]),centerRegistryError=ref('')
 const centerSoftwareSelections=reactive<Record<string,string>>({})
-const imageManageDialog=reactive<ImageManageDialog>({visible:false,loading:false,images:[],deleting:''})
+const imageManageDialog=reactive<ImageManageDialog>({visible:false,loading:false,images:[],selected:[],deleting:''})
 const centerVersionApplying=ref(''),centerVersionApplyingCenter=ref(''),centerPinBusy=ref('')
 const centerReleaseTask=ref<Task|null>(null),centerReleaseLogs=ref<string[]>([]),centerReleaseTitle=ref(''),centerReleaseStage=ref(''),centerReleaseProgress=ref(0),centerReleaseMessage=ref(''),centerReleaseError=ref('')
 let centerReleaseWorkflowID=0
@@ -437,11 +437,11 @@ async function submitSourcePublish(){
 const fmtImageTime=(ts:number)=>ts?new Date(ts*1000).toLocaleString():'-'
 // 对中心只存在"镜像版本"概念：ref 与 commit 合并展示为镜像版本主体
 const imageVersionLabel=(ref?:string,commit?:string)=>ref?(commit?`${ref}-${commit.slice(0,8)}`:ref):'-'
-async function loadCenterSoftwareImages(){const centerID=activeCenterOverview.value?.center.id;if(!centerID)return;imageManageDialog.loading=true;try{const data=await http.get(`/centers/${centerID}/software/images`);imageManageDialog.images=Array.isArray(data)?data:[]}catch(e:any){imageManageDialog.images=[];ElMessage.error(e.message)}finally{imageManageDialog.loading=false}}
-function openImageManage(){imageManageDialog.images=[];imageManageDialog.visible=true;loadCenterSoftwareImages()}
+async function loadCenterSoftwareImages(){const centerID=activeCenterOverview.value?.center.id;if(!centerID)return;imageManageDialog.loading=true;imageManageDialog.selected=[];try{const data=await http.get(`/centers/${centerID}/software/images`);imageManageDialog.images=Array.isArray(data)?data:[]}catch(e:any){imageManageDialog.images=[];ElMessage.error(e.message)}finally{imageManageDialog.loading=false}}
+function openImageManage(){imageManageDialog.images=[];imageManageDialog.selected=[];imageManageDialog.visible=true;loadCenterSoftwareImages()}
 async function removeCenterSoftwareImage(img:SoftwareImage){
   const centerID=activeCenterOverview.value?.center.id
-  if(!guardAdminAction()||!centerID||img.in_use)return
+  if(!guardAdminAction()||!centerID||img.in_use||imageManageDialog.deleting)return
   try{
     await ElMessageBox.confirm(`确定删除镜像 ${img.image}（构建于 ${fmtImageTime(img.created_at)}）？删除后需要重新构建才能再次发布该版本。`,'删除镜像',{type:'warning',confirmButtonText:'删除',cancelButtonText:'取消',closeOnClickModal:false})
     imageManageDialog.deleting=img.id
@@ -449,6 +449,20 @@ async function removeCenterSoftwareImage(img:SoftwareImage){
     ElMessage.success('镜像已删除')
     await loadCenterSoftwareImages()
   }catch(e:any){if(e!=='cancel'&&e!=='close')ElMessage.error(e.message)}finally{imageManageDialog.deleting=''}
+}
+// 多选批量删除：后端先整体校验（来源标签、容器占用），任一镜像不满足
+// 条件全部不删除并逐条返回原因；部分删除失败时提示已删数量并刷新列表。
+async function removeCenterSoftwareImages(){
+  const centerID=activeCenterOverview.value?.center.id,targets=imageManageDialog.selected
+  if(!guardAdminAction()||!centerID||imageManageDialog.deleting)return
+  if(!targets.length)return
+  try{
+    await ElMessageBox.confirm(`确定删除所选的 ${targets.length} 个镜像？删除后需要重新构建才能再次发布对应版本。`,'删除镜像',{type:'warning',confirmButtonText:'删除',cancelButtonText:'取消',closeOnClickModal:false})
+    imageManageDialog.deleting='batch'
+    await http.delete(`/centers/${centerID}/software/images`,{ids:targets.map(item=>item.id)})
+    ElMessage.success(`已删除 ${targets.length} 个镜像`)
+    await loadCenterSoftwareImages()
+  }catch(e:any){if(e!=='cancel'&&e!=='close'){ElMessage.error(e.message);await loadCenterSoftwareImages()}}finally{imageManageDialog.deleting=''}
 }
 async function toggleCenterModelPin(){if(!guardAdminAction())return;const centerID=activeCenterOverview.value?.center.id,pinned=centerModelSetPinned.value;if(!centerID)return;try{if(pinned)await ElMessageBox.confirm('解绑后才能新增、删除或切换任一模型版本，确定整体解绑？','解绑模型版本组',{type:'warning',confirmButtonText:'确认解绑',cancelButtonText:'取消'});else await ElMessageBox.confirm(`将固定当前 ${deployedCenterModels.value.length} 个模型组成的版本快照。固定后任何模型调整都必须先整体解绑，是否继续？`,'固定模型版本组',{type:'warning',confirmButtonText:'固定当前版本组',cancelButtonText:'取消'});centerPinBusy.value='model-set';await http.put(`/centers/${centerID}/models/pin`,{pinned:!pinned});ElMessage.success(pinned?'模型版本组已解绑':'当前模型版本组已固定');await refreshActiveCenterOverview()}catch(e:any){if(e!=='cancel'&&e!=='close')ElMessage.error(e.message)}finally{centerPinBusy.value=''}}
 function invalidateDeploymentPlan(){deploymentPlan.value=[]}
@@ -629,7 +643,7 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
       <el-form-item label="告警控制"><el-switch v-model="centerForm.test_mode"/><div class="form-tip">开启后该中心的管理端飞书通知全部静默：软件/模型/统一发布的开始与结束、初始化开始与结果、暂停/恢复、模型固定/解绑等；同时不纳入统一监控探测（失联告警静默）。中心侧监控告警不受影响。</div></el-form-item>
       <el-form-item label="Debug 模式"><el-switch v-model="centerForm.debug_log_enabled"/><div class="form-tip">开启后业务 Worker（center-cv-service）日志等级切换为 debug（LOG_LEVEL 环境变量），关闭恢复默认 info。仅模块化中心支持；排障时临时开启，日志量会显著增大。修改后需在模块管理中整体发布 business 模块生效。</div></el-form-item>
       <el-form-item label="存图"><el-switch v-model="centerForm.save_image_enabled"/><div class="form-tip">开启后业务 Worker（center-cv-service）每轮推理保存调试图片（原始帧与带检测框结果帧，CV_SAVE_DEBUG_IMAGE 环境变量），关闭恢复默认不存图。仅模块化中心支持；持续写盘、占存储，排障时临时开启。修改后需在模块管理中整体发布 business 模块生效。</div></el-form-item>
-      <el-form-item label="错分检测"><el-switch v-model="misSortEnabled" @change="onMisSortToggle"/><div class="form-tip">开关控制错分核验的 WMS 参数同步：开启后落格核验服务（chute）使用此处的 WMS 地址与鉴权发送结果；关闭后配置保留，重新打开即可恢复，未启用时服务使用模板默认 WMS 参数。落格核验服务始终部署；错分任务不再经 ingress 摄像机轮询创建。需在软件仓库发布 chute-verification-service 镜像。配置修改后需在模块管理中整体发布 business 模块生效。</div></el-form-item>
+      <el-form-item label="错分检测"><el-switch v-model="misSortEnabled" @change="onMisSortToggle"/><div class="form-tip">开关由 ingress 统一控制错分检测：开启后 ingress 启动摄像机配置轮询（自动创建错分任务）并经 ZeroMQ 向 Worker 广播计划落格事件，Worker 本地核验，告警由 video-transcode 直接上报业务系统；WMS 地址与鉴权仅供 ingress 轮询使用。关闭后配置保留，重新打开即可恢复，未启用时轮询不启动。配置修改后需在模块管理中整体发布 business 模块生效。</div></el-form-item>
       <template v-if="misSortEnabled">
         <el-form-item label="WMS 服务地址"><el-input v-model="centerForm.wms_url" placeholder="请输入 WMS 服务基地址，含协议、主机和端口，不含路径"/><div class="form-tip">WMS 基础地址，仅协议、主机和端口；具体接口路径由服务自动拼接。</div></el-form-item>
         <el-form-item label="WMS 鉴权 misAuth"><el-input v-model="centerForm.mis_auth" placeholder="留空使用默认 20260606123a"/><div class="form-tip">落格核验服务使用的 misAuth 请求头，已预填公开约定默认值，站点不同时再修改。</div></el-form-item>
@@ -747,8 +761,9 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
     <template #footer><el-button @click="sourceVersionsDialog.visible=false">关闭</el-button></template>
   </el-dialog>
   <el-dialog v-model="imageManageDialog.visible" title="管理业务镜像" width="min(1120px,96vw)" append-to-body :close-on-click-modal="false">
-    <div class="panel-title"><div><h3>中心已构建镜像</h3><p>仅显示本管理端构建的业务镜像，按构建时间倒序；被容器使用的镜像不可删除。</p></div><el-button :icon="Refresh" :disabled="imageManageDialog.loading" @click="loadCenterSoftwareImages">刷新</el-button></div>
-    <el-table :data="imageManageDialog.images" v-loading="imageManageDialog.loading" empty-text="该中心尚无本管理端构建的业务镜像" max-height="420">
+    <div class="panel-title"><div><h3>中心已构建镜像</h3><p>仅显示本管理端构建的业务镜像，按构建时间倒序；可勾选多个批量删除，被容器使用的镜像不可勾选。</p></div><el-button :icon="Refresh" :disabled="imageManageDialog.loading" @click="loadCenterSoftwareImages">刷新</el-button></div>
+    <el-table :data="imageManageDialog.images" row-key="id" v-loading="imageManageDialog.loading" empty-text="该中心尚无本管理端构建的业务镜像" max-height="420" @selection-change="(rows:SoftwareImage[])=>imageManageDialog.selected=rows">
+      <el-table-column type="selection" width="48" :selectable="(row:SoftwareImage)=>!row.in_use"/>
       <el-table-column label="软件" min-width="120" show-overflow-tooltip><template #default="{row}"><strong>{{row.source_name||row.source_id}}</strong></template></el-table-column>
       <el-table-column label="版本" min-width="110" show-overflow-tooltip><template #default="{row}">{{row.ref}}</template></el-table-column>
       <el-table-column label="Commit" width="115"><template #default="{row}"><code>{{row.commit?.slice(0,12)||'-'}}</code></template></el-table-column>
@@ -756,8 +771,9 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
       <el-table-column label="构建时间" width="160"><template #default="{row}">{{fmtImageTime(row.created_at)}}</template></el-table-column>
       <el-table-column label="大小" width="90"><template #default="{row}">{{formatBytes(row.size)}}</template></el-table-column>
       <el-table-column label="状态" width="95"><template #default="{row}"><el-tooltip v-if="row.in_use" content="镜像正被容器引用（含已停止容器），不能删除" placement="top"><el-tag size="small" type="success">使用中</el-tag></el-tooltip><el-tag v-else size="small" type="info">可删除</el-tag></template></el-table-column>
-      <el-table-column label="操作" width="85"><template #default="{row}"><el-button type="danger" link :disabled="row.in_use" :loading="imageManageDialog.deleting===row.id" @click="removeCenterSoftwareImage(row)">删除</el-button></template></el-table-column>
+      <el-table-column label="操作" width="85"><template #default="{row}"><el-button type="danger" link :disabled="row.in_use||imageManageDialog.deleting==='batch'" :loading="imageManageDialog.deleting===row.id" @click="removeCenterSoftwareImage(row)">删除</el-button></template></el-table-column>
     </el-table>
+    <template #footer><el-button :disabled="imageManageDialog.deleting!==''" @click="imageManageDialog.visible=false">关闭</el-button><el-button type="danger" :disabled="!imageManageDialog.selected.length||imageManageDialog.deleting!==''&&imageManageDialog.deleting!=='batch'" :loading="imageManageDialog.deleting==='batch'" @click="removeCenterSoftwareImages()">删除选中{{imageManageDialog.selected.length?`（${imageManageDialog.selected.length}）`:''}}</el-button></template>
   </el-dialog>
   <el-dialog v-model="centerOperationDialog" width="min(980px,94vw)" append-to-body :close-on-click-modal="false" class="center-operation-dialog" @closed="closeCenterOperationStream">
     <template #header>

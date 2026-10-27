@@ -72,35 +72,12 @@ func TestInspectRequiresEveryServiceAndSuccessfulInit(t *testing.T) {
 	}
 }
 
-func TestWaitSkipsAbsentOptionalChuteProbe(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`[]`))
-	}))
-	defer server.Close()
-	cli, err := client.NewClientWithOpts(client.WithHost(server.URL), client.WithVersion("1.47"), client.WithHTTPClient(server.Client()))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cli.Close()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	m := domain.ComposeModule{ID: "business", Project: "center-cv-business"}
-	if err := Wait(ctx, &sshx.DockerClient{Client: cli}, m, nil, []string{"http://127.0.0.1:8091/readyz"}); err != nil {
-		t.Fatal(err)
-	}
-	// 默认部署固定携带错分审核服务探活；服务未部署时由 Wait 过滤兜底。
+func TestBusinessReadyURLsForServices(t *testing.T) {
 	business := NewDeployment("/tmp/deploy/compose.yml", 1).Modules[2]
-	found := false
-	for _, u := range business.ReadyURLs {
-		if strings.Contains(u, ":8091/") {
-			found = true
-		}
+	if got := ReadyURLsForServices(business, []string{"video-transcode-service"}); got[0] != "http://127.0.0.1:8092/readyz" {
+		t.Fatalf("video-transcode-service should map to its 8092 readyz probe, got %v", got)
 	}
-	if !found {
-		t.Fatal("default deployment should carry the optional chute service probe")
-	}
-	if ReadyURLsForServices(business, []string{"center-alarm-service"})[0] != "http://127.0.0.1:8093/readyz" {
-		t.Fatal("center-alarm-service should map to its 8093 readyz probe")
+	if got := ReadyURLsForServices(business, []string{"center-cv-ingress"}); got[0] != "http://127.0.0.1:8090/readyz" {
+		t.Fatalf("center-cv-ingress should map to its 8090 readyz probe, got %v", got)
 	}
 }

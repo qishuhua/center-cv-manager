@@ -46,7 +46,8 @@ func TestSoftwareImagesRouteRequiresAuth(t *testing.T) {
 }
 
 func TestDeleteSoftwareImageRequiresSelection(t *testing.T) {
-	for _, body := range []string{"", `{}`, `{"id":""}`, `{"id":"  "}`} {
+	// 单镜像 {id} 与批量 {ids} 入参都允许，但全部为空（含纯空白）必须 400。
+	for _, body := range []string{"", `{}`, `{"id":""}`, `{"id":"  "}`, `{"ids":[]}`, `{"ids":["","  "]}`, `{"id":"","ids":[""]}`} {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "c1"}}
@@ -56,5 +57,21 @@ func TestDeleteSoftwareImageRequiresSelection(t *testing.T) {
 		if w.Code != 400 {
 			t.Fatalf("body %q: got %d %s", body, w.Code, w.Body.String())
 		}
+	}
+}
+
+func TestShortImageID(t *testing.T) {
+	for _, item := range []struct{ in, want string }{
+		{"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "0123456789ab"},
+		{"sha256:short", "short"},
+		{"0123456789abcdef", "0123456789ab"},
+		{"", ""},
+	} {
+		if got := shortImageID(item.in); got != item.want {
+			t.Fatalf("shortImageID(%q) = %q, want %q", item.in, got, item.want)
+		}
+	}
+	if label := imageLabel("sha256:0123456789ab", []string{"cv/center:v1", "cv/center:v2"}); label != "cv/center:v1" {
+		t.Fatalf("imageLabel 优先仓库标签失败: %q", label)
 	}
 }

@@ -141,8 +141,8 @@ func (s *Service) Save(input domain.Center) (domain.Center, error) {
 	if input.ComposeFile == "" {
 		input.ComposeFile = centerpath.DefaultComposeFile
 	}
-	// 与两服务 CV_WMS_URL 口径一致：去掉首尾空白与尾斜杠后入库。
-	// 机构编码不再配置：两服务用 Compose 插值默认值（chute 637101）。
+	// 与 ingress 的 CV_WMS_URL 口径一致：去掉首尾空白与尾斜杠后入库。
+	// 机构编码不再配置：错分链路不再读取该值。
 	input.WMSURL = strings.TrimRight(strings.TrimSpace(input.WMSURL), "/")
 	input.MisAuth = strings.TrimSpace(input.MisAuth)
 	// misAuth 留空时使用公开约定默认值（上游 Compose 同值），写入 module.env 时始终显式。

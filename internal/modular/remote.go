@@ -126,25 +126,6 @@ func Inspect(ctx context.Context, remote *sshx.DockerClient, m domain.ComposeMod
 }
 
 func Wait(ctx context.Context, remote *sshx.DockerClient, m domain.ComposeModule, services []string, urls []string) error {
-	// Older built-in deployments included the optional chute service probe.
-	// Keep custom probes, but do not wait on a service absent from this operation.
-	if m.ID == "business" {
-		hasChute := false
-		for _, service := range services {
-			if service == "chute-verification-service" {
-				hasChute = true
-			}
-		}
-		if !hasChute {
-			filtered := make([]string, 0, len(urls))
-			for _, u := range urls {
-				if u != "http://127.0.0.1:8091/readyz" {
-					filtered = append(filtered, u)
-				}
-			}
-			urls = filtered
-		}
-	}
 	timeout := m.Timeout
 	if timeout < 10 {
 		timeout = 600

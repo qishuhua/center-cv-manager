@@ -49,10 +49,6 @@ scrape_configs:
     metrics_path: /metrics
     static_configs:
       - targets: ["127.0.0.1:8092"]
-  - job_name: center-alarm-service
-    metrics_path: /metrics
-    static_configs:
-      - targets: ["127.0.0.1:8093"]
   - job_name: rabbitmq
     metrics_path: /metrics
     static_configs:
@@ -108,8 +104,6 @@ scrape_configs:
         labels: {service: "center-cv-ingress"}
       - targets: ["http://127.0.0.1:8092/readyz"]
         labels: {service: "video-transcode-service"}
-      - targets: ["http://127.0.0.1:8093/readyz"]
-        labels: {service: "center-alarm-service"}
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -141,12 +135,8 @@ scrape_configs:
         labels: {name: "center-cv-service-7"}
       - targets: ["http://127.0.0.1:8090/readyz"]
         labels: {name: "center-cv-ingress"}
-      - targets: ["http://127.0.0.1:8091/readyz"]
-        labels: {name: "chute-verification-service"}
       - targets: ["http://127.0.0.1:8092/readyz"]
         labels: {name: "video-transcode-service"}
-      - targets: ["http://127.0.0.1:8093/readyz"]
-        labels: {name: "center-alarm-service"}
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
