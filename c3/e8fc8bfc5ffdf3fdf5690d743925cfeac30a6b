@@ -1,0 +1,31 @@
+internal/templates/modules/business/compose.nvidia.yml
+  s_bebe868fb9ea1c::t_fc7e2337125397 180-186
+internal/templates/modules/business/compose.denglin.yml
+  s_bebe868fb9ea1c::t_bd3b1473472491 180-186
+internal/templates/missort.go
+  s_bebe868fb9ea1c::t_010cce75a95f70 169-172
+  s_bebe868fb9ea1c::t_334f7f3c88bcdb 232-236
+internal/provision/wms.go
+  s_bebe868fb9ea1c::t_3b522d7ea2fa51 18-19
+CLAUDE.md
+  s_bebe868fb9ea1c::t_48cbbae27581f2 84
+  s_bebe868fb9ea1c::t_9c4d4ad21a8602 73
+web/src/App.vue
+  s_bebe868fb9ea1c::t_a9382752d96e2e 648
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "c3e8fc8bfc5ffdf3fdf5690d743925cfeac30a6b",
+  "prompts": {},
+  "sessions": {
+    "s_bebe868fb9ea1c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a50db7fa-e190-4c0e-a39c-55008c5ee3dc",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
