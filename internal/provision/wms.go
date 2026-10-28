@@ -15,7 +15,8 @@ import (
 // ApplyBusinessSettings 把中心的业务模块托管设置幂等同步到远端：
 // module.env 维护三组托管变量——错分检测（WMS 地址、共享鉴权、ingress 轮询
 // 开关，错分由 ingress 统一控制：开关打开即启动摄像机轮询与计划落格
-// ZeroMQ 广播，Worker 订阅本地核验，告警由 video-transcode 直接上报）、
+// ZeroMQ 广播，Worker 订阅本地核验；9/10 核验结果由 video-transcode 读
+// WMS 地址与鉴权直发 missort 接收端，普通告警走业务回调）、
 // Debug 模式（LOG_LEVEL=debug）、存图（CV_SAVE_DEBUG_IMAGE=1）与
 // 飞书告警测试（TEST_ALARM_ENABLED、FEISHU_WEBHOOK_URL）。
 // compose.yml 的错分/告警插值行经 Ensure* 幂等兜底（防远端手工删改）。

@@ -177,8 +177,13 @@ services:
       HTTP_PORT: "8092"
       TEST_ALARM_ENABLED: ${TEST_ALARM_ENABLED:-false}
       FEISHU_WEBHOOK_URL: ${FEISHU_WEBHOOK_URL:-}
-      # 告警上报地址（错分 9/10 类核验结果作为 detectResult 字段随同一回调
-      # 上报，不单独走地址）：按每条消息的 env 字段在 UAT/PRO 两套间选择。
+      # 错分 9/10 核验结果不经业务回调，直发 WMS missort 接收端：
+      # POST {CV_WMS_URL}/missort/api/detectResult/receive，misAuth 头取
+      # CV_MIS_AUTH。与 ingress 共用 module.env 同名托管变量；空默认无害——
+      # 源码默认空串，仅 9/10 消息需要，错分开启时 module.env 必有值。
+      CV_WMS_URL: ${CV_WMS_URL:-}
+      CV_MIS_AUTH: ${CV_MIS_AUTH:-}
+      # 普通告警上报地址：按每条消息的 env 字段在 UAT/PRO 两套间选择。
       # 插值默认与源码内置值一致——不能写成 ${VAR:-} 空默认，空串会经环境
       # 变量覆盖掉源码内置地址。
       CV_PRO_POST_API: ${CV_PRO_POST_API:-https://jmsgw.jtexpress.com.cn/businessplan/aiVideoAnalysis/v2/algorithmCallBack}

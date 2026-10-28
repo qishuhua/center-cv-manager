@@ -166,10 +166,10 @@ func envKeyOf(line string) string {
 }
 
 // ApplyMisSortModuleEnv 维护 module.env 的错分托管块：启用时写入 WMS 地址、
-// 共享鉴权与 ingress 轮询开关（错分检测由 ingress 统一控制；告警上报由
-// video-transcode 直接完成、不读这些变量）；关闭时移除托管变量，回落
-// Compose 插值默认值（轮询 0、WMS/鉴权取模板默认）。历史遗留的机构编码
-// 行一并清理。
+// 共享鉴权与 ingress 轮询开关（错分检测由 ingress 统一控制；WMS 地址与
+// 鉴权由 ingress 轮询和 video-transcode 的 9/10 核验直发共用）；关闭时
+// 移除托管变量，回落 Compose 插值默认值（轮询 0、WMS/鉴权为空，9/10
+// 核验上报随之失效）。历史遗留的机构编码行一并清理。
 func ApplyMisSortModuleEnv(env string, opts MisSortOptions) string {
 	managed := map[string]bool{
 		"CV_WMS_URL":             true,
@@ -229,10 +229,11 @@ func EnsureWorkerZMQEnv(compose string) string {
 }
 
 // EnsureTranscodeAlarmEnv 幂等保证转码服务的 environment 含告警上报地址
-// 插值行（只增不删）：错分 9/10 类核验结果作为 detectResult 字段随同一
-// 回调上报，地址按消息 env 在 UAT/PRO 两套间选择。插值默认与源码内置值
-// 一致（getenv 读到空串会覆盖内置地址，不能留空默认）；存量中心经错分
-// 同步补齐，改地址走 module.env 同名变量覆盖。
+// 插值行（只增不删）：普通告警按消息 env 在 UAT/PRO 两套间选择回调地址
+// （错分 9/10 核验结果不经此处，直发 CV_WMS_URL 拼接的 missort 接收端，
+// 由模板 transcode 侧 CV_WMS_URL/CV_MIS_AUTH 插值行取值）。插值默认与
+// 源码内置值一致（getenv 读到空串会覆盖内置地址，不能留空默认）；改地址
+// 走 module.env 同名变量覆盖。
 func EnsureTranscodeAlarmEnv(compose string) string {
 	return ensureServiceEnv(compose, "video-transcode-service", []string{
 		"      CV_PRO_POST_API: ${CV_PRO_POST_API:-https://jmsgw.jtexpress.com.cn/businessplan/aiVideoAnalysis/v2/algorithmCallBack}",
