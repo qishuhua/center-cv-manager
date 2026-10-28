@@ -1,0 +1,57 @@
+internal/api/server.go
+  s_3c999ec41b773a::t_1fdfcd45e794f8 249
+internal/center/service.go
+  s_3c999ec41b773a::t_8f21a966679299 89-104,164-169,182-184,195-197,226-230,240,361-365,376-378
+internal/center/testalarm_test.go
+  s_3c999ec41b773a::t_f673d82e8fc1b5 1-46
+internal/domain/models.go
+  s_f1f7cf30f59647::t_98f72d48d670d1 40-46,71-83
+internal/provision/service.go
+  s_3c999ec41b773a::t_c84d01a4fff2d3 218-221,227
+internal/provision/wms.go
+  s_3c999ec41b773a::t_def545080a40dd 19-20,32,62-66,72
+internal/store/sqlite.go
+  s_3c999ec41b773a::t_b1f88d31ebe581 90,134-136,295,306,326,347
+internal/store/sqlite_test.go
+  s_3c999ec41b773a::t_c082c843748980 32-52
+internal/templates/embed.go
+  s_3c999ec41b773a::t_99e4ee28ce399b 225-227
+internal/templates/modules.go
+  s_3c999ec41b773a::t_89a46575b059ea 104
+internal/templates/modules/business/compose.denglin.yml
+  s_3c999ec41b773a::t_7a65b6d19f0f0e 178-179
+internal/templates/modules/business/compose.nvidia.yml
+  s_3c999ec41b773a::t_9f1ef32b87abd8 178-179
+internal/templates/testalarm.go
+  s_3c999ec41b773a::t_9dae36a88c8953 1-40
+internal/templates/testalarm_test.go
+  s_3c999ec41b773a::t_0b622b363a5813 1-43
+web/src/App.vue
+  s_3c999ec41b773a::t_f8e007160346f6 41,292,646-647
+web/src/types.ts
+  s_3c999ec41b773a::t_c68b32dfce6134 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "9ddf6de7bd91804b5287025a5d7c9f6a75d56638",
+  "prompts": {},
+  "sessions": {
+    "s_3c999ec41b773a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17e01-2bba-7a63-91aa-1d38e6132ad9",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_f1f7cf30f59647": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d93f9a33-7899-418f-a5bb-b5ccde11f858",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
