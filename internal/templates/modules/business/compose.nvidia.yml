@@ -175,6 +175,8 @@ services:
       # Keep the management API loopback-only and away from Nginx port 8080.
       HTTP_HOST: 127.0.0.1
       HTTP_PORT: "8092"
+      TEST_ALARM_ENABLED: ${TEST_ALARM_ENABLED:-false}
+      FEISHU_WEBHOOK_URL: ${FEISHU_WEBHOOK_URL:-}
       # 告警上报地址（错分 9/10 类核验结果作为 detectResult 字段随同一回调
       # 上报，不单独走地址）：按每条消息的 env 字段在 UAT/PRO 两套间选择。
       # 插值默认与源码内置值一致——不能写成 ${VAR:-} 空默认，空串会经环境

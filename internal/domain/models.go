@@ -37,10 +37,13 @@ type Center struct {
 	// SaveImageEnabled 开启后业务 Worker（center-cv-service）每轮推理保存
 	// 调试图片（module.env 托管 CV_SAVE_DEBUG_IMAGE）；关闭移除托管值，
 	// 回落 Compose 插值默认 0（不存图）。仅模块化中心支持。
-	SaveImageEnabled bool      `json:"save_image_enabled,omitempty"`
-	TestMode        bool      `json:"test_mode,omitempty"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	SaveImageEnabled bool `json:"save_image_enabled,omitempty"`
+	// 飞书告警测试由 video-transcode 使用，机器人地址加密入库并在接口返回时脱敏。
+	TestAlarmEnabled bool      `json:"test_alarm_enabled,omitempty"`
+	FeishuWebhookURL string    `json:"feishu_webhook_url,omitempty"`
+	TestMode         bool      `json:"test_mode,omitempty"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 // Deployment keeps center paths independent of any individual Compose entry.
@@ -65,19 +68,19 @@ type ModuleMigration struct {
 }
 
 type ComposeModule struct {
-	FilesRevision   string    `json:"files_revision,omitempty"`
-	ConfigChanged   bool      `json:"config_changed,omitempty"`
-	ID              string    `json:"id"`
-	Name            string    `json:"name"`
-	Project         string    `json:"project"`
-	ComposeFile     string    `json:"compose_file"`
-	Enabled         bool      `json:"enabled"`
-	DependsOn       []string  `json:"depends_on"`
-	InitServices    []string  `json:"init_services"`
-	ModelServices   []string  `json:"model_services"`
-	ReadyURLs       []string  `json:"ready_urls"`
-	Timeout         int       `json:"timeout"`
-	Status          string    `json:"status"`
+	FilesRevision string   `json:"files_revision,omitempty"`
+	ConfigChanged bool     `json:"config_changed,omitempty"`
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	Project       string   `json:"project"`
+	ComposeFile   string   `json:"compose_file"`
+	Enabled       bool     `json:"enabled"`
+	DependsOn     []string `json:"depends_on"`
+	InitServices  []string `json:"init_services"`
+	ModelServices []string `json:"model_services"`
+	ReadyURLs     []string `json:"ready_urls"`
+	Timeout       int      `json:"timeout"`
+	Status        string   `json:"status"`
 	// RuntimeStatus 是模块运行状态（healthy/partial/starting/stopped/failed），
 	// 仅由 Compose 列表接口从 deployment 记录回填（该接口的 Status 语义是
 	// 发布状态 published/unpublished/unknown），持久化时恒为空、不入库。

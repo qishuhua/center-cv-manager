@@ -246,7 +246,7 @@ func (s *Server) saveCenter(c *gin.Context) {
 		fail(c, 400, e)
 		return
 	}
-	// 业务模块托管设置（错分检测、Debug 模式）同步到远端 business 模块
+	// 业务模块托管设置（错分检测、Debug 模式、存图、飞书告警测试）同步到远端 business 模块
 	//（module.env + Compose）：保存即幂等同步，不比较新旧值——远端文件
 	// 无变化时只读比对、零写入，而上次同步失败的中心（记录已更新、远端
 	// 仍旧值）在任意一次保存时自动重试，避免漂移被后续"值未变化"的保存

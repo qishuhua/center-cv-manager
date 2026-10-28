@@ -86,6 +86,22 @@ func validate(v domain.Center) error {
 	if err := validatePlainToken("misAuth 鉴权值", v.MisAuth, 512); err != nil {
 		return err
 	}
+	if v.TestAlarmEnabled && v.FeishuWebhookURL == "" {
+		return fmt.Errorf("开启飞书告警测试时必须填写机器人 URL")
+	}
+	return nil
+}
+
+// validateFeishuWebhook 校验中心级机器人地址，避免换行破坏 module.env。
+func validateFeishuWebhook(value string) error {
+	parsed, err := url.ParseRequestURI(value)
+	if err != nil || parsed.Scheme != "https" || parsed.Host != "open.feishu.cn" ||
+		!strings.HasPrefix(parsed.Path, "/open-apis/bot/v2/hook/") ||
+		strings.TrimPrefix(parsed.Path, "/open-apis/bot/v2/hook/") == "" ||
+		parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" ||
+		strings.ContainsAny(value, "\r\n\t ") {
+		return fmt.Errorf("飞书机器人 URL 必须是有效的飞书 Webhook HTTPS 地址")
+	}
 	return nil
 }
 
@@ -145,6 +161,12 @@ func (s *Service) Save(input domain.Center) (domain.Center, error) {
 	// 机构编码不再配置：错分链路不再读取该值。
 	input.WMSURL = strings.TrimRight(strings.TrimSpace(input.WMSURL), "/")
 	input.MisAuth = strings.TrimSpace(input.MisAuth)
+	input.FeishuWebhookURL = strings.TrimSpace(input.FeishuWebhookURL)
+	if input.FeishuWebhookURL != "" && input.FeishuWebhookURL != Mask {
+		if err := validateFeishuWebhook(input.FeishuWebhookURL); err != nil {
+			return domain.Center{}, err
+		}
+	}
 	// misAuth 留空时使用公开约定默认值（上游 Compose 同值），写入 module.env 时始终显式。
 	if input.WMSURL != "" && input.MisAuth == "" {
 		input.MisAuth = defaultMisAuth
@@ -157,6 +179,9 @@ func (s *Service) Save(input domain.Center) (domain.Center, error) {
 	} else {
 		input.ID = uuid.NewString()
 	}
+	if input.TestAlarmEnabled && input.FeishuWebhookURL == Mask && (!exists || old.FeishuWebhookURL == "") {
+		return domain.Center{}, fmt.Errorf("开启飞书告警测试时必须填写机器人 URL")
+	}
 	if exists {
 		if old.Deployment == nil && (input.WMSURL != "" || input.MisAuth != "") {
 			return domain.Center{}, fmt.Errorf("旧中心（未模块化）不支持错分检测配置")
@@ -166,6 +191,9 @@ func (s *Service) Save(input domain.Center) (domain.Center, error) {
 		}
 		if old.Deployment == nil && input.SaveImageEnabled {
 			return domain.Center{}, fmt.Errorf("旧中心（未模块化）不支持存图")
+		}
+		if old.Deployment == nil && input.TestAlarmEnabled {
+			return domain.Center{}, fmt.Errorf("旧中心（未模块化）不支持飞书告警测试")
 		}
 		input.CreatedAt = old.CreatedAt
 		input.Deployment = old.Deployment
@@ -195,6 +223,11 @@ func (s *Service) Save(input domain.Center) (domain.Center, error) {
 		} else {
 			input.Passphrase = s.encrypt(input.Passphrase)
 		}
+		if input.FeishuWebhookURL == "" || input.FeishuWebhookURL == Mask {
+			input.FeishuWebhookURL = old.FeishuWebhookURL
+		} else {
+			input.FeishuWebhookURL = s.encrypt(input.FeishuWebhookURL)
+		}
 		if input.HostKey == "" && input.Host == old.Host && input.Port == old.Port {
 			input.HostKey = old.HostKey
 		}
@@ -204,6 +237,7 @@ func (s *Service) Save(input domain.Center) (domain.Center, error) {
 		input.Password = s.encrypt(input.Password)
 		input.PrivateKey = s.encrypt(input.PrivateKey)
 		input.Passphrase = s.encrypt(input.Passphrase)
+		input.FeishuWebhookURL = s.encrypt(input.FeishuWebhookURL)
 	}
 	input.UpdatedAt = now
 	if err := validate(input); err != nil {
@@ -324,6 +358,11 @@ func (s *Service) encrypt(v string) string {
 	return out
 }
 func (s *Service) decrypt(v string) (string, error) { return s.cipher.Decrypt(v) }
+
+// TestAlarmWebhook 仅供渲染远端业务配置时解密中心级机器人地址。
+func (s *Service) TestAlarmWebhook(v domain.Center) (string, error) {
+	return s.decrypt(v.FeishuWebhookURL)
+}
 func (s *Service) mask(v *domain.Center) {
 	if v.Password != "" {
 		v.Password = Mask
@@ -333,6 +372,9 @@ func (s *Service) mask(v *domain.Center) {
 	}
 	if v.Passphrase != "" {
 		v.Passphrase = Mask
+	}
+	if v.FeishuWebhookURL != "" {
+		v.FeishuWebhookURL = Mask
 	}
 }
 

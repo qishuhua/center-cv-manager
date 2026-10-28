@@ -215,11 +215,16 @@ func (s *Service) Initialize(ctx context.Context, centerID string, r Reporter) e
 	}
 	r.Logf("中心工作目录：%s", centerpath.WorkspaceRoot(composeFile))
 	if stored.Deployment != nil {
+		testAlarmWebhook, decryptErr := s.centers.TestAlarmWebhook(stored)
+		if decryptErr != nil {
+			return fmt.Errorf("解密飞书告警测试机器人地址失败: %w", decryptErr)
+		}
 		return s.prepareModules(ctx, remote, stored, composeFile, accelerator, cpuCount, gpuCount, templates.RenderOptions{
 			Workers: workers, CPUSets: cpuSets, ModelsRoot: modelsRoot, LogsRoot: logsRoot, MediaResourcesRoot: mediaResourcesRoot,
 			ServerName: stored.Name, FeishuWebhook: alertConfig.FeishuWebhook,
 			WMSURL: stored.WMSURL, MisAuth: stored.MisAuth, MisSortEnabled: stored.MisSortEnabled,
 			DebugLogEnabled: stored.DebugLogEnabled, SaveImageEnabled: stored.SaveImageEnabled,
+			TestAlarmEnabled: stored.TestAlarmEnabled, TestAlarmWebhook: testAlarmWebhook,
 		}, r)
 	}
 	if err = templates.Render(mode, root, templates.RenderOptions{

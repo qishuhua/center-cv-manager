@@ -16,7 +16,8 @@ import (
 // module.env 维护三组托管变量——错分检测（WMS 地址、共享鉴权、ingress 轮询
 // 开关，错分由 ingress 统一控制：开关打开即启动摄像机轮询与计划落格
 // ZeroMQ 广播，Worker 订阅本地核验，告警由 video-transcode 直接上报）、
-// Debug 模式（LOG_LEVEL=debug）与存图（CV_SAVE_DEBUG_IMAGE=1）。
+// Debug 模式（LOG_LEVEL=debug）、存图（CV_SAVE_DEBUG_IMAGE=1）与
+// 飞书告警测试（TEST_ALARM_ENABLED、FEISHU_WEBHOOK_URL）。
 // compose.yml 的错分/告警插值行经 Ensure* 幂等兜底（防远端手工删改）。
 // 写入只置 ConfigChanged 等待整体发布生效；调用方需先持久化中心字段。
 // legacy 中心不支持。
@@ -28,7 +29,7 @@ func (s *Service) ApplyBusinessSettings(ctx context.Context, centerID string) er
 		}
 		defer remote.Close()
 		if c.Deployment == nil {
-			return fmt.Errorf("旧中心（未模块化）不支持错分检测、Debug 模式与存图")
+			return fmt.Errorf("旧中心（未模块化）不支持错分检测、Debug 模式、存图与飞书告警测试")
 		}
 		// 初始化未开始或重置后的中心没有远端模块文件；下次初始化渲染会
 		// 直接带上当前配置，无需在此同步。
@@ -58,11 +59,17 @@ func (s *Service) ApplyBusinessSettings(ctx context.Context, centerID string) er
 		newCompose = templates.EnsureTranscodeAlarmEnv(newCompose)
 		newCompose = templates.EnsureWorkerLogLevelEnv(newCompose)
 		newCompose = templates.EnsureWorkerSaveImageEnv(newCompose)
+		newCompose = templates.EnsureTranscodeTestAlarmEnv(newCompose)
+		testAlarmWebhook, decryptErr := s.centers.TestAlarmWebhook(c)
+		if decryptErr != nil {
+			return fmt.Errorf("解密飞书告警测试机器人地址失败: %w", decryptErr)
+		}
 		newEnv := templates.ApplyMisSortModuleEnv(oldEnv, templates.MisSortOptions{
 			Enabled: enabled, WMSURL: c.WMSURL, MisAuth: c.MisAuth,
 		})
 		newEnv = templates.ApplyLogLevelModuleEnv(newEnv, c.DebugLogEnabled)
 		newEnv = templates.ApplySaveImageModuleEnv(newEnv, c.SaveImageEnabled)
+		newEnv = templates.ApplyTestAlarmModuleEnv(newEnv, c.TestAlarmEnabled, testAlarmWebhook)
 		composeChanged := newCompose != oldCompose
 		envChanged := newEnv != oldEnv
 		if composeChanged || envChanged {

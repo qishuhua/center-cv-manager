@@ -29,6 +29,27 @@ func TestEmptyListsAreNotNil(t *testing.T) {
 	}
 }
 
+func TestCenterTestAlarmFieldsRoundTrip(t *testing.T) {
+	st, err := Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	now := time.Now()
+	v := domain.Center{ID: "test-center", Name: "测试中心", Host: "host", Port: 22, ConsolePort: 8080, Username: "root", AuthType: "password", Password: "encrypted", DockerSocket: "/var/run/docker.sock", Accelerator: "auto", ComposeFile: "/srv/deploy/docker-compose.yml", TestAlarmEnabled: true, FeishuWebhookURL: "encrypted-webhook", CreatedAt: now, UpdatedAt: now}
+	if err := st.SaveCenter(v); err != nil {
+		t.Fatal(err)
+	}
+	got, err := st.GetCenter(v.ID)
+	if err != nil || !got.TestAlarmEnabled || got.FeishuWebhookURL != v.FeishuWebhookURL {
+		t.Fatalf("中心告警测试配置读取失败: %#v %v", got, err)
+	}
+	listed, err := st.ListCenters()
+	if err != nil || len(listed) != 1 || !listed[0].TestAlarmEnabled {
+		t.Fatalf("中心列表告警测试配置读取失败: %#v %v", listed, err)
+	}
+}
+
 func TestGitCredentialSchemaUpgradeAndTimeRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "legacy.db")
 	db, err := sql.Open("sqlite", path)
