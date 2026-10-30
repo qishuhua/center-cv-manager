@@ -41,7 +41,7 @@ func RenderModules(platform string, opts RenderOptions) (map[string]string, erro
 		}
 		content = []byte(strings.ReplaceAll(string(content), "\r\n", "\n"))
 		if strings.HasPrefix(rel, "business/compose.") {
-			content, err = renderDynamicWorkers(content, mode, opts.Workers, opts.CPUSets)
+			content, err = renderDynamicWorkers(content, mode, opts.Workers, opts.CPUSets, opts.SingleWorker)
 			if err != nil {
 				return err
 			}
@@ -57,7 +57,7 @@ func RenderModules(platform string, opts RenderOptions) (map[string]string, erro
 			rel = path.Join(path.Dir(rel), "compose.yml")
 		}
 		if strings.HasPrefix(rel, "monitoring/prometheus/prometheus.") {
-			content, err = renderDynamicPrometheus(content, mode, opts.Workers)
+			content, err = renderDynamicPrometheus(content, mode, opts.Workers, opts.SingleWorker)
 			if err != nil {
 				return err
 			}
@@ -101,6 +101,7 @@ func RenderModules(platform string, opts RenderOptions) (map[string]string, erro
 			stub = ApplyMisSortModuleEnv(stub, MisSortOptions{Enabled: opts.WMSURL != "" && opts.MisSortEnabled, WMSURL: opts.WMSURL, MisAuth: opts.MisAuth})
 			stub = ApplyLogLevelModuleEnv(stub, opts.DebugLogEnabled)
 			stub = ApplySaveImageModuleEnv(stub, opts.SaveImageEnabled)
+			stub = ApplyDecodeOnlyModuleEnv(stub, opts.DecodeOnlyEnabled)
 			stub = ApplyTestAlarmModuleEnv(stub, opts.TestAlarmEnabled, opts.TestAlarmWebhook)
 		}
 		files[id+"/module.env"] = stub

@@ -19,6 +19,9 @@ x-worker-environment: &worker-environment
   # 业务存图：中心「存图」开关托管 module.env 的 CV_SAVE_DEBUG_IMAGE，
   # 未写入时回落这里的默认值 0（不存图）。
   CV_SAVE_DEBUG_IMAGE: ${CV_SAVE_DEBUG_IMAGE:-0}
+  # 业务仅解码：中心「仅解码模式」开关托管 module.env 的
+  # CV_DECODE_ONLY_MODE，未写入时回落这里的默认值 0（正常推理）。
+  CV_DECODE_ONLY_MODE: ${CV_DECODE_ONLY_MODE:-0}
 
 x-worker-common: &worker-common
   image: center-cv-service:nvidia

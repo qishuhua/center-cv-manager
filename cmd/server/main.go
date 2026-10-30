@@ -53,6 +53,10 @@ func main() {
 	if e != nil {
 		log.Fatal(e)
 	}
+	// 中心级飞书告警测试机器人地址改为明文保存：一次性解密旧版本加密值。
+	if e = st.MigrateFeishuWebhookPlaintext(cipher); e != nil {
+		log.Fatal(e)
+	}
 	authManager, e := auth.NewManager(abs)
 	if e != nil {
 		log.Fatal(e)

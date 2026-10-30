@@ -92,8 +92,12 @@ func validate(v domain.Center) error {
 	return nil
 }
 
-// validateFeishuWebhook 校验中心级机器人地址，避免换行破坏 module.env。
+// validateFeishuWebhook 校验中心级机器人地址，避免换行破坏 module.env；
+// 空值表示未配置（开关关闭时允许）。
 func validateFeishuWebhook(value string) error {
+	if value == "" {
+		return nil
+	}
 	parsed, err := url.ParseRequestURI(value)
 	if err != nil || parsed.Scheme != "https" || parsed.Host != "open.feishu.cn" ||
 		!strings.HasPrefix(parsed.Path, "/open-apis/bot/v2/hook/") ||
@@ -161,11 +165,10 @@ func (s *Service) Save(input domain.Center) (domain.Center, error) {
 	// 机构编码不再配置：错分链路不再读取该值。
 	input.WMSURL = strings.TrimRight(strings.TrimSpace(input.WMSURL), "/")
 	input.MisAuth = strings.TrimSpace(input.MisAuth)
+	// 机器人地址明文入库、明文返回（不按凭据处理，编辑页直接回显）。
 	input.FeishuWebhookURL = strings.TrimSpace(input.FeishuWebhookURL)
-	if input.FeishuWebhookURL != "" && input.FeishuWebhookURL != Mask {
-		if err := validateFeishuWebhook(input.FeishuWebhookURL); err != nil {
-			return domain.Center{}, err
-		}
+	if err := validateFeishuWebhook(input.FeishuWebhookURL); err != nil {
+		return domain.Center{}, err
 	}
 	// misAuth 留空时使用公开约定默认值（上游 Compose 同值），写入 module.env 时始终显式。
 	if input.WMSURL != "" && input.MisAuth == "" {
@@ -179,9 +182,6 @@ func (s *Service) Save(input domain.Center) (domain.Center, error) {
 	} else {
 		input.ID = uuid.NewString()
 	}
-	if input.TestAlarmEnabled && input.FeishuWebhookURL == Mask && (!exists || old.FeishuWebhookURL == "") {
-		return domain.Center{}, fmt.Errorf("开启飞书告警测试时必须填写机器人 URL")
-	}
 	if exists {
 		if old.Deployment == nil && (input.WMSURL != "" || input.MisAuth != "") {
 			return domain.Center{}, fmt.Errorf("旧中心（未模块化）不支持错分检测配置")
@@ -191,6 +191,18 @@ func (s *Service) Save(input domain.Center) (domain.Center, error) {
 		}
 		if old.Deployment == nil && input.SaveImageEnabled {
 			return domain.Center{}, fmt.Errorf("旧中心（未模块化）不支持存图")
+		}
+		if old.Deployment == nil && input.DecodeOnlyEnabled {
+			return domain.Center{}, fmt.Errorf("旧中心（未模块化）不支持仅解码模式")
+		}
+		if old.Deployment == nil && input.SingleInstanceEnabled {
+			return domain.Center{}, fmt.Errorf("旧中心（未模块化）不支持单实例模式")
+		}
+		// 单实例模式改变 Worker/GPU/CPU 拓扑，与 Worker 数一样只在初始化
+		// 渲染时生效；已初始化中心（preparing/reset 除外，两者都会重新渲染）
+		// 不允许直接切换，需重置后重新初始化。
+		if old.Deployment != nil && old.Deployment.Status != "preparing" && old.Deployment.Status != "reset" && input.SingleInstanceEnabled != old.SingleInstanceEnabled {
+			return domain.Center{}, fmt.Errorf("单实例模式只在初始化部署时生效，已初始化中心不能直接切换；如需更改请先重置中心")
 		}
 		if old.Deployment == nil && input.TestAlarmEnabled {
 			return domain.Center{}, fmt.Errorf("旧中心（未模块化）不支持飞书告警测试")
@@ -223,11 +235,6 @@ func (s *Service) Save(input domain.Center) (domain.Center, error) {
 		} else {
 			input.Passphrase = s.encrypt(input.Passphrase)
 		}
-		if input.FeishuWebhookURL == "" || input.FeishuWebhookURL == Mask {
-			input.FeishuWebhookURL = old.FeishuWebhookURL
-		} else {
-			input.FeishuWebhookURL = s.encrypt(input.FeishuWebhookURL)
-		}
 		if input.HostKey == "" && input.Host == old.Host && input.Port == old.Port {
 			input.HostKey = old.HostKey
 		}
@@ -237,7 +244,6 @@ func (s *Service) Save(input domain.Center) (domain.Center, error) {
 		input.Password = s.encrypt(input.Password)
 		input.PrivateKey = s.encrypt(input.PrivateKey)
 		input.Passphrase = s.encrypt(input.Passphrase)
-		input.FeishuWebhookURL = s.encrypt(input.FeishuWebhookURL)
 	}
 	input.UpdatedAt = now
 	if err := validate(input); err != nil {
@@ -358,11 +364,6 @@ func (s *Service) encrypt(v string) string {
 	return out
 }
 func (s *Service) decrypt(v string) (string, error) { return s.cipher.Decrypt(v) }
-
-// TestAlarmWebhook 仅供渲染远端业务配置时解密中心级机器人地址。
-func (s *Service) TestAlarmWebhook(v domain.Center) (string, error) {
-	return s.decrypt(v.FeishuWebhookURL)
-}
 func (s *Service) mask(v *domain.Center) {
 	if v.Password != "" {
 		v.Password = Mask
@@ -372,9 +373,6 @@ func (s *Service) mask(v *domain.Center) {
 	}
 	if v.Passphrase != "" {
 		v.Passphrase = Mask
-	}
-	if v.FeishuWebhookURL != "" {
-		v.FeishuWebhookURL = Mask
 	}
 }
 

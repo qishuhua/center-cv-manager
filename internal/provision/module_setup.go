@@ -57,7 +57,7 @@ func (s *Service) PrepareModuleFiles(ctx context.Context, id string, in ModuleSe
 	if strings.TrimSpace(out) != "" {
 		return fmt.Errorf("部署目录非空，请迁移原配置或选择空目录")
 	}
-	d := modular.NewDeployment(path.Join(in.Root, "docker-compose.yml"), max(1, c.GPUCount))
+	d := modular.NewDeployment(path.Join(in.Root, "docker-compose.yml"), deploymentWorkers(c, max(1, c.GPUCount)))
 	d.Status = "configured"
 	d.ModelsRoot, d.LogsRoot, d.MediaRoot = in.ModelsRoot, in.LogsRoot, in.MediaRoot
 	if err = modular.Validate(d); err != nil {

@@ -16,17 +16,26 @@ import (
 	"center-cv-manager/internal/templates"
 )
 
+// deploymentWorkers 返回 business 模块应登记的 Worker 实例数：单实例模式
+// 只登记一个，其余按（物理显卡）数量。
+func deploymentWorkers(c domain.Center, gpuTotal int) int {
+	if c.SingleInstanceEnabled {
+		return 1
+	}
+	return gpuTotal
+}
+
 func (s *Service) prepareModules(ctx context.Context, remote *sshx.DockerClient, c domain.Center, composeFile, accelerator string, cpus, gpus int, opts templates.RenderOptions, r Reporter) error {
 	d := c.Deployment
 	if d.Status == "reset" {
-		fresh := modular.NewDeployment(composeFile, opts.Workers)
+		fresh := modular.NewDeployment(composeFile, deploymentWorkers(c, opts.Workers))
 		fresh.ModelsRoot, fresh.LogsRoot, fresh.MediaRoot = d.ModelsRoot, d.LogsRoot, d.MediaRoot
 		fresh.Status = "configured"
 		fresh.ReselectionRequired = d.ReselectionRequired
 		d = fresh
 	}
 	if d.Status == "preparing" && allPending(d.Modules) {
-		d = modular.NewDeployment(composeFile, opts.Workers)
+		d = modular.NewDeployment(composeFile, deploymentWorkers(c, opts.Workers))
 	}
 	files := map[string]string{}
 	var err error
@@ -36,6 +45,10 @@ func (s *Service) prepareModules(ctx context.Context, remote *sshx.DockerClient,
 	if err != nil {
 		return err
 	}
+	// 渲染的 Worker 数（单实例=1）必须与登记表一致，否则 ValidateConfig 以
+	// 「登记的服务不存在」拒绝；无论是否重建 Deployment 都统一对齐，顺带
+	// 自愈旧登记表与实际 Compose 不一致的记录。
+	modular.SetBusinessWorkers(d, deploymentWorkers(c, opts.Workers))
 	keys := make([]string, 0, len(files))
 	for key := range files {
 		keys = append(keys, key)

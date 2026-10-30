@@ -17,11 +17,11 @@ import (
 // 开关，错分由 ingress 统一控制：开关打开即启动摄像机轮询与计划落格
 // ZeroMQ 广播，Worker 订阅本地核验；9/10 核验结果由 video-transcode 读
 // WMS 地址与鉴权直发 missort 接收端，普通告警走业务回调）、
-// Debug 模式（LOG_LEVEL=debug）、存图（CV_SAVE_DEBUG_IMAGE=1）与
-// 飞书告警测试（TEST_ALARM_ENABLED、FEISHU_WEBHOOK_URL）。
-// compose.yml 的错分/告警插值行经 Ensure* 幂等兜底（防远端手工删改）。
-// 写入只置 ConfigChanged 等待整体发布生效；调用方需先持久化中心字段。
-// legacy 中心不支持。
+// Debug 模式（LOG_LEVEL=debug）、存图（CV_SAVE_DEBUG_IMAGE=1）、仅解码
+// （CV_DECODE_ONLY_MODE=1）与飞书告警测试（TEST_ALARM_ENABLED、
+// FEISHU_WEBHOOK_URL）。compose.yml 的错分/告警插值行经 Ensure* 幂等兜底
+// （防远端手工删改）。写入只置 ConfigChanged 等待整体发布生效；调用方需先
+// 持久化中心字段。legacy 中心不支持。
 func (s *Service) ApplyBusinessSettings(ctx context.Context, centerID string) error {
 	return centerlock.Within(ctx, centerID, func(ctx context.Context) error {
 		remote, c, err := s.connect(centerID)
@@ -30,7 +30,7 @@ func (s *Service) ApplyBusinessSettings(ctx context.Context, centerID string) er
 		}
 		defer remote.Close()
 		if c.Deployment == nil {
-			return fmt.Errorf("旧中心（未模块化）不支持错分检测、Debug 模式、存图与飞书告警测试")
+			return fmt.Errorf("旧中心（未模块化）不支持错分检测、Debug 模式、存图、仅解码模式与飞书告警测试")
 		}
 		// 初始化未开始或重置后的中心没有远端模块文件；下次初始化渲染会
 		// 直接带上当前配置，无需在此同步。
@@ -60,17 +60,15 @@ func (s *Service) ApplyBusinessSettings(ctx context.Context, centerID string) er
 		newCompose = templates.EnsureTranscodeAlarmEnv(newCompose)
 		newCompose = templates.EnsureWorkerLogLevelEnv(newCompose)
 		newCompose = templates.EnsureWorkerSaveImageEnv(newCompose)
+		newCompose = templates.EnsureWorkerDecodeOnlyEnv(newCompose)
 		newCompose = templates.EnsureTranscodeTestAlarmEnv(newCompose)
-		testAlarmWebhook, decryptErr := s.centers.TestAlarmWebhook(c)
-		if decryptErr != nil {
-			return fmt.Errorf("解密飞书告警测试机器人地址失败: %w", decryptErr)
-		}
 		newEnv := templates.ApplyMisSortModuleEnv(oldEnv, templates.MisSortOptions{
 			Enabled: enabled, WMSURL: c.WMSURL, MisAuth: c.MisAuth,
 		})
 		newEnv = templates.ApplyLogLevelModuleEnv(newEnv, c.DebugLogEnabled)
 		newEnv = templates.ApplySaveImageModuleEnv(newEnv, c.SaveImageEnabled)
-		newEnv = templates.ApplyTestAlarmModuleEnv(newEnv, c.TestAlarmEnabled, testAlarmWebhook)
+		newEnv = templates.ApplyDecodeOnlyModuleEnv(newEnv, c.DecodeOnlyEnabled)
+		newEnv = templates.ApplyTestAlarmModuleEnv(newEnv, c.TestAlarmEnabled, c.FeishuWebhookURL)
 		composeChanged := newCompose != oldCompose
 		envChanged := newEnv != oldEnv
 		if composeChanged || envChanged {

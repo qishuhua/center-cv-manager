@@ -42,7 +42,7 @@ func (s *Service) ResetCenter(ctx context.Context, id string, r Reporter) error 
 		if err = validateResetRoot(root); err != nil {
 			return err
 		}
-		next := modular.NewDeployment(path.Join(root, path.Base(compose)), max(1, c.GPUCount))
+		next := modular.NewDeployment(path.Join(root, path.Base(compose)), deploymentWorkers(c, max(1, c.GPUCount)))
 		next.Status = "reset"
 		next.ReselectionRequired = true
 		if c.Deployment != nil {

@@ -38,7 +38,19 @@ type Center struct {
 	// 调试图片（module.env 托管 CV_SAVE_DEBUG_IMAGE）；关闭移除托管值，
 	// 回落 Compose 插值默认 0（不存图）。仅模块化中心支持。
 	SaveImageEnabled bool `json:"save_image_enabled,omitempty"`
-	// 飞书告警测试由 video-transcode 使用，机器人地址加密入库并在接口返回时脱敏。
+	// DecodeOnlyEnabled 开启后业务 Worker（center-cv-service）进入仅解码
+	// 模式（module.env 托管 CV_DECODE_ONLY_MODE）：只拉流、解码、按任务
+	// 既有采样策略抽帧，不加载模型、不推理，也不产生事件/录片/告警；关闭
+	// 移除托管值，回落 Compose 插值默认 0。仅模块化中心支持；该环境变量
+	// 仅进程启动时读取，修改后需重启 Worker 生效。
+	DecodeOnlyEnabled bool `json:"decode_only_enabled,omitempty"`
+	// SingleInstanceEnabled 开启后 business 模块只部署一个 center-cv-service
+	// 实例：可见全部 GPU（nvidia NVIDIA_VISIBLE_DEVICES=all、登临全部分配
+	// 逻辑卡）、不绑定 cpuset（由调度器使用全部 CPU）。与 Worker/CPU 拓扑
+	// 一样只在初始化渲染时生效，已初始化中心切换需先重置。
+	SingleInstanceEnabled bool `json:"single_instance_enabled,omitempty"`
+	// 飞书告警测试由 video-transcode 使用，机器人地址明文入库并明文返回
+	//（不按凭据处理，编辑页直接回显）。
 	TestAlarmEnabled bool      `json:"test_alarm_enabled,omitempty"`
 	FeishuWebhookURL string    `json:"feishu_webhook_url,omitempty"`
 	TestMode         bool      `json:"test_mode,omitempty"`

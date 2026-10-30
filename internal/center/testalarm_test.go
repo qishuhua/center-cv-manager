@@ -7,7 +7,7 @@ import (
 	"center-cv-manager/internal/secret"
 )
 
-func TestCenterTestAlarmWebhookEncryptedAndMasked(t *testing.T) {
+func TestCenterTestAlarmWebhookPlain(t *testing.T) {
 	cipher, err := secret.LoadOrCreate(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -27,20 +27,20 @@ func TestCenterTestAlarmWebhookEncryptedAndMasked(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if saved.FeishuWebhookURL != Mask || repo.value.FeishuWebhookURL == base.FeishuWebhookURL {
-		t.Fatal("接口应脱敏，入库应加密")
+	if saved.FeishuWebhookURL != base.FeishuWebhookURL || repo.value.FeishuWebhookURL != base.FeishuWebhookURL {
+		t.Fatal("接口返回与入库都应是明文机器人地址")
 	}
-	decrypted, err := s.TestAlarmWebhook(repo.value)
-	if err != nil || decrypted != base.FeishuWebhookURL {
-		t.Fatalf("解密机器人地址失败: %v", err)
-	}
-	base.ID, base.Password, base.FeishuWebhookURL = saved.ID, Mask, Mask
+	base.ID, base.Password = saved.ID, Mask
 	base.TestAlarmEnabled = false
-	if _, err := s.Save(base); err != nil || repo.value.FeishuWebhookURL == "" {
+	if _, err := s.Save(base); err != nil || repo.value.FeishuWebhookURL != base.FeishuWebhookURL {
 		t.Fatalf("关闭开关应保留机器人地址: %v", err)
 	}
+	base.FeishuWebhookURL = ""
+	if _, err := s.Save(base); err != nil || repo.value.FeishuWebhookURL != "" {
+		t.Fatalf("清空字段应清除机器人地址: %v", err)
+	}
 	base.TestAlarmEnabled = true
-	if _, err := s.Save(base); err != nil {
-		t.Fatalf("重新开启应沿用机器人地址: %v", err)
+	if _, err := s.Save(base); err == nil {
+		t.Fatal("重新开启时缺少 URL 应拒绝")
 	}
 }

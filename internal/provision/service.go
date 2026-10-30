@@ -185,7 +185,10 @@ func (s *Service) Initialize(ctx context.Context, centerID string, r Reporter) e
 		workers = 1
 	}
 	cpuSets := []string(nil)
-	if mode != "business" {
+	// 单实例模式只部署一个 center-cv-service 实例：不绑定 cpuset（由调度器
+	// 使用全部 CPU），也无需读取 CPU 拓扑做均分；Workers 仍传显卡总数，
+	// 供渲染层推导登临逻辑卡清单与监控标签范围。
+	if mode != "business" && !stored.SingleInstanceEnabled {
 		topologyOutput, topologyErr := runSSH(ctx, remote.SSH, "LC_ALL=C lscpu -p=CPU,NODE,SOCKET,CORE,ONLINE 2>/dev/null || LC_ALL=C lscpu -p=CPU,NODE,SOCKET,CORE 2>/dev/null", "")
 		topology := parseCPUTopology(topologyOutput)
 		if topologyErr == nil && len(topology) > 0 {
@@ -197,6 +200,9 @@ func (s *Service) Initialize(ctx context.Context, centerID string, r Reporter) e
 		} else {
 			r.Log("未读取到可靠的 CPU ID/NUMA 拓扑，将不限制 Worker cpuset，由 Linux 调度器分配 CPU")
 		}
+	}
+	if stored.SingleInstanceEnabled {
+		r.Logf("单实例模式：business 只部署 1 个 center-cv-service 实例，占用全部 GPU 与 CPU")
 	}
 	alertConfig, err := s.alerts.Config()
 	if err != nil {
@@ -215,16 +221,13 @@ func (s *Service) Initialize(ctx context.Context, centerID string, r Reporter) e
 	}
 	r.Logf("中心工作目录：%s", centerpath.WorkspaceRoot(composeFile))
 	if stored.Deployment != nil {
-		testAlarmWebhook, decryptErr := s.centers.TestAlarmWebhook(stored)
-		if decryptErr != nil {
-			return fmt.Errorf("解密飞书告警测试机器人地址失败: %w", decryptErr)
-		}
 		return s.prepareModules(ctx, remote, stored, composeFile, accelerator, cpuCount, gpuCount, templates.RenderOptions{
 			Workers: workers, CPUSets: cpuSets, ModelsRoot: modelsRoot, LogsRoot: logsRoot, MediaResourcesRoot: mediaResourcesRoot,
 			ServerName: stored.Name, FeishuWebhook: alertConfig.FeishuWebhook,
 			WMSURL: stored.WMSURL, MisAuth: stored.MisAuth, MisSortEnabled: stored.MisSortEnabled,
-			DebugLogEnabled: stored.DebugLogEnabled, SaveImageEnabled: stored.SaveImageEnabled,
-			TestAlarmEnabled: stored.TestAlarmEnabled, TestAlarmWebhook: testAlarmWebhook,
+			DebugLogEnabled: stored.DebugLogEnabled, SaveImageEnabled: stored.SaveImageEnabled, DecodeOnlyEnabled: stored.DecodeOnlyEnabled,
+			SingleWorker: stored.SingleInstanceEnabled,
+			TestAlarmEnabled: stored.TestAlarmEnabled, TestAlarmWebhook: stored.FeishuWebhookURL,
 		}, r)
 	}
 	if err = templates.Render(mode, root, templates.RenderOptions{

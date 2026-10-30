@@ -32,7 +32,7 @@ func TestCleanupStaleManagedTemplates(t *testing.T) {
 
 func TestRenderDynamicDenglinWorkers(t *testing.T) {
 	source := []byte("services:\n  center-cv-service-0:\n    old: true\n  center-cv-service-1:\n    old: true\n  center-cv-ingress:\n    image: ingress\n")
-	result, err := renderDynamicWorkers(source, "denglin", 2, []string{"0-3", "4-7"})
+	result, err := renderDynamicWorkers(source, "denglin", 2, []string{"0-3", "4-7"}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,7 @@ func TestRenderEightDenglinPhysicalGPUsCover32LogicalDevices(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := renderDynamicWorkers(content, "denglin", 8, nil)
+	result, err := renderDynamicWorkers(content, "denglin", 8, nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestActualComposeTemplatesRenderDetectedTopology(t *testing.T) {
 				t.Fatalf("%s compose missing Kibana initialization %q", mode, required)
 			}
 		}
-		result, err := renderDynamicWorkers(content, mode, 2, []string{"0-7", "8-15"})
+		result, err := renderDynamicWorkers(content, mode, 2, []string{"0-7", "8-15"}, false)
 		if err != nil {
 			t.Fatalf("%s: %v", mode, err)
 		}
@@ -285,7 +285,7 @@ func TestRenderHostMounts(t *testing.T) {
 
 func TestRenderDynamicPrometheus(t *testing.T) {
 	source := []byte("  - job_name: center-cv-service\r\n    static_configs:\r\n      - targets: [\"127.0.0.1:8181\"]\r\n        labels: {worker: old}\r\n    metric_relabel_configs:\r\n      - action: drop\r\n  - job_name: service-http-health\r\n    static_configs:\r\n      - targets: [\"http://127.0.0.1:8181/api/healthz\"]\r\n        labels: {worker: old}\r\n      - targets: [\"http://127.0.0.1:8090/readyz\"]\r\n        labels: {service: ingress}\r\n    relabel_configs:\r\n  - job_name: service-readiness\r\n    static_configs:\r\n      - targets: [\"http://127.0.0.1:8181/api/readyz\"]\r\n        labels: {name: old}\r\n      - targets: [\"http://127.0.0.1:8090/readyz\"]\r\n        labels: {name: ingress}\r\n    relabel_configs:\r\n")
-	result, err := renderDynamicPrometheus(source, "tensorrt", 2)
+	result, err := renderDynamicPrometheus(source, "tensorrt", 2, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,7 +357,7 @@ func TestRenderUsesOneWorkerEnvironment(t *testing.T) {
 		"LOG_LEVEL": "debug",
 		"CUSTOM":    "a:b # value",
 	})
-	rendered, err := renderDynamicWorkers(selected, "tensorrt", 2, []string{"0-3", "4-7"})
+	rendered, err := renderDynamicWorkers(selected, "tensorrt", 2, []string{"0-3", "4-7"}, false)
 	if err != nil {
 		t.Fatal(err)
 	}

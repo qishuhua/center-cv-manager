@@ -7,6 +7,45 @@ import (
 	"center-cv-manager/internal/domain"
 )
 
+func TestSetBusinessWorkersAlignsRegistrationWithRenderedTopology(t *testing.T) {
+	// 按显卡数登记后切到单实例：对齐后只剩一个 Worker，探活保留
+	// ingress/transcode；其余模块登记不受影响。
+	d := NewDeployment("/home/cv/.local/share/center-manager/deploy/docker-compose.yml", 4)
+	SetBusinessWorkers(d, 1)
+	var business *domain.ComposeModule
+	for i := range d.Modules {
+		if d.Modules[i].ID == "business" {
+			business = &d.Modules[i]
+		}
+	}
+	if business == nil {
+		t.Fatal("缺少 business 模块")
+	}
+	if len(business.ModelServices) != 1 || business.ModelServices[0] != "center-cv-service-0" {
+		t.Fatalf("单实例登记表应只剩 worker-0: %v", business.ModelServices)
+	}
+	if len(business.ReadyURLs) != 3 || business.ReadyURLs[0] != "http://127.0.0.1:8181/api/readyz" ||
+		business.ReadyURLs[1] != "http://127.0.0.1:8090/readyz" || business.ReadyURLs[2] != "http://127.0.0.1:8092/readyz" {
+		t.Fatalf("单实例探活清单不匹配: %v", business.ReadyURLs)
+	}
+	// 对齐后的登记表能通过单 Worker Compose 的服务校验。
+	compose := "name: center-cv-business\nservices:\n  center-cv-service-0: {image: a}\n  center-cv-ingress: {image: b}\n  video-transcode-service: {image: c}\n"
+	if err := ValidateConfig(*business, compose); err != nil {
+		t.Fatalf("对齐后仍校验失败: %v", err)
+	}
+	// 多实例幂等：与 NewDeployment 生成结果一致。
+	SetBusinessWorkers(d, 2)
+	if len(business.ModelServices) != 2 || business.ModelServices[1] != "center-cv-service-1" {
+		t.Fatalf("多实例登记表不匹配: %v", business.ModelServices)
+	}
+	if err := ValidateConfig(*business, compose+"  center-cv-service-1: {image: d}\n"); err != nil {
+		t.Fatalf("多实例对齐后校验失败: %v", err)
+	}
+	if err := ValidateConfig(*business, compose); err == nil {
+		t.Fatal("缺少 worker-1 的 Compose 应被拒绝")
+	}
+}
+
 func TestDefaultDeploymentOrderAndPaths(t *testing.T) {
 	d := NewDeployment("/home/cv/.local/share/center-manager/deploy/docker-compose.yml", 2)
 	if err := Validate(d); err != nil {

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"center-cv-manager/internal/domain"
+	"center-cv-manager/internal/secret"
 	_ "modernc.org/sqlite"
 )
 
@@ -131,7 +132,11 @@ func Open(path string) (*Store, error) {
 		{"debug_log_enabled", `INTEGER NOT NULL DEFAULT 0`},
 		// 默认 0：存图默认关闭，存量中心不因升级开始保存调试图片。
 		{"save_image_enabled", `INTEGER NOT NULL DEFAULT 0`},
-		// 默认关闭；机器人地址加密保存，供 video-transcode 告警测试使用。
+		// 默认 0：仅解码模式默认关闭，存量中心不因升级停止推理。
+		{"decode_only_enabled", `INTEGER NOT NULL DEFAULT 0`},
+		// 默认 0：单实例模式默认关闭，存量中心不因升级改变 Worker 拓扑。
+		{"single_instance_enabled", `INTEGER NOT NULL DEFAULT 0`},
+		// 默认关闭；机器人地址明文保存，供 video-transcode 告警测试使用。
 		{"test_alarm_enabled", `INTEGER NOT NULL DEFAULT 0`},
 		{"feishu_webhook_url", `TEXT NOT NULL DEFAULT ''`},
 	} {
@@ -257,6 +262,57 @@ func migrateIncorrectModelsPrefix(db *sql.DB) error {
 	return tx.Commit()
 }
 
+// MigrateFeishuWebhookPlaintext 把旧版本加密入库的中心级飞书告警测试机器人
+// 地址一次性解密为明文：该字段不再按凭据处理（明文入库、接口明文返回，
+// 编辑页直接回显）。解密失败的行原值保留——下次保存中心时会被 URL 校验
+// 拦下，重新填写即可。需在加载 master.key 之后调用（store.Open 无凭据）。
+func (s *Store) MigrateFeishuWebhookPlaintext(c *secret.Cipher) error {
+	const migration = "feishu_webhook_plaintext_v1"
+	var exists int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM schema_migrations WHERE name=?`, migration).Scan(&exists); err != nil {
+		return err
+	}
+	if exists > 0 {
+		return nil
+	}
+	rows, err := s.db.Query(`SELECT id, feishu_webhook_url FROM centers WHERE feishu_webhook_url != ''`)
+	if err != nil {
+		return err
+	}
+	type rewrite struct{ id, webhook string }
+	var updates []rewrite
+	for rows.Next() {
+		var u rewrite
+		if err = rows.Scan(&u.id, &u.webhook); err != nil {
+			rows.Close()
+			return err
+		}
+		// 明文 URL 不是合法 base64，Decrypt 必然失败，恰好只放行旧密文。
+		if plain, decErr := c.Decrypt(u.webhook); decErr == nil {
+			u.webhook = plain
+			updates = append(updates, u)
+		}
+	}
+	rows.Close()
+	if err = rows.Err(); err != nil {
+		return err
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, u := range updates {
+		if _, err = tx.Exec(`UPDATE centers SET feishu_webhook_url=? WHERE id=?`, u.webhook, u.id); err != nil {
+			return err
+		}
+	}
+	if _, err = tx.Exec(`INSERT INTO schema_migrations(name,applied_at) VALUES(?,?)`, migration, time.Now()); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func ensureColumn(db *sql.DB, table, column, definition string) error {
 	rows, err := db.Query(`PRAGMA table_info(` + table + `)`)
 	if err != nil {
@@ -292,7 +348,7 @@ func ensureColumn(db *sql.DB, table, column, definition string) error {
 func (s *Store) Close() error { return s.db.Close() }
 
 func (s *Store) ListCenters() ([]domain.Center, error) {
-	rows, err := s.db.Query(`SELECT id,name,host,port,console_port,username,auth_type,password,private_key,passphrase,host_key,docker_socket,accelerator,detected_accelerator,cpu_count,gpu_count,compose_file,compose_content,initialized_at,description,wms_url,mis_auth,mis_sort_enabled,test_mode,debug_log_enabled,save_image_enabled,test_alarm_enabled,feishu_webhook_url,created_at,updated_at,deployment_json FROM centers ORDER BY name`)
+	rows, err := s.db.Query(`SELECT id,name,host,port,console_port,username,auth_type,password,private_key,passphrase,host_key,docker_socket,accelerator,detected_accelerator,cpu_count,gpu_count,compose_file,compose_content,initialized_at,description,wms_url,mis_auth,mis_sort_enabled,test_mode,debug_log_enabled,save_image_enabled,decode_only_enabled,single_instance_enabled,test_alarm_enabled,feishu_webhook_url,created_at,updated_at,deployment_json FROM centers ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -303,7 +359,7 @@ func (s *Store) ListCenters() ([]domain.Center, error) {
 		var createdAt, updatedAt sqliteTime
 		var initializedAt nullableSQLiteTime
 		var deploymentJSON string
-		if err = rows.Scan(&v.ID, &v.Name, &v.Host, &v.Port, &v.ConsolePort, &v.Username, &v.AuthType, &v.Password, &v.PrivateKey, &v.Passphrase, &v.HostKey, &v.DockerSocket, &v.Accelerator, &v.DetectedAccelerator, &v.CPUCount, &v.GPUCount, &v.ComposeFile, &v.ComposeContent, &initializedAt, &v.Description, &v.WMSURL, &v.MisAuth, &v.MisSortEnabled, &v.TestMode, &v.DebugLogEnabled, &v.SaveImageEnabled, &v.TestAlarmEnabled, &v.FeishuWebhookURL, &createdAt, &updatedAt, &deploymentJSON); err != nil {
+		if err = rows.Scan(&v.ID, &v.Name, &v.Host, &v.Port, &v.ConsolePort, &v.Username, &v.AuthType, &v.Password, &v.PrivateKey, &v.Passphrase, &v.HostKey, &v.DockerSocket, &v.Accelerator, &v.DetectedAccelerator, &v.CPUCount, &v.GPUCount, &v.ComposeFile, &v.ComposeContent, &initializedAt, &v.Description, &v.WMSURL, &v.MisAuth, &v.MisSortEnabled, &v.TestMode, &v.DebugLogEnabled, &v.SaveImageEnabled, &v.DecodeOnlyEnabled, &v.SingleInstanceEnabled, &v.TestAlarmEnabled, &v.FeishuWebhookURL, &createdAt, &updatedAt, &deploymentJSON); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal([]byte(deploymentJSON), &v.Deployment); err != nil {
@@ -323,7 +379,7 @@ func (s *Store) GetCenter(id string) (domain.Center, error) {
 	var createdAt, updatedAt sqliteTime
 	var initializedAt nullableSQLiteTime
 	var deploymentJSON string
-	err := s.db.QueryRow(`SELECT id,name,host,port,console_port,username,auth_type,password,private_key,passphrase,host_key,docker_socket,accelerator,detected_accelerator,cpu_count,gpu_count,compose_file,compose_content,initialized_at,description,wms_url,mis_auth,mis_sort_enabled,test_mode,debug_log_enabled,save_image_enabled,test_alarm_enabled,feishu_webhook_url,created_at,updated_at,deployment_json FROM centers WHERE id=?`, id).Scan(&v.ID, &v.Name, &v.Host, &v.Port, &v.ConsolePort, &v.Username, &v.AuthType, &v.Password, &v.PrivateKey, &v.Passphrase, &v.HostKey, &v.DockerSocket, &v.Accelerator, &v.DetectedAccelerator, &v.CPUCount, &v.GPUCount, &v.ComposeFile, &v.ComposeContent, &initializedAt, &v.Description, &v.WMSURL, &v.MisAuth, &v.MisSortEnabled, &v.TestMode, &v.DebugLogEnabled, &v.SaveImageEnabled, &v.TestAlarmEnabled, &v.FeishuWebhookURL, &createdAt, &updatedAt, &deploymentJSON)
+	err := s.db.QueryRow(`SELECT id,name,host,port,console_port,username,auth_type,password,private_key,passphrase,host_key,docker_socket,accelerator,detected_accelerator,cpu_count,gpu_count,compose_file,compose_content,initialized_at,description,wms_url,mis_auth,mis_sort_enabled,test_mode,debug_log_enabled,save_image_enabled,decode_only_enabled,single_instance_enabled,test_alarm_enabled,feishu_webhook_url,created_at,updated_at,deployment_json FROM centers WHERE id=?`, id).Scan(&v.ID, &v.Name, &v.Host, &v.Port, &v.ConsolePort, &v.Username, &v.AuthType, &v.Password, &v.PrivateKey, &v.Passphrase, &v.HostKey, &v.DockerSocket, &v.Accelerator, &v.DetectedAccelerator, &v.CPUCount, &v.GPUCount, &v.ComposeFile, &v.ComposeContent, &initializedAt, &v.Description, &v.WMSURL, &v.MisAuth, &v.MisSortEnabled, &v.TestMode, &v.DebugLogEnabled, &v.SaveImageEnabled, &v.DecodeOnlyEnabled, &v.SingleInstanceEnabled, &v.TestAlarmEnabled, &v.FeishuWebhookURL, &createdAt, &updatedAt, &deploymentJSON)
 	if errors.Is(err, sql.ErrNoRows) {
 		err = ErrNotFound
 	}
@@ -344,7 +400,7 @@ func (s *Store) SaveCenter(v domain.Center) error {
 	if marshalErr != nil {
 		return marshalErr
 	}
-	_, err := s.db.Exec(`INSERT INTO centers(id,name,host,port,console_port,username,auth_type,password,private_key,passphrase,host_key,docker_socket,accelerator,detected_accelerator,cpu_count,gpu_count,compose_file,compose_content,initialized_at,description,wms_url,mis_auth,mis_sort_enabled,test_mode,debug_log_enabled,save_image_enabled,test_alarm_enabled,feishu_webhook_url,created_at,updated_at,deployment_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,host=excluded.host,port=excluded.port,console_port=excluded.console_port,username=excluded.username,auth_type=excluded.auth_type,password=excluded.password,private_key=excluded.private_key,passphrase=excluded.passphrase,host_key=excluded.host_key,docker_socket=excluded.docker_socket,accelerator=excluded.accelerator,detected_accelerator=excluded.detected_accelerator,cpu_count=excluded.cpu_count,gpu_count=excluded.gpu_count,compose_file=excluded.compose_file,compose_content=excluded.compose_content,initialized_at=excluded.initialized_at,description=excluded.description,wms_url=excluded.wms_url,mis_auth=excluded.mis_auth,mis_sort_enabled=excluded.mis_sort_enabled,test_mode=excluded.test_mode,debug_log_enabled=excluded.debug_log_enabled,save_image_enabled=excluded.save_image_enabled,test_alarm_enabled=excluded.test_alarm_enabled,feishu_webhook_url=excluded.feishu_webhook_url,updated_at=excluded.updated_at,deployment_json=excluded.deployment_json`, v.ID, v.Name, v.Host, v.Port, v.ConsolePort, v.Username, v.AuthType, v.Password, v.PrivateKey, v.Passphrase, v.HostKey, v.DockerSocket, v.Accelerator, v.DetectedAccelerator, v.CPUCount, v.GPUCount, v.ComposeFile, v.ComposeContent, v.InitializedAt, v.Description, v.WMSURL, v.MisAuth, v.MisSortEnabled, v.TestMode, v.DebugLogEnabled, v.SaveImageEnabled, v.TestAlarmEnabled, v.FeishuWebhookURL, v.CreatedAt, v.UpdatedAt, string(deploymentJSON))
+	_, err := s.db.Exec(`INSERT INTO centers(id,name,host,port,console_port,username,auth_type,password,private_key,passphrase,host_key,docker_socket,accelerator,detected_accelerator,cpu_count,gpu_count,compose_file,compose_content,initialized_at,description,wms_url,mis_auth,mis_sort_enabled,test_mode,debug_log_enabled,save_image_enabled,decode_only_enabled,single_instance_enabled,test_alarm_enabled,feishu_webhook_url,created_at,updated_at,deployment_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,host=excluded.host,port=excluded.port,console_port=excluded.console_port,username=excluded.username,auth_type=excluded.auth_type,password=excluded.password,private_key=excluded.private_key,passphrase=excluded.passphrase,host_key=excluded.host_key,docker_socket=excluded.docker_socket,accelerator=excluded.accelerator,detected_accelerator=excluded.detected_accelerator,cpu_count=excluded.cpu_count,gpu_count=excluded.gpu_count,compose_file=excluded.compose_file,compose_content=excluded.compose_content,initialized_at=excluded.initialized_at,description=excluded.description,wms_url=excluded.wms_url,mis_auth=excluded.mis_auth,mis_sort_enabled=excluded.mis_sort_enabled,test_mode=excluded.test_mode,debug_log_enabled=excluded.debug_log_enabled,save_image_enabled=excluded.save_image_enabled,decode_only_enabled=excluded.decode_only_enabled,single_instance_enabled=excluded.single_instance_enabled,feishu_webhook_url=excluded.feishu_webhook_url,updated_at=excluded.updated_at,deployment_json=excluded.deployment_json`, v.ID, v.Name, v.Host, v.Port, v.ConsolePort, v.Username, v.AuthType, v.Password, v.PrivateKey, v.Passphrase, v.HostKey, v.DockerSocket, v.Accelerator, v.DetectedAccelerator, v.CPUCount, v.GPUCount, v.ComposeFile, v.ComposeContent, v.InitializedAt, v.Description, v.WMSURL, v.MisAuth, v.MisSortEnabled, v.TestMode, v.DebugLogEnabled, v.SaveImageEnabled, v.DecodeOnlyEnabled, v.SingleInstanceEnabled, v.TestAlarmEnabled, v.FeishuWebhookURL, v.CreatedAt, v.UpdatedAt, string(deploymentJSON))
 	return err
 }
 

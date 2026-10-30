@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"center-cv-manager/internal/domain"
+	"center-cv-manager/internal/secret"
 )
 
 func TestEmptyListsAreNotNil(t *testing.T) {
@@ -36,7 +37,7 @@ func TestCenterTestAlarmFieldsRoundTrip(t *testing.T) {
 	}
 	defer st.Close()
 	now := time.Now()
-	v := domain.Center{ID: "test-center", Name: "测试中心", Host: "host", Port: 22, ConsolePort: 8080, Username: "root", AuthType: "password", Password: "encrypted", DockerSocket: "/var/run/docker.sock", Accelerator: "auto", ComposeFile: "/srv/deploy/docker-compose.yml", TestAlarmEnabled: true, FeishuWebhookURL: "encrypted-webhook", CreatedAt: now, UpdatedAt: now}
+	v := domain.Center{ID: "test-center", Name: "测试中心", Host: "host", Port: 22, ConsolePort: 8080, Username: "root", AuthType: "password", Password: "encrypted", DockerSocket: "/var/run/docker.sock", Accelerator: "auto", ComposeFile: "/srv/deploy/docker-compose.yml", TestAlarmEnabled: true, FeishuWebhookURL: "https://open.feishu.cn/open-apis/bot/v2/hook/test-token", CreatedAt: now, UpdatedAt: now}
 	if err := st.SaveCenter(v); err != nil {
 		t.Fatal(err)
 	}
@@ -47,6 +48,57 @@ func TestCenterTestAlarmFieldsRoundTrip(t *testing.T) {
 	listed, err := st.ListCenters()
 	if err != nil || len(listed) != 1 || !listed[0].TestAlarmEnabled {
 		t.Fatalf("中心列表告警测试配置读取失败: %#v %v", listed, err)
+	}
+}
+
+func TestMigrateFeishuWebhookPlaintext(t *testing.T) {
+	dir := t.TempDir()
+	st, err := Open(filepath.Join(dir, "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	cipher, err := secret.LoadOrCreate(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	const plain = "https://open.feishu.cn/open-apis/bot/v2/hook/test-token"
+	encrypted, err := cipher.Encrypt(plain)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	base := domain.Center{Name: "测试中心", Host: "host", Port: 22, ConsolePort: 8080, Username: "root", AuthType: "password", Password: "encrypted", DockerSocket: "/var/run/docker.sock", Accelerator: "auto", ComposeFile: "/srv/deploy/docker-compose.yml", CreatedAt: now, UpdatedAt: now}
+	legacy := base
+	legacy.ID, legacy.FeishuWebhookURL = "legacy-center", encrypted
+	if err := st.SaveCenter(legacy); err != nil {
+		t.Fatal(err)
+	}
+	// 已是明文的行应原样保留。
+	plainRow := base
+	plainRow.ID, plainRow.FeishuWebhookURL = "plain-center", plain
+	if err := st.SaveCenter(plainRow); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.MigrateFeishuWebhookPlaintext(cipher); err != nil {
+		t.Fatal(err)
+	}
+	for id, want := range map[string]string{"legacy-center": plain, "plain-center": plain} {
+		got, err := st.GetCenter(id)
+		if err != nil || got.FeishuWebhookURL != want {
+			t.Fatalf("中心 %s 机器人地址应为 %s，实际 %#v（%v）", id, want, got.FeishuWebhookURL, err)
+		}
+	}
+	// schema_migrations 记录后再次运行应直接跳过：手动塞回密文也不再被改写。
+	if _, err = st.db.Exec(`UPDATE centers SET feishu_webhook_url=? WHERE id='legacy-center'`, encrypted); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.MigrateFeishuWebhookPlaintext(cipher); err != nil {
+		t.Fatal(err)
+	}
+	got, err := st.GetCenter("legacy-center")
+	if err != nil || got.FeishuWebhookURL != encrypted {
+		t.Fatalf("已应用的迁移不应重复改写: %#v %v", got.FeishuWebhookURL, err)
 	}
 }
 
@@ -221,6 +273,12 @@ func TestCenterRuntimeSchemaUpgrade(t *testing.T) {
 	if loaded.SaveImageEnabled {
 		t.Fatal("存图开关迁移默认值应为关闭（0）")
 	}
+	if loaded.DecodeOnlyEnabled {
+		t.Fatal("仅解码模式开关迁移默认值应为关闭（0）")
+	}
+	if loaded.SingleInstanceEnabled {
+		t.Fatal("单实例模式开关迁移默认值应为关闭（0）")
+	}
 	loaded.WMSURL, loaded.MisAuth = "http://10.21.61.48:31995", "auth"
 	loaded.TestMode = true
 	if err = st.SaveCenter(loaded); err != nil {
@@ -269,6 +327,20 @@ func TestCenterRuntimeSchemaUpgrade(t *testing.T) {
 	}
 	if again, err := st.GetCenter("legacy-center"); err != nil || !again.SaveImageEnabled {
 		t.Fatal("存图开关应支持开启回写")
+	}
+	reloaded.DecodeOnlyEnabled = true
+	if err = st.SaveCenter(reloaded); err != nil {
+		t.Fatal(err)
+	}
+	if again, err := st.GetCenter("legacy-center"); err != nil || !again.DecodeOnlyEnabled {
+		t.Fatal("仅解码模式开关应支持开启回写")
+	}
+	reloaded.SingleInstanceEnabled = true
+	if err = st.SaveCenter(reloaded); err != nil {
+		t.Fatal(err)
+	}
+	if again, err := st.GetCenter("legacy-center"); err != nil || !again.SingleInstanceEnabled {
+		t.Fatal("单实例模式开关应支持开启回写")
 	}
 }
 

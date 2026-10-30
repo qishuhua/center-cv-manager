@@ -222,6 +222,16 @@ type RenderOptions struct {
 	// SaveImageEnabled 开启时 business 模块在 module.env 托管
 	// CV_SAVE_DEBUG_IMAGE=1（Worker 公共环境锚点插值兜底 0），关闭回落默认值。
 	SaveImageEnabled bool
+	// DecodeOnlyEnabled 开启时 business 模块在 module.env 托管
+	// CV_DECODE_ONLY_MODE=1（Worker 公共环境锚点插值兜底 0），关闭回落
+	// 默认值；该环境变量仅进程启动时读取。
+	DecodeOnlyEnabled bool
+	// SingleWorker 开启时只部署一个 center-cv-service 实例：可见全部 GPU
+	//（nvidia NVIDIA_VISIBLE_DEVICES=all、登临分配全部逻辑卡）、不写 cpuset
+	//（由调度器使用全部 CPU），监控只生成一组 Worker 目标。Workers 仍传物理
+	// 显卡总数（登临逻辑卡清单与监控标签范围由它推导）。与 Workers/CPUSets
+	// 同为初始化渲染参数，已初始化中心不随开关重排。
+	SingleWorker bool
 	// 飞书告警测试仅供 video-transcode 使用，关闭时不传递机器人地址。
 	TestAlarmEnabled bool
 	TestAlarmWebhook string
@@ -248,7 +258,7 @@ func Render(mode, deployRoot string, opts RenderOptions, log func(string)) error
 		content = []byte(strings.ReplaceAll(string(content), "\r\n", "\n"))
 		if spec.EmbedPath == filepath.Join("compose", composeForMode(mode)) && mode != "business" {
 			content = renderWorkerEnvironment(content, opts.WorkerEnv)
-			content, err = renderDynamicWorkers(content, mode, opts.Workers, opts.CPUSets)
+			content, err = renderDynamicWorkers(content, mode, opts.Workers, opts.CPUSets, opts.SingleWorker)
 			if err != nil {
 				return fmt.Errorf("生成 Worker 配置失败: %w", err)
 			}
@@ -260,7 +270,7 @@ func Render(mode, deployRoot string, opts RenderOptions, log func(string)) error
 			}
 		}
 		if spec.TargetPath == filepath.Join("monitoring", "prometheus", prometheusForMode(mode)) && mode != "business" {
-			content, err = renderDynamicPrometheus(content, mode, opts.Workers)
+			content, err = renderDynamicPrometheus(content, mode, opts.Workers, opts.SingleWorker)
 			if err != nil {
 				return fmt.Errorf("生成 Worker 监控配置失败: %w", err)
 			}
@@ -422,10 +432,19 @@ func renderHostMounts(content []byte, mode, modelsRoot, logsRoot, mediaResources
 	return []byte(text)
 }
 
-// renderDynamicWorkers 用物理显卡数生成一对一 Worker，并为每个 Worker 写入均分后的 CPU 集合。
-func renderDynamicWorkers(content []byte, mode string, workers int, cpuSets []string) ([]byte, error) {
+// renderDynamicWorkers 生成 Worker 服务块：默认按物理显卡数一对一生成，
+// 每个 Worker 写入均分后的 CPU 集合与各自 GPU；single 时只生成一个实例，
+// 可见全部 GPU 且不绑定 cpuset（由调度器使用全部 CPU），gpuTotal 仍用于
+// 推导登临的全部逻辑卡清单。
+func renderDynamicWorkers(content []byte, mode string, gpuTotal int, cpuSets []string, single bool) ([]byte, error) {
+	workers := gpuTotal
 	if workers < 1 {
 		workers = 1
+	}
+	gpuTotal = workers
+	count := workers
+	if single {
+		count = 1
 	}
 	text := strings.ReplaceAll(string(content), "\r\n", "\n")
 	start := strings.Index(text, "  center-cv-service-0:")
@@ -437,24 +456,45 @@ func renderDynamicWorkers(content []byte, mode string, workers int, cpuSets []st
 		return nil, fmt.Errorf("未找到 Worker 结束标记")
 	}
 	var generated strings.Builder
-	for i := 0; i < workers; i++ {
+	for i := 0; i < count; i++ {
 		cpuSet := ""
-		if i < len(cpuSets) {
+		if !single && i < len(cpuSets) {
 			cpuSet = cpuSets[i]
 		}
 		if mode == "denglin" {
-			writeDenglinWorker(&generated, i, cpuSet)
+			writeDenglinWorker(&generated, i, cpuSet, denglinWorkerDevices(i, gpuTotal, single))
 		} else {
-			writeNvidiaWorker(&generated, i, cpuSet)
+			writeNvidiaWorker(&generated, i, cpuSet, nvidiaWorkerDevices(i, single))
 		}
 	}
 	end := start + endRelative
 	return []byte(text[:start] + generated.String() + text[end:]), nil
 }
 
-func writeDenglinWorker(out *strings.Builder, index int, cpuSet string) {
-	logicalStart := index * 4
-	devices := fmt.Sprintf("%d,%d,%d,%d", logicalStart, logicalStart+1, logicalStart+2, logicalStart+3)
+// nvidiaWorkerDevices 返回 Worker 的 NVIDIA_VISIBLE_DEVICES：默认一对一
+// 分配物理卡，单实例模式一个实例可见全部 GPU（nvidia 运行时支持 all）。
+func nvidiaWorkerDevices(index int, single bool) string {
+	if single {
+		return "all"
+	}
+	return strconv.Itoa(index)
+}
+
+// denglinWorkerDevices 返回 Worker 的 DL_DEVICES：默认每个物理卡对应 4 个
+// 连续逻辑卡，单实例模式一个实例占用全部逻辑卡。
+func denglinWorkerDevices(index, gpuTotal int, single bool) string {
+	if single {
+		devices := make([]string, 0, gpuTotal*4)
+		for d := 0; d < gpuTotal*4; d++ {
+			devices = append(devices, strconv.Itoa(d))
+		}
+		return strings.Join(devices, ",")
+	}
+	start := index * 4
+	return fmt.Sprintf("%d,%d,%d,%d", start, start+1, start+2, start+3)
+}
+
+func writeDenglinWorker(out *strings.Builder, index int, cpuSet, devices string) {
 	fmt.Fprintf(out, "  center-cv-service-%d:\n", index)
 	out.WriteString("    <<: *worker-common\n")
 	fmt.Fprintf(out, "    container_name: center-cv-service-%d\n", index)
@@ -467,7 +507,7 @@ func writeDenglinWorker(out *strings.Builder, index int, cpuSet string) {
 	fmt.Fprintf(out, "      DL_DEVICES: \"%s\"\n\n", devices)
 }
 
-func writeNvidiaWorker(out *strings.Builder, index int, cpuSet string) {
+func writeNvidiaWorker(out *strings.Builder, index int, cpuSet, devices string) {
 	fmt.Fprintf(out, "  center-cv-service-%d:\n", index)
 	out.WriteString("    <<: *worker-common\n")
 	fmt.Fprintf(out, "    container_name: center-cv-service-%d\n", index)
@@ -477,13 +517,39 @@ func writeNvidiaWorker(out *strings.Builder, index int, cpuSet string) {
 	out.WriteString("    environment:\n      <<: *worker-environment\n")
 	fmt.Fprintf(out, "      APPNAME: center-cv-service-%d\n", index)
 	fmt.Fprintf(out, "      CV_LISTEN_PORT: %d\n", 8181+index)
-	fmt.Fprintf(out, "      NVIDIA_VISIBLE_DEVICES: \"%d\"\n", index)
+	fmt.Fprintf(out, "      NVIDIA_VISIBLE_DEVICES: \"%s\"\n", devices)
 	out.WriteString("\n")
 }
 
-func renderDynamicPrometheus(content []byte, mode string, workers int) ([]byte, error) {
+func renderDynamicPrometheus(content []byte, mode string, gpuTotal int, single bool) ([]byte, error) {
+	workers := gpuTotal
 	if workers < 1 {
 		workers = 1
+	}
+	gpuTotal = workers
+	count := workers
+	if single {
+		count = 1
+	}
+	// 单实例模式一个实例占用全部 GPU，目标标签标注完整卡范围而非单卡。
+	physicalLabel := func(i int) string {
+		if single {
+			return fmt.Sprintf("0-%d", gpuTotal-1)
+		}
+		return strconv.Itoa(i)
+	}
+	logicalLabel := func(i int) string {
+		if single {
+			end := gpuTotal - 1
+			if mode == "denglin" {
+				end = gpuTotal * 4 - 1
+			}
+			return fmt.Sprintf("0-%d", end)
+		}
+		if mode == "denglin" {
+			return fmt.Sprintf("%d-%d", i*4, i*4+3)
+		}
+		return strconv.Itoa(i)
 	}
 	text := strings.ReplaceAll(string(content), "\r\n", "\n")
 	jobStart := strings.Index(text, "  - job_name: center-cv-service\n")
@@ -498,13 +564,9 @@ func renderDynamicPrometheus(content []byte, mode string, workers int) ([]byte, 
 	staticStart += jobStart + len("    static_configs:\n")
 	metricEnd += jobStart
 	var metricTargets strings.Builder
-	for i := 0; i < workers; i++ {
+	for i := 0; i < count; i++ {
 		fmt.Fprintf(&metricTargets, "      - targets: [\"127.0.0.1:%d\"]\n", 8181+i)
-		if mode == "denglin" {
-			fmt.Fprintf(&metricTargets, "        labels: {worker: \"center-cv-service-%d\", physical_gpu: \"%d\", logical_gpus: \"%d-%d\"}\n", i, i, i*4, i*4+3)
-		} else {
-			fmt.Fprintf(&metricTargets, "        labels: {worker: \"center-cv-service-%d\", physical_gpu: \"%d\", logical_gpus: \"%d\"}\n", i, i, i)
-		}
+		fmt.Fprintf(&metricTargets, "        labels: {worker: \"center-cv-service-%d\", physical_gpu: \"%s\", logical_gpus: \"%s\"}\n", i, physicalLabel(i), logicalLabel(i))
 	}
 	text = text[:staticStart] + metricTargets.String() + text[metricEnd:]
 
@@ -520,9 +582,9 @@ func renderDynamicPrometheus(content []byte, mode string, workers int) ([]byte, 
 	healthStatic += healthStart + len("    static_configs:\n")
 	ingressTarget += healthStart
 	var healthTargets strings.Builder
-	for i := 0; i < workers; i++ {
+	for i := 0; i < count; i++ {
 		fmt.Fprintf(&healthTargets, "      - targets: [\"http://127.0.0.1:%d/api/healthz\"]\n", 8181+i)
-		fmt.Fprintf(&healthTargets, "        labels: {worker: \"center-cv-service-%d\", physical_gpu: \"%d\"}\n", i, i)
+		fmt.Fprintf(&healthTargets, "        labels: {worker: \"center-cv-service-%d\", physical_gpu: \"%s\"}\n", i, physicalLabel(i))
 	}
 	text = text[:healthStatic] + healthTargets.String() + text[ingressTarget:]
 
@@ -538,7 +600,7 @@ func renderDynamicPrometheus(content []byte, mode string, workers int) ([]byte, 
 	readinessStatic += readinessStart + len("    static_configs:\n")
 	readinessIngress += readinessStart
 	var readinessTargets strings.Builder
-	for i := 0; i < workers; i++ {
+	for i := 0; i < count; i++ {
 		fmt.Fprintf(&readinessTargets, "      - targets: [\"http://127.0.0.1:%d/api/readyz\"]\n", 8181+i)
 		fmt.Fprintf(&readinessTargets, "        labels: {name: \"center-cv-service-%d\"}\n", i)
 	}

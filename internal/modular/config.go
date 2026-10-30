@@ -57,6 +57,32 @@ func Modules(c domain.Center) []domain.ComposeModule {
 	return []domain.ComposeModule{{ID: "legacy", Name: "原有部署", ComposeFile: c.ComposeFile, Enabled: true, Timeout: 600}}
 }
 
+// SetBusinessWorkers 按（重）渲染的实际 Worker 数对齐 business 模块登记的
+// 模型服务与就绪探活清单：单实例模式、显卡数变化或旧登记表与 Compose 不
+// 一致时，ValidateConfig 会以「登记的服务不存在」拒绝，渲染后统一对齐
+//（多实例时与 NewDeployment 生成结果一致，幂等）。ingress/transcode 探活
+// 固定不变。
+func SetBusinessWorkers(d *domain.Deployment, workers int) {
+	for i := range d.Modules {
+		if d.Modules[i].ID != "business" {
+			continue
+		}
+		if workers < 1 {
+			workers = 1
+		}
+		models := make([]string, 0, workers)
+		ready := make([]string, 0, workers+2)
+		for w := 0; w < workers; w++ {
+			models = append(models, fmt.Sprintf("center-cv-service-%d", w))
+			ready = append(ready, fmt.Sprintf("http://127.0.0.1:%d/api/readyz", 8181+w))
+		}
+		ready = append(ready, "http://127.0.0.1:8090/readyz", "http://127.0.0.1:8092/readyz")
+		d.Modules[i].ModelServices = models
+		d.Modules[i].ReadyURLs = ready
+		return
+	}
+}
+
 func Find(c domain.Center, id string) (domain.ComposeModule, error) {
 	for _, m := range Modules(c) {
 		if m.ID == id {
