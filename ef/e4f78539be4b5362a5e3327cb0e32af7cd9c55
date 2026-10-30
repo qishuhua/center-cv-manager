@@ -1,0 +1,126 @@
+web/src/App.vue
+  s_e39cda52ab1860::t_8a2973daa940db 560
+  s_e39cda52ab1860::t_6a91a078c9efa9 643-645,647,649-652,654-655
+  s_e39cda52ab1860::t_842deba6a8c80f 566
+  s_e39cda52ab1860::t_735062b8b942d1 646
+  s_e39cda52ab1860::t_68000f195beaf8 41
+  s_e39cda52ab1860::t_5270d959c4ad82 698
+  s_e39cda52ab1860::t_9ab7e63477cf00 292
+  s_e39cda52ab1860::t_04bb8e5d90bf19 556
+  s_e39cda52ab1860::t_2239f0f2d76c30 648
+cmd/server/main.go
+  s_e8aa3bfc7aa1ca::t_1b725b90a97521 56-59
+internal/templates/modules/business/compose.denglin.yml
+  s_e39cda52ab1860::t_f9657faa2c06c5 22-24
+internal/templates/decodeonly_test.go
+  s_e39cda52ab1860::t_486722ce2721c6 1-111
+web/src/types.ts
+  s_e39cda52ab1860::t_d83f77af44523a 3
+internal/domain/models.go
+  s_e8aa3bfc7aa1ca::t_01c1f0ebbd5762 52-53
+  s_e39cda52ab1860::t_11b27c0387a9ce 41-46
+  s_e39cda52ab1860::t_654a28ca03d5d1 47-51
+internal/store/sqlite_test.go
+  s_e39cda52ab1860::t_641764a88da7c5 276-278
+  s_e8aa3bfc7aa1ca::t_4fe7a1ed33c621 10
+  s_e39cda52ab1860::t_11ff12b7675a37 102,338-344
+  s_e39cda52ab1860::t_3f863771bc29f7 279-281
+  s_e39cda52ab1860::t_0e203e4b0af958 331-337
+  s_e8aa3bfc7aa1ca::t_028bb00200c934 40,54-101
+  s_e39cda52ab1860::t_f558bf9e9676a0 103-104
+internal/center/service.go
+  s_e39cda52ab1860::t_0343ac3a2611d2 195-197
+  s_e8aa3bfc7aa1ca::t_2f97a07749dfb2 168,170-171
+  s_e8aa3bfc7aa1ca::t_2e9f793f404bdd 95-96,98-100
+  s_e39cda52ab1860::t_d5c4d36e9309b2 198-206
+internal/templates/modules/business/compose.nvidia.yml
+  s_e39cda52ab1860::t_95b5adf1a60bdc 22-24
+internal/templates/decodeonly.go
+  s_e39cda52ab1860::t_5156de0f2f76c3 1-52
+internal/provision/reset.go
+  s_e39cda52ab1860::t_3f155bd6b51958 45
+internal/templates/embed.go
+  s_e39cda52ab1860::t_57becf8c9bac5c 261
+  s_e39cda52ab1860::t_ae7cd0fa7056b3 585,587
+  s_e39cda52ab1860::t_0304c9dc172096 435-440,444-448,459,461,465,467,474-497,510,520
+  s_e39cda52ab1860::t_39cceb8e486df3 524-525,529-553,567,569
+  s_e39cda52ab1860::t_65a237b23c0876 225-228
+  s_e39cda52ab1860::t_c9d61d42a57b76 603
+  s_e39cda52ab1860::t_633b47096f404e 273
+  s_e39cda52ab1860::t_c27af346c37c2b 229-234
+internal/modular/config.go
+  s_e39cda52ab1860::t_62be1e7db2f227 60-85
+internal/center/testalarm_test.go
+  s_e8aa3bfc7aa1ca::t_cfad8adf5662a7 10,30-31,33,35,38-41,43-44
+internal/templates/embed_test.go
+  s_e39cda52ab1860::t_03c52528e497ec 97
+  s_e39cda52ab1860::t_0ef51aa3b2b822 35
+  s_e39cda52ab1860::t_e7d515bb29893e 288
+  s_e39cda52ab1860::t_b6a30c2ab5db6a 55
+  s_e39cda52ab1860::t_545bb9a9781912 360
+internal/store/sqlite.go
+  s_e39cda52ab1860::t_a0dc2351cc1700 135-136
+  s_e39cda52ab1860::t_6d1a6f69764f51 403
+  s_e39cda52ab1860::t_fb3a70a3a83792 137-138
+  s_e8aa3bfc7aa1ca::t_11872daee274ab 265-315
+  s_e8aa3bfc7aa1ca::t_ce55304472881e 12
+  s_e39cda52ab1860::t_0f575cbc2b81be 351
+  s_e39cda52ab1860::t_99b71d36805dd0 362,382
+  s_e8aa3bfc7aa1ca::t_058852229d8b31 139
+internal/templates/modules.go
+  s_e39cda52ab1860::t_c119750e30dc3f 60
+  s_e39cda52ab1860::t_3cd567768109be 104
+  s_e39cda52ab1860::t_0533c5f879b231 44
+internal/provision/modules.go
+  s_e39cda52ab1860::t_258a035a349735 19-27,31,38,48-51
+internal/provision/module_setup.go
+  s_e39cda52ab1860::t_18adb6c50bec9d 60
+internal/templates/singleworker_test.go
+  s_e39cda52ab1860::t_9f3d752c865300 1-80
+internal/provision/service.go
+  s_e39cda52ab1860::t_01c9e8bf98451e 229
+  s_e39cda52ab1860::t_053a52076358f8 188-191,204-205
+  s_e39cda52ab1860::t_8129d36198cb34 228
+  s_e8aa3bfc7aa1ca::t_4be27d7f34cdd0 230
+  s_e39cda52ab1860::t_8bd301937cb536 206
+web/src/style.css
+  s_e39cda52ab1860::t_0fbf88cfe58d00 23
+CLAUDE.md
+  s_e39cda52ab1860::t_28a0356a0663c9 86
+  s_e39cda52ab1860::t_cfabaae939278c 54
+  s_e8aa3bfc7aa1ca::t_6b04892b5ecd10 94
+  s_e39cda52ab1860::t_b41c6d5f626fc5 85
+  s_e39cda52ab1860::t_a98444345a0bbd 68
+internal/modular/config_test.go
+  s_e39cda52ab1860::t_03f5c9e6994987 10-48
+internal/provision/wms.go
+  s_e39cda52ab1860::t_99ba5ea0bafbb0 33
+  s_e39cda52ab1860::t_9c57d5f6efca3a 63
+  s_e39cda52ab1860::t_f009757361c285 70
+  s_e8aa3bfc7aa1ca::t_2c7bd2cc47c091 71
+  s_e39cda52ab1860::t_07f81c61c7518a 20-24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "efe4f78539be4b5362a5e3327cb0e32af7cd9c55",
+  "prompts": {},
+  "sessions": {
+    "s_e39cda52ab1860": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ae245d3b-e3d1-46ca-b164-30df4c5d0255",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_e8aa3bfc7aa1ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a0777b79-9bcd-48eb-b432-b2db4fad3120",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
