@@ -7,7 +7,7 @@ import (
 	"center-cv-manager/internal/domain"
 )
 
-// notificationSender 返回中心的飞书通知发送器；开启告警控制（test_mode）
+// notificationSender 返回中心的飞书通知发送器；平台告警关闭（test_mode）
 // 的中心返回 nil，静默该中心的全部管理端通知（发布开始/结束、初始化、暂停/恢复、模型固定/解绑）。
 // 各通知函数对 nil 发送器均为安全空操作，任务本身不受影响。
 func (s *Server) notificationSender(center domain.Center) textSender {

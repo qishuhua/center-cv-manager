@@ -58,8 +58,8 @@ func New(store Store, cipher *secret.Cipher, root string, prometheusURL string) 
 }
 
 // targetGroup 是 prometheus file_sd 的清单格式，也是 dashboard-generator 的
-// 输入；site 用中心 ID 前 8 位短 slug，gpu_vendor 取检测平台。告警控制中心
-// 不写入清单（完全不探测）。
+// 输入；site 用中心 ID 前 8 位短 slug，gpu_vendor 取检测平台。平台告警
+// 静默中心（test_mode）不写入清单（完全不探测）。
 type targetGroup struct {
 	Targets []string          `json:"targets"`
 	Labels  map[string]string `json:"labels"`
@@ -78,8 +78,8 @@ func (s *Service) Sync() error {
 	groups := make([]targetGroup, 0, len(centers))
 	seen := map[string]bool{}
 	for _, c := range centers {
-		// 告警控制中心完全不探测：不写入 targets（prometheus 不抓取，生成器
-		// 随之自动清理其数据源与仪表盘），关闭告警控制后自动恢复。
+		// 平台告警静默中心完全不探测：不写入 targets（prometheus 不抓取，
+		// 生成器随之自动清理其数据源与仪表盘），重新打开平台告警后自动恢复。
 		if c.TestMode {
 			continue
 		}
@@ -202,7 +202,7 @@ func (s *Service) Status(ctx context.Context) Status {
 		vendor := monitorVendor(c)
 		switch {
 		case c.TestMode:
-			item.Reason = "告警控制开启时不探测，关闭后自动纳入"
+			item.Reason = "平台告警已关闭：不探测，重新打开后自动纳入"
 		case vendor != "nvidia" && vendor != "denglin":
 			if vendor == "auto" || vendor == "" {
 				item.Reason = "硬件平台未检测，请先执行硬件检测"

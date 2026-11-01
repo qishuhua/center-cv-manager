@@ -253,19 +253,20 @@ func (s *Server) saveCenter(c *gin.Context) {
 		fail(c, 400, e)
 		return
 	}
-	// 业务模块托管设置（错分检测、Debug 模式、存图、飞书告警测试）同步到远端 business 模块
-	//（module.env + Compose）：保存即幂等同步，不比较新旧值——远端文件
-	// 无变化时只读比对、零写入，而上次同步失败的中心（记录已更新、远端
-	// 仍旧值）在任意一次保存时自动重试，避免漂移被后续"值未变化"的保存
-	// 掩盖。初始化前/重置后的中心等初始化渲染时带上。
+	// 中心托管设置同步到远端（错分检测、Debug 模式、存图、飞书告警测试 →
+	// business 模块 module.env + Compose；平台告警开关 → monitoring 模块
+	// alertmanager Webhook 文件 + SIGHUP 即时静默/恢复）：保存即幂等同步，
+	// 不比较新旧值——远端文件无变化时只读比对、零写入，而上次同步失败的
+	// 中心（记录已更新、远端仍旧值）在任意一次保存时自动重试，避免漂移被
+	// 后续"值未变化"的保存掩盖。初始化前/重置后的中心等初始化渲染时带上。
 	if old.ID != "" && old.Deployment != nil && out.Deployment != nil {
 		status := out.Deployment.Status
 		if status != "preparing" && status != "reset" {
 			ctx, cancel := context.WithTimeout(c.Request.Context(), 45*time.Second)
 			defer cancel()
 			if syncErr := s.provisioning.ApplyBusinessSettings(ctx, out.ID); syncErr != nil {
-				log.Printf("业务模块托管设置同步失败 center=%s(%s): %v", out.ID, out.Name, syncErr)
-				fail(c, 500, fmt.Errorf("中心已保存，但业务模块托管设置同步失败: %w", syncErr))
+				log.Printf("中心托管设置同步失败 center=%s(%s): %v", out.ID, out.Name, syncErr)
+				fail(c, 500, fmt.Errorf("中心已保存，但托管设置同步失败: %w", syncErr))
 				return
 			}
 		}

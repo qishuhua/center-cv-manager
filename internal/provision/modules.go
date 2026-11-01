@@ -61,9 +61,12 @@ func (s *Service) prepareModules(ctx context.Context, remote *sshx.DockerClient,
 		if err != nil {
 			return err
 		}
-		if strings.TrimSpace(state) == "exists" {
+		if strings.TrimSpace(state) == "exists" && rel != "monitoring/alerting/feishu-webhook-url" {
 			continue
 		}
+		// 例外：飞书 Webhook 文件由管理端全权托管（全局凭据 + 平台告警开关），
+		// 重新初始化也按当前状态重写（保存中心时的 ensurePlatformAlerts 同口径
+		// 收敛），否则重置期间切换开关会让旧值滞留到下次保存。
 		mode := "0644"
 		if strings.HasSuffix(rel, ".sh") {
 			mode = "0755"

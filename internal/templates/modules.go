@@ -9,6 +9,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// SilencedFeishuWebhook 是「平台告警」关闭（test_mode）的中心写入
+// monitoring/alerting/feishu-webhook-url 的占位地址：alertmanager 配置不
+// 变（url_file 仍被引用），通知发送必然失败仅记日志，中心本地告警评估与
+// UI 不受影响。指向中心本机 discard 端口，连接立即被拒，不产生外发流量。
+// 与开发机 monitor 包的 unconfiguredWebhook 同套路。
+const SilencedFeishuWebhook = "http://127.0.0.1:9/platform-alerts-silenced"
+
 // RenderModules returns independent files based on the categorized Docker
 // repository templates. Legacy rendering remains separate for existing centers.
 func RenderModules(platform string, opts RenderOptions) (map[string]string, error) {

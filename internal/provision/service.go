@@ -208,6 +208,13 @@ func (s *Service) Initialize(ctx context.Context, centerID string, r Reporter) e
 	if err != nil {
 		return err
 	}
+	// 平台告警关闭（test_mode）的中心初始化即写入占位地址：中心本地
+	// alertmanager 评估照常、通知不外发；重新打开后经保存中心的同步路径
+	//（ensurePlatformAlerts）恢复真实 Webhook。
+	alertWebhook := alertConfig.FeishuWebhook
+	if stored.TestMode {
+		alertWebhook = templates.SilencedFeishuWebhook
+	}
 	modelsRoot := centerpath.ModelsRoot(composeFile)
 	logsRoot := centerpath.LogsRoot(composeFile)
 	mediaResourcesRoot := centerpath.MediaResourcesRoot(composeFile)
@@ -223,7 +230,7 @@ func (s *Service) Initialize(ctx context.Context, centerID string, r Reporter) e
 	if stored.Deployment != nil {
 		return s.prepareModules(ctx, remote, stored, composeFile, accelerator, cpuCount, gpuCount, templates.RenderOptions{
 			Workers: workers, CPUSets: cpuSets, ModelsRoot: modelsRoot, LogsRoot: logsRoot, MediaResourcesRoot: mediaResourcesRoot,
-			ServerName: stored.Name, FeishuWebhook: alertConfig.FeishuWebhook,
+			ServerName: stored.Name, FeishuWebhook: alertWebhook,
 			WMSURL: stored.WMSURL, MisAuth: stored.MisAuth, MisSortEnabled: stored.MisSortEnabled, MisSortIntervalSeconds: stored.MisSortIntervalSeconds,
 			DebugLogEnabled: stored.DebugLogEnabled, SaveImageEnabled: stored.SaveImageEnabled, DecodeOnlyEnabled: stored.DecodeOnlyEnabled,
 			SingleWorker: stored.SingleInstanceEnabled,
@@ -232,7 +239,7 @@ func (s *Service) Initialize(ctx context.Context, centerID string, r Reporter) e
 	}
 	if err = templates.Render(mode, root, templates.RenderOptions{
 		Workers: workers, CPUSets: cpuSets, ModelsRoot: modelsRoot, LogsRoot: logsRoot, MediaResourcesRoot: mediaResourcesRoot,
-		WorkerEnv: map[string]string{"TZ": "Asia/Shanghai"}, ServerName: stored.Name, FeishuWebhook: alertConfig.FeishuWebhook,
+		WorkerEnv: map[string]string{"TZ": "Asia/Shanghai"}, ServerName: stored.Name, FeishuWebhook: alertWebhook,
 	}, r.Log); err != nil {
 		return err
 	}
