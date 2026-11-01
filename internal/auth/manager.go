@@ -59,7 +59,8 @@ type UserInfo struct {
 
 // authFile 是当前的凭据文件格式：多用户数组。
 type authFile struct {
-	Users []User `json:"users"`
+	Users  []User     `json:"users"`
+	Tokens []APIToken `json:"api_tokens,omitempty"`
 }
 
 // legacyAuthFile 是旧的单用户格式，读取时自动迁移为 users 数组。
@@ -87,6 +88,7 @@ type Manager struct {
 	mu       sync.Mutex
 	path     string
 	users    []User
+	tokens   []APIToken
 	sessions map[string]session
 	failures map[string]failure
 	now      func() time.Time
@@ -117,6 +119,7 @@ func (m *Manager) loadOrCreate() error {
 			migrated = true
 		}
 		m.users = file.Users
+		m.tokens = file.Tokens
 		fixed := enforceSuperAdmin(m.users)
 		if err = m.validateUsersLocked(); err != nil {
 			return err
@@ -324,6 +327,7 @@ func (m *Manager) DeleteUser(actor, username string) error {
 		return ErrLastAdmin
 	}
 	m.users = append(m.users[:index], m.users[index+1:]...)
+	m.removeUserTokensLocked(username)
 	if err := m.saveLocked(); err != nil {
 		return err
 	}
@@ -345,6 +349,9 @@ func (m *Manager) SetUserRole(username, role string) (UserInfo, error) {
 	}
 	if u.Role == RoleAdmin && role != RoleAdmin && m.adminCountLocked() <= 1 {
 		return UserInfo{}, ErrLastAdmin
+	}
+	if u.Role != role {
+		m.removeUserTokensLocked(username)
 	}
 	u.Role = role
 	if err := m.saveLocked(); err != nil {
@@ -368,6 +375,7 @@ func (m *Manager) ResetUserPassword(username, newPassword string) (UserInfo, err
 	}
 	u.PasswordHash = string(hash)
 	u.MustChangePassword = true
+	m.removeUserTokensLocked(username)
 	if err = m.saveLocked(); err != nil {
 		return UserInfo{}, err
 	}
@@ -413,7 +421,7 @@ func (m *Manager) saveLocked() error {
 	if err := os.MkdirAll(filepath.Dir(m.path), 0700); err != nil {
 		return err
 	}
-	data, err := json.MarshalIndent(authFile{Users: m.users}, "", "  ")
+	data, err := json.MarshalIndent(authFile{Users: m.users, Tokens: m.tokens}, "", "  ")
 	if err != nil {
 		return err
 	}

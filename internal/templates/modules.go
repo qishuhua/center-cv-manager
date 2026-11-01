@@ -98,11 +98,11 @@ func RenderModules(platform string, opts RenderOptions) (map[string]string, erro
 	for _, id := range []string{"infra", "logging", "business", "gateway", "monitoring"} {
 		stub := "# Module-specific Compose variables\n"
 		if id == "business" {
-			stub = ApplyMisSortModuleEnv(stub, MisSortOptions{Enabled: opts.WMSURL != "" && opts.MisSortEnabled, WMSURL: opts.WMSURL, MisAuth: opts.MisAuth})
+			stub = ApplyMisSortModuleEnv(stub, MisSortOptions{Enabled: opts.WMSURL != "" && opts.MisSortEnabled, WMSURL: opts.WMSURL, MisAuth: opts.MisAuth, IntervalSeconds: opts.MisSortIntervalSeconds})
 			stub = ApplyLogLevelModuleEnv(stub, opts.DebugLogEnabled)
 			stub = ApplySaveImageModuleEnv(stub, opts.SaveImageEnabled)
 			stub = ApplyDecodeOnlyModuleEnv(stub, opts.DecodeOnlyEnabled)
-			stub = ApplyTestAlarmModuleEnv(stub, opts.TestAlarmEnabled, opts.TestAlarmWebhook)
+			stub = ApplyTestAlarmModuleEnv(stub, opts.TestAlarmEnabled, opts.TestAlarmWebhook, opts.TestAlarmPlayerURL)
 		}
 		files[id+"/module.env"] = stub
 	}

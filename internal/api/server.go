@@ -82,6 +82,7 @@ func (s *Server) Router() *gin.Engine {
 	_ = r.SetTrustedProxies(nil)
 	r.Use(gin.Logger(), gin.Recovery())
 	root := r.Group("/api/v1")
+	s.registerMCP(root)
 	root.GET("/health", func(c *gin.Context) { ok(c, map[string]any{"status": "ok", "time": time.Now()}) })
 	root.GET("/auth/status", s.authStatus)
 	root.POST("/auth/login", s.login)
@@ -91,6 +92,9 @@ func (s *Server) Router() *gin.Engine {
 	// 查看用户可访问的只读数据接口；硬件检测只读取远端状态并刷新本地缓存。
 	api := root.Group("")
 	api.Use(s.requireAuth())
+	api.GET("/mcp-tokens", s.listTokens)
+	api.POST("/mcp-tokens", s.createToken)
+	api.DELETE("/mcp-tokens/:id", s.revokeToken)
 	api.GET("/centers", s.listCenters)
 	api.POST("/centers/:id/detect", s.detectCenter)
 	api.GET("/centers/:id/modules", s.listModules)
@@ -114,6 +118,7 @@ func (s *Server) Router() *gin.Engine {
 	api.GET("/tasks/:id/logs", s.taskLogs)
 	api.GET("/tasks/:id/events", s.taskEvents)
 	api.GET("/settings/status", s.settingsStatus)
+	api.GET("/settings/model-convert", s.getModelConvertSettings)
 	api.GET("/registry/versions", s.listRegistryVersions)
 	api.GET("/monitoring/status", s.monitoringStatus)
 
@@ -166,6 +171,8 @@ func (s *Server) Router() *gin.Engine {
 	admin.DELETE("/model-uploads/:id", s.abortModelUpload)
 	admin.POST("/model-releases/plan", s.modelReleasePlan)
 	admin.POST("/model-releases", s.releaseModels)
+	admin.PUT("/settings/model-convert", s.saveModelConvertSettings)
+	admin.POST("/models/convert", s.convertModel)
 	admin.POST("/sources", s.saveSource)
 	admin.PUT("/sources/:id", s.saveSource)
 	admin.DELETE("/sources/:id", s.deleteSource)
@@ -1619,6 +1626,7 @@ func (s *Server) release(c *gin.Context) {
 			"versions":    job.versionsText,
 			"items":       string(encodedItems),
 			"model_items": job.encoded,
+			"operator":    releaseOperator(c),
 		}
 		centerID, centerName, modelItems := job.center.ID, job.center.Name, job.modelItems
 		notify := notifier != nil && !job.center.TestMode
@@ -1852,7 +1860,17 @@ func uniqueStrings(values []string) []string {
 
 func (s *Server) listTasks(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
-	ok(c, s.tasks.List(limit))
+	list := s.tasks.List(limit)
+	if kind := c.Query("type"); kind != "" {
+		filtered := make([]*domain.Task, 0, len(list))
+		for _, t := range list {
+			if t.Type == kind {
+				filtered = append(filtered, t)
+			}
+		}
+		list = filtered
+	}
+	ok(c, list)
 }
 func (s *Server) getTask(c *gin.Context) {
 	v, found := s.tasks.Get(c.Param("id"))

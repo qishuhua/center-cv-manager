@@ -30,6 +30,36 @@ func TestEmptyListsAreNotNil(t *testing.T) {
 	}
 }
 
+func TestModelConvertSettingsRoundTrip(t *testing.T) {
+	st, err := Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if empty, err := st.GetModelConvertSettings(); err != nil || empty.Nvidia.Configured() || empty.Denglin.Configured() {
+		t.Fatalf("初始转换设置应为空: %#v %v", empty, err)
+	}
+	now := time.Now()
+	saved := domain.ModelConvertSettings{
+		Nvidia:    domain.ModelConvertPlatform{CenterID: "c-nvidia", DockerArgs: "--gpus all", Image: "nvcr.io/nvidia/tensorrt:24.01-py3", Command: "trtexec --onnx=/work/source.onnx --saveEngine=/work/output.plan"},
+		Denglin:   domain.ModelConvertPlatform{CenterID: "c-denglin", DockerArgs: "--device /dev/dlcard", Image: "denglin/toolchain:1", Command: "dlc /work/source.onnx /work/output.engine"},
+		UpdatedAt: now,
+	}
+	if !saved.Nvidia.Configured() || !saved.Denglin.Configured() {
+		t.Fatal("完整配置的 Platform 应报告 Configured")
+	}
+	if err = st.SaveModelConvertSettings(saved); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := st.GetModelConvertSettings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Nvidia != saved.Nvidia || loaded.Denglin != saved.Denglin {
+		t.Fatalf("转换设置往返不一致: %#v", loaded)
+	}
+}
+
 func TestCenterTestAlarmFieldsRoundTrip(t *testing.T) {
 	st, err := Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
@@ -267,6 +297,9 @@ func TestCenterRuntimeSchemaUpgrade(t *testing.T) {
 	if !loaded.MisSortEnabled {
 		t.Fatal("错分检测开关迁移默认值应为启用（1），由 wms_url 是否非空决定实际生效")
 	}
+	if loaded.MisSortIntervalSeconds != 3600 {
+		t.Fatalf("错分轮询周期迁移默认值应为 3600，实际 %d", loaded.MisSortIntervalSeconds)
+	}
 	if loaded.DebugLogEnabled {
 		t.Fatal("Debug 模式开关迁移默认值应为关闭（0）")
 	}
@@ -279,7 +312,7 @@ func TestCenterRuntimeSchemaUpgrade(t *testing.T) {
 	if loaded.SingleInstanceEnabled {
 		t.Fatal("单实例模式开关迁移默认值应为关闭（0）")
 	}
-	loaded.WMSURL, loaded.MisAuth = "http://10.21.61.48:31995", "auth"
+	loaded.WMSURL, loaded.MisAuth, loaded.MisSortIntervalSeconds = "http://10.21.61.48:31995", "auth", 120
 	loaded.TestMode = true
 	if err = st.SaveCenter(loaded); err != nil {
 		t.Fatal(err)
@@ -291,6 +324,9 @@ func TestCenterRuntimeSchemaUpgrade(t *testing.T) {
 	if reloaded.WMSURL != "http://10.21.61.48:31995" || reloaded.MisAuth != "auth" {
 		t.Fatalf("错分检测字段回读不匹配: %#v", reloaded)
 	}
+	if reloaded.MisSortIntervalSeconds != 120 {
+		t.Fatalf("错分轮询周期回读应为 120，实际 %d", reloaded.MisSortIntervalSeconds)
+	}
 	// 关闭开关：配置值保留、开关位清零，重新打开恢复。
 	reloaded.MisSortEnabled = false
 	if err = st.SaveCenter(reloaded); err != nil {
@@ -300,8 +336,8 @@ func TestCenterRuntimeSchemaUpgrade(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if disabled.MisSortEnabled || disabled.WMSURL != "http://10.21.61.48:31995" || disabled.MisAuth != "auth" {
-		t.Fatalf("关闭错分开关后配置值应保留: enabled=%v wms=%q mis=%q", disabled.MisSortEnabled, disabled.WMSURL, disabled.MisAuth)
+	if disabled.MisSortEnabled || disabled.WMSURL != "http://10.21.61.48:31995" || disabled.MisAuth != "auth" || disabled.MisSortIntervalSeconds != 120 {
+		t.Fatalf("关闭错分开关后配置值应保留: enabled=%v wms=%q mis=%q interval=%d", disabled.MisSortEnabled, disabled.WMSURL, disabled.MisAuth, disabled.MisSortIntervalSeconds)
 	}
 	reloaded.MisSortEnabled = true
 	if !reloaded.TestMode {

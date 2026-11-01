@@ -1,6 +1,6 @@
 export type UserRole='admin'|'viewer'
 export interface UserAccount {username:string;role:UserRole;must_change_password:boolean;created_at:string}
-export interface Center {deployment?:{reselection_required?:boolean;migration?:{completed:boolean};root:string;status:string;modules:ComposeModule[]};id?:string;name:string;host:string;port:number;console_port:number;username:string;auth_type:'password'|'private_key';password?:string;private_key?:string;passphrase?:string;host_key?:string;docker_socket:string;accelerator:'auto'|'nvidia'|'denglin'|'cpu';detected_accelerator?:string;cpu_count:number;gpu_count:number;compose_file:string;initialized_at?:string;description:string;wms_url?:string;mis_auth?:string;mis_sort_enabled?:boolean;test_mode?:boolean;debug_log_enabled?:boolean;save_image_enabled?:boolean;decode_only_enabled?:boolean;single_instance_enabled?:boolean;test_alarm_enabled?:boolean;feishu_webhook_url?:string;updated_at?:string}
+export interface Center {deployment?:{reselection_required?:boolean;migration?:{completed:boolean};root:string;status:string;modules:ComposeModule[]};id?:string;name:string;host:string;port:number;console_port:number;username:string;auth_type:'password'|'private_key';password?:string;private_key?:string;passphrase?:string;host_key?:string;docker_socket:string;accelerator:'auto'|'nvidia'|'denglin'|'cpu';detected_accelerator?:string;cpu_count:number;gpu_count:number;compose_file:string;initialized_at?:string;description:string;wms_url?:string;mis_auth?:string;mis_sort_enabled?:boolean;mis_sort_interval_seconds?:number;test_mode?:boolean;debug_log_enabled?:boolean;save_image_enabled?:boolean;decode_only_enabled?:boolean;single_instance_enabled?:boolean;test_alarm_enabled?:boolean;feishu_webhook_url?:string;updated_at?:string}
 export interface Source {id?:string;name:string;repository:string;description:string;updated_at?:string}
 export interface GitCredential {base_url:string;username:string;token?:string;configured:boolean;updated_at?:string}
 export interface Version {ref:string;commit:string;kind:'branch'|'tag'}
@@ -29,6 +29,8 @@ export interface EmptyModelFolder {model:string;files:number;size:number}
 export interface ModelUploadFile {path:string;size:number;upload_url?:string}
 export interface ModelUploadFormat {id:string;platform:ModelPlatform;hardware_profile?:string;files:ModelUploadFile[]}
 export interface ModelUpload {upload_id?:string;model:string;version:string;formats:ModelUploadFormat[]}
+export interface ModelConvertPlatform {center_id:string;docker_args:string;image:string;command:string}
+export interface ModelConvertSettings {nvidia:ModelConvertPlatform;denglin:ModelConvertPlatform;updated_at?:string}
 export interface ComposeDocument {center_id:string;path:string;content:string}
 export interface HardwareGPU {model:string;count:number;memory_bytes?:number}
 export interface HardwareDisk {device:string;mount_point:string;total_bytes:number;used_bytes:number;available_bytes:number;usage:string}

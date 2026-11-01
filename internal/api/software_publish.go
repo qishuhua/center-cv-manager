@@ -77,7 +77,7 @@ func (s *Server) publishSourceImage(c *gin.Context) {
 	}
 	sourceID, sourceName, ref := src.ID, src.Name, in.Ref
 	ok(c, s.tasks.Submit("PUBLISH_IMAGE", map[string]string{
-		"source_id": sourceID, "source_name": sourceName, "ref": ref, "commit": commit,
+		"source_id": sourceID, "source_name": sourceName, "ref": ref, "commit": commit, "operator": releaseOperator(c),
 		"versions": softwareVersionText(sourceName, ref, commit),
 	}, func(ctx context.Context, h *task.Handle) error {
 		h.Message(fmt.Sprintf("阶段 1/3：准备 %s 源码（%s@%s）", sourceName, ref, shortCommit(commit)))

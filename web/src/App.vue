@@ -12,7 +12,8 @@ const initializationDialog=ref<InstanceType<typeof InitializeCenterDialog>>()
 const initializationTask=(c:Center)=>tasks.value.find(t=>t.type==='INITIALIZE_CENTER'&&t.params?.center_id===c.id&&['PENDING','RUNNING'].includes(t.status))
 async function initializationSubmitted(task:Task){tasks.value.unshift(task);await openTask(task);await loadAll()}
 import UserManagement from './UserManagement.vue'
-import type {AlertCredential,BaseImageArchive,Center,CenterOverview,Checkout,ComposeDocument,CurrentModelVersion,EmptyModelFolder,GitCredential,HardwareInfo,ModelVersion,MonitoringCenterStatus,MonitoringStatus,OSSCredential,OverviewContainer,OverviewVersion,RegistrySettings,RegistrySoftwareVersion,RegistrySourceVersions,RegistryStorage,SoftwareImage,Source,Task,UserRole,Version} from './types'
+import McpTokens from './McpTokens.vue'
+import type {AlertCredential,BaseImageArchive,Center,CenterOverview,Checkout,ComposeDocument,CurrentModelVersion,EmptyModelFolder,GitCredential,HardwareInfo,ModelConvertSettings,ModelVersion,MonitoringCenterStatus,MonitoringStatus,OSSCredential,OverviewContainer,OverviewVersion,RegistrySettings,RegistrySoftwareVersion,RegistrySourceVersions,RegistryStorage,SoftwareImage,Source,Task,UserRole,Version} from './types'
 
 const YamlEditor=defineAsyncComponent(()=>import('./YamlEditor.vue'))
 
@@ -38,7 +39,7 @@ function guardAdminAction(){
 const loginForm=reactive({username:'',password:''}),passwordForm=reactive({old_password:'',new_password:'',confirm_password:''})
 const passwordDialog=ref(false),passwordSaving=ref(false)
 const centerDialog=ref(false),sourceDialog=ref(false),gitCredentialDialog=ref(false),ossCredentialDialog=ref(false),alertCredentialDialog=ref(false),modelUploadDialog=ref(false),modelUploadTarget=ref(''),logDrawer=ref(false),centerOverviewDrawer=ref(false),centerOperationDialog=ref(false),centerReleaseDialog=ref(false),composeDrawer=ref(false),hardwareDialog=ref(false)
-const centerForm=reactive<Center>({name:'',host:'',port:22,console_port:8080,username:'root',auth_type:'password',password:'',private_key:'',passphrase:'',docker_socket:'/var/run/docker.sock',accelerator:'auto',cpu_count:0,gpu_count:0,compose_file:'~/.local/share/center-manager/deploy/docker-compose.yml',description:'',wms_url:'',mis_auth:'',mis_sort_enabled:false,test_mode:false,debug_log_enabled:false,save_image_enabled:false,decode_only_enabled:false,single_instance_enabled:false,test_alarm_enabled:false,feishu_webhook_url:''})
+const centerForm=reactive<Center>({name:'',host:'',port:22,console_port:8080,username:'root',auth_type:'password',password:'',private_key:'',passphrase:'',docker_socket:'/var/run/docker.sock',accelerator:'auto',cpu_count:0,gpu_count:0,compose_file:'~/.local/share/center-manager/deploy/docker-compose.yml',description:'',wms_url:'',mis_auth:'',mis_sort_enabled:false,mis_sort_interval_seconds:3600,test_mode:false,debug_log_enabled:false,save_image_enabled:false,decode_only_enabled:false,single_instance_enabled:false,test_alarm_enabled:false,feishu_webhook_url:''})
 const misSortEnabled=ref(false)
 // 开关只控制启用状态：关闭时 WMS/misAuth 原值保留（表单隐藏但提交原值），
 // 重新打开即可恢复使用，不丢失任何配置。
@@ -289,7 +290,7 @@ async function changePassword(){
 }
 async function skipPasswordChange(){authLoading.value=true;try{await http.post('/auth/skip-password-change');authState.must_change_password=false;resetPasswordForm();await loadAll()}catch(e:any){ElMessage.error(e.message)}finally{authLoading.value=false}}
 async function logout(){try{await http.post('/auth/logout')}finally{Object.assign(authState,{authenticated:false,username:'',role:'',must_change_password:false});loginForm.password='';passwordDialog.value=false;resetPasswordForm()}}
-function resetCenter(){Object.assign(centerForm,{id:undefined,name:'',host:'',port:22,console_port:8080,username:'root',auth_type:'password',password:'',private_key:'',passphrase:'',host_key:'',docker_socket:'/var/run/docker.sock',accelerator:'auto',detected_accelerator:'',cpu_count:0,gpu_count:0,compose_file:'~/.local/share/center-manager/deploy/docker-compose.yml',initialized_at:undefined,description:'',wms_url:'',mis_auth:'',mis_sort_enabled:false,test_mode:false,debug_log_enabled:false,save_image_enabled:false,decode_only_enabled:false,single_instance_enabled:false,test_alarm_enabled:false,feishu_webhook_url:''});misSortEnabled.value=false}
+function resetCenter(){Object.assign(centerForm,{id:undefined,name:'',host:'',port:22,console_port:8080,username:'root',auth_type:'password',password:'',private_key:'',passphrase:'',host_key:'',docker_socket:'/var/run/docker.sock',accelerator:'auto',detected_accelerator:'',cpu_count:0,gpu_count:0,compose_file:'~/.local/share/center-manager/deploy/docker-compose.yml',initialized_at:undefined,description:'',wms_url:'',mis_auth:'',mis_sort_enabled:false,mis_sort_interval_seconds:3600,test_mode:false,debug_log_enabled:false,save_image_enabled:false,decode_only_enabled:false,single_instance_enabled:false,test_alarm_enabled:false,feishu_webhook_url:''});misSortEnabled.value=false}
 function editCenter(v?:Center){if(!guardAdminAction())return;resetCenter();if(v)Object.assign(centerForm,v);misSortEnabled.value=!!centerForm.wms_url&&centerForm.mis_sort_enabled===true;if(misSortEnabled.value&&!centerForm.mis_auth)centerForm.mis_auth='20260606123a';centerDialog.value=true}
 async function saveCenter(){if(!guardAdminAction())return;centerForm.mis_sort_enabled=misSortEnabled.value;try{const isNew=!centerForm.id;const path=isNew?'/centers':`/centers/${centerForm.id}`;const result:Center=isNew?await http.post(path,centerForm):await http.put(path,centerForm);centerDialog.value=false;await loadAll();ElMessage.success('中心已保存');if(isNew)await initializationDialog.value?.open(result)}catch(e:any){ElMessage.error(e.message)}}
 async function removeCenter(v:Center){if(!guardAdminAction())return;await ElMessageBox.confirm(`确定删除中心“${v.name}”？`,'确认');try{await http.delete(`/centers/${v.id}`);ElMessage.success('已删除');await loadAll()}catch(e:any){ElMessage.error(e.message)}}
@@ -356,6 +357,14 @@ async function loadEmptyModelFolders(){try{const data=await http.get('/models/em
 async function refreshModelsPage(){await Promise.all([loadModels(),loadEmptyModelFolders()])}
 async function openModels(){section.value='models';if(ossCredential.configured)await refreshModelsPage()}
 function openModelUpload(model=''){if(!guardAdminAction())return;modelUploadTarget.value=model;modelUploadDialog.value=true}
+const emptyConvertPlatform=():ModelConvertSettings['nvidia']=>({center_id:'',docker_args:'',image:'',command:''})
+const modelConvertSettingsDialog=ref(false),modelConvertSaving=ref(false)
+const modelConvertSettingsForm=reactive<ModelConvertSettings>({nvidia:emptyConvertPlatform(),denglin:emptyConvertPlatform()})
+async function editModelConvertSettings(){if(!guardAdminAction())return;try{const settings:ModelConvertSettings=await http.get('/settings/model-convert');modelConvertSettingsForm.nvidia=settings.nvidia||emptyConvertPlatform();modelConvertSettingsForm.denglin=settings.denglin||emptyConvertPlatform()}catch(e:any){ElMessage.error(e.message);return}modelConvertSettingsDialog.value=true}
+async function saveModelConvertSettings(){if(!guardAdminAction())return;modelConvertSaving.value=true;try{await http.put('/settings/model-convert',modelConvertSettingsForm);ElMessage.success('模型转换设置已保存');modelConvertSettingsDialog.value=false}catch(e:any){ElMessage.error(e.message)}finally{modelConvertSaving.value=false}}
+const modelConvertDialog=reactive<{visible:boolean;version:ModelVersion|null;platform:'nvidia'|'denglin';submitting:boolean}>({visible:false,version:null,platform:'nvidia',submitting:false})
+function openModelConvert(version:ModelVersion){if(!guardAdminAction())return;modelConvertDialog.version=version;modelConvertDialog.platform='nvidia';modelConvertDialog.visible=true}
+async function submitModelConvert(){if(!modelConvertDialog.version)return;modelConvertDialog.submitting=true;try{const task:Task=await http.post('/models/convert',{platform:modelConvertDialog.platform,manifest_key:modelConvertDialog.version.manifest_key,manifest_digest:modelConvertDialog.version.manifest_digest});modelConvertDialog.visible=false;tasks.value.unshift(task);await openTask(task);await loadModels()}catch(e:any){ElMessage.error(e.message)}finally{modelConvertDialog.submitting=false}}
 function modelSelections(){return models.value.filter(item=>deployForm.model_keys.includes(item.manifest_key)).map(item=>({manifest_key:item.manifest_key,manifest_digest:item.manifest_digest}))}
 function beginCenterRelease(title:string,stage:string){centerReleaseWorkflowID++;centerReleaseTitle.value=title;centerReleaseStage.value=stage;centerReleaseProgress.value=0;centerReleaseMessage.value='正在准备发布…';centerReleaseError.value='';centerReleaseTask.value=null;centerReleaseLogs.value=[];centerReleaseDialog.value=true;return centerReleaseWorkflowID}
 function prepareCenterReleaseStage(stage:string,progress:number,message:string){centerReleaseTask.value=null;centerReleaseStage.value=stage;centerReleaseProgress.value=progress;centerReleaseMessage.value=message}
@@ -526,12 +535,13 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
         <el-menu-item index="sources"><el-icon><Files/></el-icon>软件仓库</el-menu-item>
         <el-menu-item index="releases"><el-icon><Promotion/></el-icon>版本发布</el-menu-item>
         <el-menu-item index="tasks"><el-icon><VideoPlay/></el-icon>任务与日志</el-menu-item>
+        <el-menu-item index="mcp-tokens"><el-icon><Lock/></el-icon>MCP 令牌</el-menu-item>
         <el-menu-item v-if="isAdmin" index="users"><el-icon><User/></el-icon>用户管理</el-menu-item>
       </el-menu>
       <div class="account"><span><el-icon><User/></el-icon>{{authState.username}}<el-tag size="small" :type="isAdmin?'primary':'info'" effect="plain">{{isAdmin?'管理员':'查看用户'}}</el-tag></span><button title="修改密码" aria-label="修改密码" @click="openPasswordDialog"><el-icon><Lock/></el-icon><span class="account-label">修改密码</span></button><button title="退出" aria-label="退出" @click="logout"><el-icon><SwitchButton/></el-icon>退出</button></div>
     </el-aside>
     <el-main class="main" :class="{'terminal-main':section==='terminal'}" v-loading="loading">
-      <header v-if="section!=='terminal'"><div><h1>{{section==='overview'?'运行总览':section==='centers'?'中心服务器':section==='terminal'?'SSH 终端':section==='base-images'?'基础镜像':section==='models'?'模型仓库':section==='sources'?'软件仓库':section==='releases'?'版本发布':section==='users'?'用户管理':'任务与日志'}}</h1><p v-if="['terminal','releases','base-images','models','sources','users'].includes(section)">{{section==='terminal'?'连接已配置的中心服务器并进行交互式运维':section==='releases'?'从镜像仓库选择软件镜像版本，与模型版本一起发布到各中心':section==='base-images'?'从 OSS 按中心显卡类型下载并更新基础镜像':section==='models'?'上传和发布按硬件格式组织的模型版本':section==='sources'?'管理软件源码地址，构建并发布镜像版本到镜像仓库':section==='users'?'管理登录账号与角色；普通用户仅可查看各中心状态':''}}</p></div><el-button :icon="Refresh" circle @click="refreshCurrent"/></header>
+      <header v-if="section!=='terminal'"><div><h1>{{section==='overview'?'运行总览':section==='centers'?'中心服务器':section==='terminal'?'SSH 终端':section==='base-images'?'基础镜像':section==='models'?'模型仓库':section==='sources'?'软件仓库':section==='releases'?'版本发布':section==='users'?'用户管理':section==='mcp-tokens'?'MCP 令牌':'任务与日志'}}</h1><p v-if="['terminal','releases','base-images','models','sources','users'].includes(section)">{{section==='terminal'?'连接已配置的中心服务器并进行交互式运维':section==='releases'?'从镜像仓库选择软件镜像版本，与模型版本一起发布到各中心':section==='base-images'?'从 OSS 按中心显卡类型下载并更新基础镜像':section==='models'?'上传和发布按硬件格式组织的模型版本':section==='sources'?'管理软件源码地址，构建并发布镜像版本到镜像仓库':section==='users'?'管理登录账号与角色；普通用户仅可查看各中心状态':''}}</p></div><el-button :icon="Refresh" circle @click="refreshCurrent"/></header>
 
       <template v-if="section==='overview'">
         <div class="overview-dashboard" v-loading="overviewLoading">
@@ -586,10 +596,10 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
         <el-alert class="compat-alert" title="模型仓库只负责上传和管理版本；需要部署或更新模型时，请前往版本发布。" type="info" :closable="false" show-icon/>
         <div class="toolbar">
           <div><p>模型与基础镜像共用 OSS Endpoint、Bucket 和加密访问凭据。</p><el-tag :type="ossCredential.configured?'success':'warning'">{{ossCredential.configured?(ossCredential.bucket?`${ossCredential.bucket}/${ossCredential.models_prefix}`:'已配置 OSS'):'尚未配置 OSS'}}</el-tag></div>
-          <div><el-button :icon="Lock" @click="editOSSCredential">配置 OSS</el-button><el-button type="primary" :icon="UploadFilled" :disabled="!ossCredential.configured" @click="openModelUpload()">新建模型</el-button></div>
+          <div><el-button :icon="Lock" @click="editOSSCredential">配置 OSS</el-button><el-button v-if="isAdmin" :icon="Lock" @click="editModelConvertSettings">转换设置</el-button><el-button type="primary" :icon="UploadFilled" :disabled="!ossCredential.configured" @click="openModelUpload()">新建模型</el-button></div>
         </div>
         <el-alert v-if="!ossCredential.configured" title="请先配置 OSS Endpoint、Bucket、访问凭据和模型前缀。" type="warning" :closable="false" show-icon/>
-        <template v-else><ModelCatalog :models="models" :loading="modelsLoading" :selectable="false" :empty-folders="emptyModelFolders" @delete-model="deleteModelFolder" @refresh="refreshModelsPage" @upload-version="openModelUpload"/></template>
+        <template v-else><ModelCatalog :models="models" :loading="modelsLoading" :selectable="false" :empty-folders="emptyModelFolders" :convert-enabled="isAdmin" @delete-model="deleteModelFolder" @refresh="refreshModelsPage" @upload-version="openModelUpload" @convert="openModelConvert"/></template>
       </template>
       <template v-else-if="section==='sources'">
         <div class="toolbar"><div><p>所有同一 Git 服务下的软件仓库共用一套加密访问令牌。</p><el-tag :type="gitCredential.configured?'success':'warning'" effect="plain">{{gitCredential.configured?(gitCredential.base_url?`已配置：${gitCredential.base_url}`:'已配置访问令牌'):'尚未配置访问令牌'}}</el-tag>&nbsp;<el-tag :type="registrySettings.configured?'success':'info'" effect="plain">{{registrySettings.configured?(registrySettings.endpoint||'镜像仓库已配置'):'镜像仓库未启用'}}</el-tag></div><div><el-button :icon="Lock" @click="editRegistry">配置镜像仓库</el-button><el-button :icon="Lock" @click="editGitCredential">配置 Git 令牌</el-button><el-button type="primary" :icon="Plus" @click="editSource()">添加软件仓库</el-button></div></div>
@@ -613,6 +623,7 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
         <div v-if="deploymentTasks.length" class="panel deployment-results"><div class="panel-title"><div><h2>本次版本发布</h2><p>点击中心查看构建与部署各阶段日志。</p></div><el-button :icon="Refresh" @click="refreshDeploymentTasks">刷新状态</el-button></div><el-table :data="deploymentTasks" @row-click="openTask"><el-table-column label="中心" min-width="180"><template #default="{row}"><strong>{{row.params?.center_name||row.params?.center_id}}</strong></template></el-table-column><el-table-column label="发布版本" min-width="300"><template #default="{row}">{{row.params?.versions}}</template></el-table-column><el-table-column label="进度" width="180"><template #default="{row}"><el-progress :percentage="Math.round(row.progress||0)" :status="row.status==='FAILED'?'exception':row.status==='SUCCESS'?'success':undefined"/></template></el-table-column><el-table-column label="状态" width="120"><template #default="{row}"><el-tag :type="statusType(row.status)" effect="dark">{{row.status}}</el-tag></template></el-table-column><el-table-column label="当前阶段 / 失败原因" min-width="320"><template #default="{row}"><span :class="{'deploy-error':row.status==='FAILED'}">{{row.error||row.message||'等待执行'}}</span></template></el-table-column></el-table></div>
       </template>
 
+      <template v-else-if="section==='mcp-tokens'"><McpTokens :is-admin="isAdmin"/></template>
       <template v-else-if="section==='users'">
         <UserManagement :current-username="authState.username" :super-admin="isSuperAdmin" @role-changed="checkAuth"/>
       </template>
@@ -653,6 +664,7 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
       <template v-if="misSortEnabled">
         <el-form-item label="WMS 服务地址"><el-input v-model="centerForm.wms_url" placeholder="请输入 WMS 服务基地址，含协议、主机和端口，不含路径"/></el-form-item>
         <el-form-item label="WMS 鉴权 misAuth"><el-input v-model="centerForm.mis_auth" placeholder="留空使用默认 20260606123a"/></el-form-item>
+        <el-form-item label="轮询周期（秒）"><el-input-number v-model="centerForm.mis_sort_interval_seconds" :min="10" :max="86400" :step="60" style="width:100%"/><div class="form-tip">ingress 摄像机配置轮询周期，默认 3600 秒（1 小时），保存后随业务模块整体发布生效</div></el-form-item>
       </template>
       <el-form-item :label="centerForm.deployment?'部署目录锚点':'Compose 文件'"><el-input v-model="centerForm.compose_file" placeholder="例如 ~/.local/share/center-manager/deploy/docker-compose.yml"/><div class="form-tip">{{centerForm.deployment?'模块化中心此路径仅作部署目录锚点，实际入口为部署目录下各模块的 compose.yml + module.env，修改需谨慎。':'默认使用 SSH 用户家目录；初始化后会保存解析出的绝对路径。文件已存在时只导入，不会自动覆盖。'}}</div></el-form-item>
       <el-form-item label="说明"><el-input v-model="centerForm.description" type="textarea"/></el-form-item>
@@ -803,5 +815,36 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
   </el-dialog>
   <InitializeCenterDialog ref="initializationDialog" @task="initializationSubmitted"/>
   <ModelUploadDialog v-model="modelUploadDialog" :model-name="modelUploadTarget" @uploaded="loadModels"/>
+  <el-dialog v-model="modelConvertSettingsDialog" title="模型转换设置" width="720px">
+    <el-form label-width="110px">
+      <el-form-item v-for="platform of (['nvidia','denglin'] as const)" :key="platform" :label="platform==='nvidia'?'NVIDIA 构建机':'登临构建机'">
+        <div class="convert-platform-form">
+          <el-select v-model="modelConvertSettingsForm[platform].center_id" placeholder="选择已登记的中心服务器作为构建机" clearable filterable style="width:100%">
+            <el-option v-for="center in centers" :key="center.id" :value="center.id" :label="`${center.name}（${center.host}）`"/>
+          </el-select>
+          <el-input v-model="modelConvertSettingsForm[platform].docker_args" :placeholder="platform==='nvidia'?'--gpus all':'登临设备参数，如 --device /dev/dlcard'">
+            <template #prepend>docker 参数</template>
+          </el-input>
+          <el-input v-model="modelConvertSettingsForm[platform].image" placeholder="转换专用镜像，如 nvcr.io/nvidia/tensorrt:24.01-py3">
+            <template #prepend>镜像</template>
+          </el-input>
+          <el-input v-model="modelConvertSettingsForm[platform].command" type="textarea" :rows="2" placeholder="容器内命令，如 trtexec --onnx=/work/source.onnx --saveEngine=/work/output.plan"/>
+        </div>
+      </el-form-item>
+      <el-alert type="info" :closable="false" show-icon title="工作目录挂载为容器 /work：源模型固定在 /work/source.onnx，产物必须写入 /work/output.plan（NVIDIA）或 /work/output.engine（登临）。构建机 SSH 用户需可直接运行 docker；NVIDIA 产物自动按构建机 GPU 型号标注 hardware_profile。整组留空表示该平台暂不启用转换。"/>
+    </el-form>
+    <template #footer><el-button @click="modelConvertSettingsDialog=false">取消</el-button><el-button type="primary" :loading="modelConvertSaving" @click="saveModelConvertSettings">保存</el-button></template>
+  </el-dialog>
+  <el-dialog v-model="modelConvertDialog.visible" title="转换模型版本" width="520px">
+    <div v-if="modelConvertDialog.version">
+      <p>源版本：<strong>{{modelConvertDialog.version.model}}:v{{modelConvertDialog.version.version}}</strong>（含 ONNX 格式）</p>
+      <el-radio-group v-model="modelConvertDialog.platform">
+        <el-radio value="nvidia">NVIDIA（TensorRT plan）</el-radio>
+        <el-radio value="denglin">登临（engine）</el-radio>
+      </el-radio-group>
+      <p class="form-tip">将在对应平台构建机的容器中执行转换，产物作为新版本 <code>{{modelConvertDialog.version.version}}-{{modelConvertDialog.platform}}</code> 入仓（重名自动追加序号）；源文件与产物经 OSS 签名 URL 直传，不经过管理端。</p>
+    </div>
+    <template #footer><el-button @click="modelConvertDialog.visible=false">取消</el-button><el-button type="primary" :loading="modelConvertDialog.submitting" @click="submitModelConvert">开始转换</el-button></template>
+  </el-dialog>
   <el-drawer v-model="logDrawer" size="58%" @closed="closeLogs"><template #header><div><h3>{{activeTask?.type}}</h3><span>{{activeTask?.id}}</span></div></template><div class="task-summary"><el-tag :type="statusType(activeTask?.status||'')">{{activeTask?.status}}</el-tag><el-progress :percentage="Math.round(activeTask?.progress||0)"/><span>{{activeTask?.message}}</span></div><div v-if="activeTask&&isAdmin" class="task-actions"><el-button v-if="isActiveTask(activeTask)" type="warning" :disabled="taskActionBusy" @click="stopTasks([activeTask])">停止任务</el-button></div><pre class="logs">{{taskLogs.join('\n')||(activeTask&&isActiveTask(activeTask)?'等待日志…':'暂无日志')}}</pre></el-drawer>
 </template>

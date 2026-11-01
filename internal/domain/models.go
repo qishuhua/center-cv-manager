@@ -30,6 +30,10 @@ type Center struct {
 	// MisSortEnabled 是错分检测的启用开关；关闭时 WMSURL/MisAuth 原值保留，
 	// 重新开启后直接恢复使用。启用判定 = WMSURL 非空且本开关为 true。
 	MisSortEnabled bool `json:"mis_sort_enabled,omitempty"`
+	// MisSortIntervalSeconds 是错分检测开启时 ingress 摄像机配置轮询周期
+	//（秒，module.env 托管 CV_CAMERA_POLL_INTERVAL_SECONDS）；0 视为未配置，
+	// 由保存/渲染层回填默认 1 小时。关闭开关时值同样保留在中心记录。
+	MisSortIntervalSeconds int `json:"mis_sort_interval_seconds,omitempty"`
 	// DebugLogEnabled 开启后业务 Worker（center-cv-service）日志等级改为
 	// debug（module.env 托管 LOG_LEVEL）；关闭移除托管值，回落 Compose
 	// 插值默认 info。仅模块化中心支持。
@@ -126,6 +130,28 @@ type RegistrySettings struct {
 	Endpoint   string    `json:"endpoint"`
 	Configured bool      `json:"configured"`
 	UpdatedAt  time.Time `json:"updated_at,omitempty"`
+}
+
+// ModelConvertPlatform 是一个平台（nvidia/denglin）的模型转换配置：指定已登记中心
+// 作为构建机，经 SSH 在其上 docker run 专用镜像完成 ONNX → TensorRT/登临 engine 转换。
+// 约定：源模型落构建机 /work/source.onnx，产物必须写 /work/output.plan（nvidia）
+// 或 /work/output.engine（denglin）；Command 为容器内命令，路径按容器内视角书写。
+type ModelConvertPlatform struct {
+	CenterID   string `json:"center_id"`
+	DockerArgs string `json:"docker_args"`
+	Image      string `json:"image"`
+	Command    string `json:"command"`
+}
+
+type ModelConvertSettings struct {
+	Nvidia    ModelConvertPlatform `json:"nvidia"`
+	Denglin   ModelConvertPlatform `json:"denglin"`
+	UpdatedAt time.Time            `json:"updated_at,omitempty"`
+}
+
+// Configured 报告该平台是否完整配置（构建机、镜像、命令齐备），未配置的平台拒绝转换。
+func (p ModelConvertPlatform) Configured() bool {
+	return p.CenterID != "" && p.Image != "" && p.Command != ""
 }
 
 // RegistryStorage 是镜像仓库存储侧的唯一可配置项：OSS 凭据、Bucket 与

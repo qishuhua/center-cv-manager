@@ -14,9 +14,10 @@ import (
 
 // ApplyBusinessSettings 把中心的业务模块托管设置幂等同步到远端：
 // module.env 维护三组托管变量——错分检测（WMS 地址、共享鉴权、ingress 轮询
-// 开关，错分由 ingress 统一控制：开关打开即启动摄像机轮询与计划落格
-// ZeroMQ 广播，Worker 订阅本地核验；9/10 核验结果由 video-transcode 读
-// WMS 地址与鉴权直发 missort 接收端，普通告警走业务回调）、
+// 开关与轮询周期，错分由 ingress 统一控制：开关打开即启动摄像机轮询与
+// 计划落格 ZeroMQ 广播，Worker 订阅本地核验；9/10 核验结果由
+// video-transcode 读 WMS 地址与鉴权直发 missort 接收端，普通告警走业务
+// 回调）、
 // Debug 模式（LOG_LEVEL=debug）、存图（CV_SAVE_DEBUG_IMAGE=1）、仅解码
 // （CV_DECODE_ONLY_MODE=1）与飞书告警测试（TEST_ALARM_ENABLED、
 // FEISHU_WEBHOOK_URL）。compose.yml 的错分/告警插值行经 Ensure* 幂等兜底
@@ -63,12 +64,12 @@ func (s *Service) ApplyBusinessSettings(ctx context.Context, centerID string) er
 		newCompose = templates.EnsureWorkerDecodeOnlyEnv(newCompose)
 		newCompose = templates.EnsureTranscodeTestAlarmEnv(newCompose)
 		newEnv := templates.ApplyMisSortModuleEnv(oldEnv, templates.MisSortOptions{
-			Enabled: enabled, WMSURL: c.WMSURL, MisAuth: c.MisAuth,
+			Enabled: enabled, WMSURL: c.WMSURL, MisAuth: c.MisAuth, IntervalSeconds: c.MisSortIntervalSeconds,
 		})
 		newEnv = templates.ApplyLogLevelModuleEnv(newEnv, c.DebugLogEnabled)
 		newEnv = templates.ApplySaveImageModuleEnv(newEnv, c.SaveImageEnabled)
 		newEnv = templates.ApplyDecodeOnlyModuleEnv(newEnv, c.DecodeOnlyEnabled)
-		newEnv = templates.ApplyTestAlarmModuleEnv(newEnv, c.TestAlarmEnabled, c.FeishuWebhookURL)
+		newEnv = templates.ApplyTestAlarmModuleEnv(newEnv, c.TestAlarmEnabled, c.FeishuWebhookURL, centerPlayerURL(c))
 		composeChanged := newCompose != oldCompose
 		envChanged := newEnv != oldEnv
 		if composeChanged || envChanged {
@@ -123,6 +124,11 @@ func (s *Service) ApplyBusinessSettings(ctx context.Context, centerID string) er
 				module.Status = "prepared"
 				module.UpdatedAt = time.Now()
 			}
+		}
+		// 网关播放器静态页与飞书告警测试联动（FEISHU_PLAYER_URL 指向它）：
+		// 存量中心在此幂等补齐 player.html/挂载/location，变化置 gateway 待发布。
+		if err = s.ensureGatewayPlayer(ctx, remote, &c); err != nil {
+			return err
 		}
 		return s.centers.UpdateDeployment(centerID, c.Deployment)
 	})

@@ -34,7 +34,8 @@ func TestRenderModulesMisSortArchitecture(t *testing.T) {
 	}
 
 	// 开启错分检测：compose 形态不变（ingress 控制开关），module.env 写入
-	// WMS、共享鉴权与轮询开关（机构编码不配置）。
+	// WMS、共享鉴权、轮询开关与轮询周期（未配置时回填默认 1 小时；机构
+	// 编码不配置）。
 	base.WMSURL, base.MisAuth, base.MisSortEnabled = "http://10.21.61.48:31995", "20260606123a", true
 	files, err = RenderModules("denglin", base)
 	if err != nil {
@@ -45,6 +46,7 @@ func TestRenderModulesMisSortArchitecture(t *testing.T) {
 		"CV_WMS_URL=http://10.21.61.48:31995",
 		"CV_MIS_AUTH=20260606123a",
 		"CV_CAMERA_POLL_ENABLED=1",
+		"CV_CAMERA_POLL_INTERVAL_SECONDS=3600",
 	} {
 		if !strings.Contains(env, line) {
 			t.Fatalf("module.env 缺少 %s", line)
@@ -53,6 +55,17 @@ func TestRenderModulesMisSortArchitecture(t *testing.T) {
 	if strings.Contains(env, "CV_ORGAN_CODE=") {
 		t.Fatal("机构编码不再配置，module.env 不应写入")
 	}
+
+	// 自定义轮询周期：module.env 写入显式取值。
+	base.MisSortIntervalSeconds = 120
+	files, err = RenderModules("nvidia", base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if env = files["business/module.env"]; !strings.Contains(env, "CV_CAMERA_POLL_INTERVAL_SECONDS=120") {
+		t.Fatal("module.env 应写入自定义轮询周期 120")
+	}
+	base.MisSortIntervalSeconds = 0
 
 	// 配置保留但开关关闭：module.env 同样回落注释桩（wms_url 留存于中心
 	// 记录，重新打开开关即可恢复）。
@@ -69,8 +82,16 @@ func TestRenderModulesMisSortArchitecture(t *testing.T) {
 func TestApplyMisSortModuleEnv(t *testing.T) {
 	opts := MisSortOptions{Enabled: true, WMSURL: "http://h:1", MisAuth: "a"}
 	fromStub := ApplyMisSortModuleEnv("# Module-specific Compose variables\n", opts)
+	if !strings.Contains(fromStub, "CV_CAMERA_POLL_INTERVAL_SECONDS=3600") {
+		t.Fatal("轮询周期未配置时应回填默认 3600")
+	}
 	if fromStub != ApplyMisSortModuleEnv(fromStub, opts) {
 		t.Fatal("重复应用应幂等")
+	}
+	// 自定义周期替换旧值（含模板时代写入的 300），始终只保留一行。
+	retuned := ApplyMisSortModuleEnv(fromStub, MisSortOptions{Enabled: true, WMSURL: "http://h:1", MisAuth: "a", IntervalSeconds: 120})
+	if strings.Count(retuned, "CV_CAMERA_POLL_INTERVAL_SECONDS=") != 1 || !strings.Contains(retuned, "CV_CAMERA_POLL_INTERVAL_SECONDS=120") {
+		t.Fatal("自定义轮询周期应替换旧值")
 	}
 	// 旧版本写入的 CV_ORGAN_CODE 存量行应被清理，让服务回落插值默认值。
 	foreign := "RABBITMQ_REALTIME_PRIORITY=7\nCV_ORGAN_CODE=637101\n" + fromStub
@@ -82,7 +103,7 @@ func TestApplyMisSortModuleEnv(t *testing.T) {
 		t.Fatal("存量 CV_ORGAN_CODE 行应被移除")
 	}
 	disabled := ApplyMisSortModuleEnv(merged, MisSortOptions{})
-	if strings.Contains(disabled, "CV_WMS_URL=") || strings.Contains(disabled, "CV_MIS_AUTH=") || strings.Contains(disabled, "CV_ORGAN_CODE=") || !strings.Contains(disabled, "RABBITMQ_REALTIME_PRIORITY=7") {
+	if strings.Contains(disabled, "CV_WMS_URL=") || strings.Contains(disabled, "CV_MIS_AUTH=") || strings.Contains(disabled, "CV_CAMERA_POLL_INTERVAL_SECONDS=") || strings.Contains(disabled, "CV_ORGAN_CODE=") || !strings.Contains(disabled, "RABBITMQ_REALTIME_PRIORITY=7") {
 		t.Fatal("关闭后应移除托管变量并保留外部变量")
 	}
 }
@@ -148,12 +169,15 @@ func TestMisSortSyncEnsures(t *testing.T) {
 	if sync(missing) != missing {
 		t.Fatal("missing services must be skipped")
 	}
-	enabled := ApplyMisSortModuleEnv("CUSTOM=keep\nCV_CAMERA_POLL_ENABLED=0\n", MisSortOptions{Enabled: true, WMSURL: "http://wms", MisAuth: "auth"})
+	enabled := ApplyMisSortModuleEnv("CUSTOM=keep\nCV_CAMERA_POLL_ENABLED=0\nCV_CAMERA_POLL_INTERVAL_SECONDS=300\n", MisSortOptions{Enabled: true, WMSURL: "http://wms", MisAuth: "auth"})
 	if strings.Count(enabled, "CV_CAMERA_POLL_ENABLED=") != 1 || !strings.Contains(enabled, "CV_CAMERA_POLL_ENABLED=1") {
 		t.Fatal("enable must replace stale switch")
 	}
+	if strings.Count(enabled, "CV_CAMERA_POLL_INTERVAL_SECONDS=") != 1 || !strings.Contains(enabled, "CV_CAMERA_POLL_INTERVAL_SECONDS=3600") {
+		t.Fatal("enable must replace stale interval with managed default")
+	}
 	disabled := ApplyMisSortModuleEnv(enabled, MisSortOptions{})
-	if strings.Contains(disabled, "CV_CAMERA_POLL_ENABLED=") || !strings.Contains(disabled, "CUSTOM=keep") {
+	if strings.Contains(disabled, "CV_CAMERA_POLL_ENABLED=") || strings.Contains(disabled, "CV_CAMERA_POLL_INTERVAL_SECONDS=") || !strings.Contains(disabled, "CUSTOM=keep") {
 		t.Fatal("disable must remove managed switch only")
 	}
 }

@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { Delete, FolderOpened, Plus, Refresh } from '@element-plus/icons-vue'
+import { Delete, FolderOpened, Plus, Refresh, Switch } from '@element-plus/icons-vue'
 import type { EmptyModelFolder, ModelFormat, ModelVersion } from './types'
 import { groupModels } from './modelGroups'
 
-const props = withDefaults(defineProps<{models: ModelVersion[]; modelValue?: string[]; loading: boolean; selectable?: boolean; emptyFolders?: EmptyModelFolder[]}>(), {modelValue:()=>[],selectable:true,emptyFolders:()=>[]})
+const props = withDefaults(defineProps<{models: ModelVersion[]; modelValue?: string[]; loading: boolean; selectable?: boolean; emptyFolders?: EmptyModelFolder[]; convertEnabled?: boolean}>(), {modelValue:()=>[],selectable:true,emptyFolders:()=>[],convertEnabled:false})
 const emit = defineEmits<{
   'update:modelValue': [keys: string[]]
   refresh: []
   uploadVersion: [model: string]
   deleteModel: [model: string]
+  convert: [version: ModelVersion]
 }>()
 const groups = computed(() => {
   const grouped = groupModels(props.models)
@@ -35,6 +36,7 @@ const formatName = (format: ModelFormat) => format.platform==='onnx'?'ONNX':form
 const formatType = (format: ModelFormat) => format.platform==='onnx'?'info':format.platform==='denglin'?'warning':'success'
 const formatSummary = (item: ModelVersion) => item.formats.map(format=>format.hardware_profile?`${format.platform}-${format.hardware_profile}`:format.platform).join(' / ')
 const selectedVersion = (items: ModelVersion[]) => items.find(item => selected.value.has(item.manifest_key))
+const hasOnnx = (item: ModelVersion) => item.formats.some(format => format.platform === 'onnx')
 
 function selectLatest(items: ModelVersion[]) {
   const latest = new Map<string, ModelVersion>()
@@ -129,6 +131,11 @@ function sizeLabel(value: number) {
           <el-table-column label="总大小" width="120"><template #default="{row}">{{sizeLabel(versionSize(row))}}</template></el-table-column>
           <el-table-column label="上传时间" width="190"><template #default="{row}">{{row.created_at ? new Date(row.created_at).toLocaleString() : '-'}}</template></el-table-column>
           <el-table-column label="Manifest" min-width="130"><template #default="{row}"><code>{{row.manifest_digest.slice(0,12)}}</code></template></el-table-column>
+          <el-table-column v-if="convertEnabled" label="操作" width="110">
+            <template #default="{row}">
+              <el-button size="small" type="primary" plain :icon="Switch" :disabled="loading || !hasOnnx(row)" :title="hasOnnx(row) ? '在构建机上转换为 TensorRT/登临格式并作为新版本入仓' : '该版本没有 ONNX 格式，无法转换'" @click="emit('convert', row)">转换</el-button>
+            </template>
+          </el-table-column>
         </el-table>
       </el-collapse-item>
     </el-collapse>

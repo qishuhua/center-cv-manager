@@ -80,6 +80,18 @@ func TestSaveMisSortNormalizesAndRejectsLegacy(t *testing.T) {
 	if saved.MisAuth != "20260606123a" {
 		t.Fatalf("misAuth 留空应回填默认值，实际 %q", saved.MisAuth)
 	}
+	if saved.MisSortIntervalSeconds != 3600 {
+		t.Fatalf("轮询周期未填应回填默认 3600，实际 %d", saved.MisSortIntervalSeconds)
+	}
+	// 自定义周期在合法区间内原样保留，越界值拒绝。
+	if saved, err = s.Save(domain.Center{ID: "c1", Name: "中心", Host: "host", Username: "root", AuthType: "password", Password: Mask, ComposeFile: "/srv/deploy/docker-compose.yml", WMSURL: "http://h:31995", MisAuth: "auth", MisSortIntervalSeconds: 120}); err != nil || saved.MisSortIntervalSeconds != 120 {
+		t.Fatalf("合法自定义周期应保留: err=%v interval=%d", err, saved.MisSortIntervalSeconds)
+	}
+	for _, bad := range []int{9, 86401, -1} {
+		if _, err = s.Save(domain.Center{ID: "c1", Name: "中心", Host: "host", Username: "root", AuthType: "password", Password: Mask, ComposeFile: "/srv/deploy/docker-compose.yml", WMSURL: "http://h:31995", MisAuth: "auth", MisSortIntervalSeconds: bad}); err == nil {
+			t.Fatalf("越界轮询周期 %d 应被拒绝", bad)
+		}
+	}
 	repo.value.Deployment = nil
 	if _, err = s.Save(domain.Center{ID: "c1", Name: "中心", Host: "host", Username: "root", AuthType: "password", Password: Mask, ComposeFile: "/srv/deploy/docker-compose.yml", WMSURL: "http://h", MisAuth: "auth"}); err == nil {
 		t.Fatal("旧中心（未模块化）应拒绝错分检测配置")

@@ -213,9 +213,11 @@ type RenderOptions struct {
 	// WMSURL/MisAuth 为错分检测配置：启用（WMSURL 非空且 MisSortEnabled）
 	// 时 business 模块在 module.env 写入两个服务共用的取值；关闭时配置值
 	// 保留在中心记录，模块回落 Compose 插值默认值。机构编码不配置。
-	WMSURL         string
-	MisAuth        string
-	MisSortEnabled bool
+	// MisSortIntervalSeconds 是摄像机配置轮询周期（秒），≤0 按默认 1 小时写入。
+	WMSURL                string
+	MisAuth               string
+	MisSortEnabled        bool
+	MisSortIntervalSeconds int
 	// DebugLogEnabled 开启时 business 模块在 module.env 托管 LOG_LEVEL=debug
 	//（Worker 公共环境锚点插值兜底 info），关闭回落默认值。
 	DebugLogEnabled bool
@@ -233,8 +235,20 @@ type RenderOptions struct {
 	// 同为初始化渲染参数，已初始化中心不随开关重排。
 	SingleWorker bool
 	// 飞书告警测试仅供 video-transcode 使用，关闭时不传递机器人地址。
-	TestAlarmEnabled bool
-	TestAlarmWebhook string
+	// TestAlarmPlayerURL 是本中心网关的播放器入口（http://<Host>:<ConsolePort>/player.html），
+	// 告警消息经它回放视频，随开关一并托管。
+	TestAlarmEnabled   bool
+	TestAlarmWebhook   string
+	TestAlarmPlayerURL string
+}
+
+// GatewayPlayerHTML 返回网关播放器静态页内容（存量中心补齐 player.html 用）。
+func GatewayPlayerHTML() (string, error) {
+	content, err := fs.ReadFile(templateFiles, "modules/gateway/nginx/player.html")
+	if err != nil {
+		return "", fmt.Errorf("读取播放器模板失败: %w", err)
+	}
+	return strings.ReplaceAll(string(content), "\r\n", "\n"), nil
 }
 
 // Render 使用统一配置渲染部署模板。WorkerEnv 会写入公共锚点，确保所有 Worker 一致。

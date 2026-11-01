@@ -1,6 +1,9 @@
 package templates
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
 // 错分检测（mis-sort）架构：ingress 统一控制开关——CV_CAMERA_POLL_ENABLED=1
 // 时启动摄像机配置轮询（创建 9/10 类错分任务）并绑定计划落格 ZeroMQ PUB 端口
@@ -15,7 +18,14 @@ type MisSortOptions struct {
 	Enabled bool
 	WMSURL  string
 	MisAuth string
+	// IntervalSeconds 是 ingress 摄像机配置轮询周期（秒）；≤0 时按
+	// DefaultCameraPollIntervalSeconds（1 小时）写入。仅启用错分时生效。
+	IntervalSeconds int
 }
+
+// DefaultCameraPollIntervalSeconds 是摄像机配置轮询周期的默认值（1 小时），
+// 与 Compose 插值默认及中心编辑页口径一致。
+const DefaultCameraPollIntervalSeconds = 3600
 
 const (
 	// module.env 中由中心 WMS 设置托管的变量，启用时按此顺序写入。
@@ -166,16 +176,17 @@ func envKeyOf(line string) string {
 }
 
 // ApplyMisSortModuleEnv 维护 module.env 的错分托管块：启用时写入 WMS 地址、
-// 共享鉴权与 ingress 轮询开关（错分检测由 ingress 统一控制；WMS 地址与
-// 鉴权由 ingress 轮询和 video-transcode 的 9/10 核验直发共用）；关闭时
-// 移除托管变量，回落 Compose 插值默认值（轮询 0、WMS/鉴权为空，9/10
-// 核验上报随之失效）。历史遗留的机构编码行一并清理。
+// 共享鉴权、ingress 轮询开关与轮询周期（错分检测由 ingress 统一控制；WMS
+// 地址与鉴权由 ingress 轮询和 video-transcode 的 9/10 核验直发共用）；关闭时
+// 移除托管变量，回落 Compose 插值默认值（轮询 0、WMS/鉴权为空、周期 1 小时，
+// 9/10 核验上报随之失效）。历史遗留的机构编码行一并清理。
 func ApplyMisSortModuleEnv(env string, opts MisSortOptions) string {
 	managed := map[string]bool{
-		"CV_WMS_URL":             true,
-		"CV_MIS_AUTH":            true,
-		"CV_ORGAN_CODE":          true,
-		"CV_CAMERA_POLL_ENABLED": true,
+		"CV_WMS_URL":                     true,
+		"CV_MIS_AUTH":                    true,
+		"CV_ORGAN_CODE":                  true,
+		"CV_CAMERA_POLL_ENABLED":         true,
+		"CV_CAMERA_POLL_INTERVAL_SECONDS": true,
 	}
 	lines := strings.Split(env, "\n")
 	kept := make([]string, 0, len(lines))
@@ -190,9 +201,14 @@ func ApplyMisSortModuleEnv(env string, opts MisSortOptions) string {
 	}
 	result := strings.TrimRight(strings.Join(kept, "\n"), "\n ")
 	if opts.Enabled {
+		interval := opts.IntervalSeconds
+		if interval <= 0 {
+			interval = DefaultCameraPollIntervalSeconds
+		}
 		block := misSortEnvMarker + "\n" +
 			"CV_WMS_URL=" + opts.WMSURL + "\n" +
-			"CV_MIS_AUTH=" + opts.MisAuth + "\nCV_CAMERA_POLL_ENABLED=1"
+			"CV_MIS_AUTH=" + opts.MisAuth + "\nCV_CAMERA_POLL_ENABLED=1" +
+			"\nCV_CAMERA_POLL_INTERVAL_SECONDS=" + strconv.Itoa(interval)
 		if result == "" {
 			result = block
 		} else {
@@ -214,7 +230,7 @@ func EnsureIngressPollEnv(compose string) string {
 		"      CV_WMS_URL: ${CV_WMS_URL:-http://10.21.61.48:31995}",
 		"      CV_MIS_AUTH: ${CV_MIS_AUTH:-20260606123a}",
 		"      CV_CAMERA_CONFIG_PATH: ${CV_CAMERA_CONFIG_PATH:-/missort/api/cameraConfig/query}",
-		"      CV_CAMERA_POLL_INTERVAL_SECONDS: ${CV_CAMERA_POLL_INTERVAL_SECONDS:-300}",
+		"      CV_CAMERA_POLL_INTERVAL_SECONDS: ${CV_CAMERA_POLL_INTERVAL_SECONDS:-3600}",
 		"      CV_CAMERA_CONFIG_TIMEOUT_MS: ${CV_CAMERA_CONFIG_TIMEOUT_MS:-5000}",
 		"      CV_PLANNED_ZMQ_BIND: ${CV_PLANNED_ZMQ_BIND:-tcp://127.0.0.1:8091}",
 	})

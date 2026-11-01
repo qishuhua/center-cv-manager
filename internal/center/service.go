@@ -13,6 +13,7 @@ import (
 	"center-cv-manager/internal/modular"
 	"center-cv-manager/internal/secret"
 	"center-cv-manager/internal/sshx"
+	"center-cv-manager/internal/templates"
 	"github.com/google/uuid"
 )
 
@@ -85,6 +86,11 @@ func validate(v domain.Center) error {
 	}
 	if err := validatePlainToken("misAuth 鉴权值", v.MisAuth, 512); err != nil {
 		return err
+	}
+	// 轮询周期 0 表示未配置（回落默认值），非 0 时限定合理区间：过短会
+	// 高频打 WMS 接口，过长则摄像机配置变更迟迟不生效。
+	if v.MisSortIntervalSeconds != 0 && (v.MisSortIntervalSeconds < 10 || v.MisSortIntervalSeconds > 86400) {
+		return fmt.Errorf("摄像机轮询周期必须介于 10 秒与 86400 秒（24 小时）之间")
 	}
 	if v.TestAlarmEnabled && v.FeishuWebhookURL == "" {
 		return fmt.Errorf("开启飞书告警测试时必须填写机器人 URL")
@@ -173,6 +179,11 @@ func (s *Service) Save(input domain.Center) (domain.Center, error) {
 	// misAuth 留空时使用公开约定默认值（上游 Compose 同值），写入 module.env 时始终显式。
 	if input.WMSURL != "" && input.MisAuth == "" {
 		input.MisAuth = defaultMisAuth
+	}
+	// 轮询周期未填（0）时回填默认 1 小时（与 Compose 插值默认同值）；开关
+	// 关闭不回填，原值保留在记录里，重新打开恢复使用。
+	if input.WMSURL != "" && input.MisSortIntervalSeconds == 0 {
+		input.MisSortIntervalSeconds = templates.DefaultCameraPollIntervalSeconds
 	}
 	now := time.Now()
 	var old domain.Center

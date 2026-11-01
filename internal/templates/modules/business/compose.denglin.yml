@@ -146,7 +146,7 @@ services:
       CV_WMS_URL: ${CV_WMS_URL:-http://10.21.61.48:31995}
       CV_MIS_AUTH: ${CV_MIS_AUTH:-20260606123a}
       CV_CAMERA_CONFIG_PATH: ${CV_CAMERA_CONFIG_PATH:-/missort/api/cameraConfig/query}
-      CV_CAMERA_POLL_INTERVAL_SECONDS: ${CV_CAMERA_POLL_INTERVAL_SECONDS:-300}
+      CV_CAMERA_POLL_INTERVAL_SECONDS: ${CV_CAMERA_POLL_INTERVAL_SECONDS:-3600}
       CV_CAMERA_CONFIG_TIMEOUT_MS: ${CV_CAMERA_CONFIG_TIMEOUT_MS:-5000}
       # 计划落格发布端口：仅回环绑定——局域网注入必须经网关 /fall-events/planned
       # 的 misAuth 鉴权，直连 ZMQ 可绕过鉴权。不用上游默认 8092（与
@@ -180,6 +180,8 @@ services:
       HTTP_PORT: "8092"
       TEST_ALARM_ENABLED: ${TEST_ALARM_ENABLED:-false}
       FEISHU_WEBHOOK_URL: ${FEISHU_WEBHOOK_URL:-}
+      # 告警消息里的回放播放器入口（本中心网关静态页），随飞书告警测试开关托管。
+      FEISHU_PLAYER_URL: ${FEISHU_PLAYER_URL:-}
       # 错分 9/10 核验结果不经业务回调，直发 WMS missort 接收端：
       # POST {CV_WMS_URL}/missort/api/detectResult/receive，misAuth 头取
       # CV_MIS_AUTH。与 ingress 共用 module.env 同名托管变量；空默认无害——

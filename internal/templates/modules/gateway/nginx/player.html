@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="referrer" content="no-referrer" />
+  <title>告警视频回放</title>
+  <style>
+    :root{color-scheme:dark;--bg:#080f1e;--panel:#121c30;--line:#2b3850;--text:#e9f0fc;--muted:#a3b2c9;--blue:#5aaaff;--ok:#59dda8;--red:#ff8080}
+    *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+    body{background:radial-gradient(ellipse 1400px 650px at 50% -250px,#19355f 0%,#080f1e 72%)}
+    .shell{max-width:1170px;margin:auto;padding:26px 24px 60px}
+    .top{display:flex;justify-content:space-between;gap:14px;align-items:center;margin-bottom:22px}
+    h1{margin:0;font-size:24px;font-weight:700;letter-spacing:.3px}
+    .card{border:1px solid var(--line);background:var(--panel);border-radius:16px;overflow:hidden;box-shadow:0 20px 60px #0005}
+    .frame{width:100%;aspect-ratio:16/9;position:relative;background:#000;overflow:hidden;isolation:isolate}
+    .frame video,.frame .overlay{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+    .frame video{z-index:1;background:#000;outline:0}
+    .frame .overlay{z-index:2;pointer-events:none;user-select:none;-webkit-user-drag:none;transition:opacity .12s}
+    .frame .overlay.off{opacity:0!important}
+    /* 全屏时包含视频及轨迹图层。 */
+    .frame:fullscreen,.frame:-webkit-full-screen,.frame.is-pseudo-fullscreen{
+      width:100vw!important;height:100vh!important;height:100dvh!important;
+      aspect-ratio:auto!important;background:#000;border-radius:0
+    }
+    .frame.is-pseudo-fullscreen{position:fixed!important;inset:0;z-index:99999;max-width:none}
+    body.lock-scroll{overflow:hidden}
+    .media-controls{position:absolute;left:0;right:0;bottom:0;z-index:5;display:flex;flex-direction:column;
+      gap:5px;padding:22px 14px 10px;background:linear-gradient(transparent,#000c 33%,#000e);color:#fff;
+      opacity:1;transition:opacity .15s}
+    .media-controls .seek{width:100%;height:18px;min-width:0;cursor:pointer;accent-color:#56adff}
+    .media-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;min-height:36px}
+    .media-actions button,.media-actions select{font:inherit;cursor:pointer;padding:5px 10px;background:#101b2dc9;border:1px solid #ffffff55;
+      border-radius:7px;color:#fff;min-height:32px}
+    .media-actions button:hover{background:#245080}
+    .media-actions .time{font-variant-numeric:tabular-nums;white-space:nowrap;font-size:12px}
+    .media-actions .volume{width:84px;min-width:40px;accent-color:#56adff}
+    .media-actions .push{margin-left:auto}
+    .frame video{cursor:pointer}
+    .frame:fullscreen .media-controls,.frame.is-pseudo-fullscreen .media-controls{padding-bottom:max(12px,env(safe-area-inset-bottom));padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
+    @media(max-width:520px){.media-controls{padding:14px 8px 6px}.media-actions{gap:6px}.media-actions .volume{width:50px}.media-actions button{padding:4px 7px}}
+    .controls{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:14px 18px;border-top:1px solid var(--line);flex-wrap:wrap}
+    .controls-left,.controls-right{display:flex;align-items:center;gap:13px;flex-wrap:wrap}.controls small{color:var(--muted)}
+    label.switch{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+    input[type=checkbox]{accent-color:#3f9fff;width:17px;height:17px}
+    input[type=range]{accent-color:#3f9fff;width:96px}
+    button{cursor:pointer;border:1px solid #3e526c;color:var(--text);background:#223652;padding:9px 14px;border-radius:9px;font:inherit}
+    button:hover{background:#2e4668}
+    .status{color:var(--muted);margin-top:13px;font-size:13px;min-height:19px;overflow-wrap:anywhere}
+    .status:empty{display:none}.status.err{color:var(--red)}
+    @media(max-width:680px){.shell{padding:14px 9px 40px}.top{margin:2px 8px 14px}h1{font-size:19px}.controls{padding:12px}}
+  </style>
+</head>
+<body>
+<main class="shell">
+  <header class="top">
+    <h1>告警视频回放</h1>
+  </header>
+  <section class="card">
+    <div class="frame" id="frame">
+      <!-- 使用自定义控件，让视频和轨迹图层一起进入全屏。 -->
+      <video id="video" preload="metadata" playsinline webkit-playsinline disablepictureinpicture></video>
+      <img id="overlay" class="overlay" alt="检测区域与轨迹叠加图层" draggable="false" />
+      <div class="media-controls" aria-label="视频播放控制">
+        <input id="seek" class="seek" type="range" min="0" max="1000" value="0" step="1" aria-label="播放进度" />
+        <div class="media-actions">
+          <button id="playPause" type="button" aria-label="播放或暂停">▶ 播放</button>
+          <span class="time" id="timeDisplay">00:00 / 00:00</span>
+          <button id="mute" type="button" aria-label="静音或取消静音">🔊</button>
+          <input id="volume" class="volume" type="range" min="0" max="1" value="1" step="0.05" aria-label="音量" />
+          <select id="playbackRate" aria-label="播放倍速" title="播放倍速">
+            <option value="0.5">0.5×</option>
+            <option value="0.75">0.75×</option>
+            <option value="1" selected>1×</option>
+            <option value="1.25">1.25×</option>
+            <option value="1.5">1.5×</option>
+            <option value="2">2×</option>
+            <option value="3">3×</option>
+            <option value="4">4×</option>
+          </select>
+          <button id="fullScreenInPlayer" type="button" class="push">⛶ 全屏</button>
+        </div>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="controls-left">
+        <label class="switch"><input type="checkbox" id="showOverlay" checked>显示轨迹</label>
+        <label class="switch"><span style="color:var(--muted)">透明度</span><input type="range" id="opacity" min="0" max="100" value="100" step="5"></label>
+      </div>
+      <div class="controls-right"><small id="dimensions">视频尺寸：—</small><button id="fullScreen" type="button">全屏</button></div>
+    </div>
+  </section>
+  <p id="status" class="status" role="status" aria-live="polite"></p>
+</main>
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const video = $('video');
+  const overlay = $('overlay');
+  const frame = $('frame');
+  const status = $('status');
+  let pseudoFullscreen = false;
+  let seeking = false;
+
+  function message(text, type = '') {
+    status.textContent = text;
+    status.className = 'status' + (type ? ' ' + type : '');
+  }
+  function validUrl(value, optional = false) {
+    const s = String(value || '').trim();
+    if (!s && optional) return '';
+    if (!s) throw Error('必须填写 MP4 和 SVG URL');
+    let u;
+    try { u = new URL(s); } catch { throw Error('URL 格式无效：' + s.slice(0, 90)); }
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') throw Error('仅允许 http/https URL');
+    return u.href;
+  }
+  function reset() {
+    video.pause();
+    video.removeAttribute('src');
+    video.removeAttribute('poster');
+    overlay.removeAttribute('src');
+    video.load();
+    $('dimensions').textContent = '视频尺寸：—';
+    frame.style.aspectRatio = '16 / 9';
+    $('seek').value = '0';
+    $('timeDisplay').textContent = '00:00 / 00:00';
+    updatePlayButton();
+  }
+  function loadSource(src, poster, svg) {
+    reset();
+    if (poster) video.poster = poster;
+    overlay.src = svg;
+    video.src = src;
+    video.load();
+  }
+  $('showOverlay').addEventListener('change', () => {
+    overlay.classList.toggle('off', !$('showOverlay').checked);
+  });
+  $('opacity').addEventListener('input', () => {
+    overlay.style.opacity = String(Number($('opacity').value) / 100);
+  });
+  // 对视频与轨迹图层的共同父容器启用全屏。
+  function isFullscreen() { return !!document.fullscreenElement || pseudoFullscreen; }
+  function syncFullscreenButtons() {
+    const label = isFullscreen() ? '⤡ 退出全屏' : '⛶ 全屏';
+    $('fullScreen').textContent = label;
+    $('fullScreenInPlayer').textContent = label;
+  }
+  async function toggleFullscreen() {
+    if (pseudoFullscreen) {
+      pseudoFullscreen = false;
+      frame.classList.remove('is-pseudo-fullscreen');
+      document.body.classList.remove('lock-scroll');
+    } else if (document.fullscreenElement) {
+      try { await document.exitFullscreen(); } catch(e) { message('退出全屏失败：' + e.message, 'err'); }
+    } else {
+      let entered = false;
+      if (frame.requestFullscreen) {
+        try { await frame.requestFullscreen(); entered = true; }
+        catch(e) { /* 不支持原生全屏时使用 CSS 全屏。 */ }
+      }
+      if (!entered) {
+        pseudoFullscreen = true;
+        frame.classList.add('is-pseudo-fullscreen');
+        document.body.classList.add('lock-scroll');
+      }
+    }
+    syncFullscreenButtons();
+  }
+  $('fullScreen').addEventListener('click', toggleFullscreen);
+  $('fullScreenInPlayer').addEventListener('click', toggleFullscreen);
+  document.addEventListener('fullscreenchange', syncFullscreenButtons);
+  document.addEventListener('webkitfullscreenchange', syncFullscreenButtons);
+  function formatTime(seconds) {
+    if (!Number.isFinite(seconds)) return '00:00';
+    const total = Math.max(0, Math.floor(seconds));
+    const sec = String(total % 60).padStart(2, '0');
+    const mins = Math.floor(total / 60);
+    return mins >= 60 ? `${Math.floor(mins/60)}:${String(mins%60).padStart(2,'0')}:${sec}` : `${String(mins).padStart(2,'0')}:${sec}`;
+  }
+  function updatePlayButton() {
+    $('playPause').textContent = video.paused || video.ended ? '▶ 播放' : '⏸ 暂停';
+  }
+  function updateTimeline() {
+    const duration = video.duration;
+    const current = video.currentTime || 0;
+    if (!seeking) $('seek').value = Number.isFinite(duration) && duration > 0 ? String(Math.round(current / duration * 1000)) : '0';
+    $('timeDisplay').textContent = formatTime(current) + ' / ' + formatTime(duration);
+  }
+  function togglePlay() {
+    if (!video.src) return;
+    if (video.paused || video.ended) video.play().catch(e => message('播放失败：' + e.message, 'err'));
+    else video.pause();
+  }
+  $('playPause').addEventListener('click', togglePlay);
+  video.addEventListener('click', togglePlay);
+  video.addEventListener('dblclick', e => { e.preventDefault(); toggleFullscreen(); });
+  for (const ev of ['loadedmetadata', 'durationchange', 'timeupdate', 'seeked', 'emptied']) {
+    video.addEventListener(ev, updateTimeline);
+  }
+  for (const ev of ['play', 'pause', 'ended', 'emptied']) {
+    video.addEventListener(ev, updatePlayButton);
+  }
+  $('seek').addEventListener('input', () => {
+    const duration = video.duration;
+    if (Number.isFinite(duration) && duration > 0) {
+      seeking = true;
+      video.currentTime = Number($('seek').value) / 1000 * duration;
+      $('timeDisplay').textContent = formatTime(video.currentTime) + ' / ' + formatTime(duration);
+    }
+  });
+  $('seek').addEventListener('change', () => { seeking = false; updateTimeline(); });
+  $('seek').addEventListener('pointerup', () => { seeking = false; updateTimeline(); });
+  $('playbackRate').addEventListener('change', () => {
+    const rate = Number($('playbackRate').value);
+    video.defaultPlaybackRate = rate;
+    video.playbackRate = rate;
+  });
+  video.addEventListener('ratechange', () => {
+    $('playbackRate').value = String(video.playbackRate);
+  });
+  $('mute').addEventListener('click', () => { video.muted = !video.muted; });
+  $('volume').addEventListener('input', () => {
+    video.volume = Number($('volume').value);
+    video.muted = video.volume === 0;
+  });
+  video.addEventListener('volumechange', () => {
+    $('mute').textContent = video.muted || video.volume === 0 ? '🔇' : '🔊';
+    $('volume').value = String(video.volume);
+  });
+  // Esc 关闭 CSS 全屏，原生全屏由浏览器关闭。
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && pseudoFullscreen) { toggleFullscreen(); return; }
+    if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(document.activeElement?.tagName)) return;
+    if (e.code === 'Space' && !e.repeat) { e.preventDefault(); togglePlay(); }
+  });
+  overlay.addEventListener('error', () => {
+    message('轨迹加载失败，请刷新重试。', 'err');
+  });
+  video.addEventListener('loadedmetadata', () => {
+    if (video.videoWidth && video.videoHeight) {
+      frame.style.aspectRatio = video.videoWidth + ' / ' + video.videoHeight;
+      $('dimensions').textContent = `视频尺寸：${video.videoWidth} × ${video.videoHeight}`;
+    }
+  });
+  video.addEventListener('error', () => {
+    const code = video.error && video.error.code;
+    message(`视频无法播放（错误码 ${code ?? '未知'}），请刷新重试。`, 'err');
+  });
+  // 播放地址只经 URL 参数传入（飞书告警卡片跳转），页面上不提供输入与本地文件入口。
+  const query = new URLSearchParams(location.search);
+  if (query.has('video')) {
+    try {
+      loadSource(validUrl(query.get('video')), validUrl(query.get('image'), true), validUrl(query.get('overlay')));
+      if (query.get('autoplay') === '1') {
+        // 浏览器普遍阻止有声自动播放，仅尝试静音自动播放。
+        video.muted = true;
+        video.play().catch(() => message('浏览器阻止了自动播放，请手动点击视频播放按钮。'));
+      }
+    } catch (e) { message('参数无效，请从飞书告警消息重新进入：' + e.message, 'err'); }
+  }
+})();
+</script>
+</body>
+</html>

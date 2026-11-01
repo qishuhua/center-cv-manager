@@ -28,6 +28,8 @@ var ErrNotConfigured = errors.New("尚未配置 OSS 模型仓库")
 
 type Repository interface {
 	GetOSSCredential() (domain.OSSCredential, error)
+	GetModelConvertSettings() (domain.ModelConvertSettings, error)
+	SaveModelConvertSettings(domain.ModelConvertSettings) error
 }
 
 type Reporter interface {

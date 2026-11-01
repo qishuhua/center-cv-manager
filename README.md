@@ -213,3 +213,49 @@ CPU 数量使用在线逻辑 CPU 数展示，但 Worker 的 `cpuset` 不再按 `
 发布回滚、中心环境/容器状态巡检、批量灰度发布、中心标签和权限分组、操作审计。
 
 管理员可在中心运行详情点击“重置中心”，二次确认后删除该中心受管 Compose 项目的容器和部署配置，保留镜像、数据卷及模型文件。不备份、不回退；完成后清空初始化状态、解除模型版本组固定，显示待初始化；重新初始化前选择业务代码分支和模型版本，单个任务自动完成基础模块、业务、网关与监控部署。其他项目的容器不删除。配置删除路径与模型或数据卷目录重叠时拒绝删除。
+
+## MCP 远程构建和发布
+
+项目提供标准输入输出（stdio）MCP 适配器。它运行在使用者的电脑上，通过现有 HTTP API 连接管理平台，复用账号权限、版本校验、发布预检和任务日志。管理平台需要从使用者电脑可访问；本功能不提供独立的远程 MCP HTTP 地址。
+
+使用 Go 1.26 编译适配器：
+
+```powershell
+go build -o center-manager-mcp.exe ./cmd/mcp
+```
+
+在支持 stdio MCP 的客户端中配置下面的命令及环境变量（配置格式按客户端调整）：
+
+```json
+{
+  "mcpServers": {
+    "center-manager": {
+      "command": "C:\\path\\to\\center-manager-mcp.exe",
+      "env": {
+        "CENTER_MANAGER_URL": "https://manager.example.com",
+        "CENTER_MANAGER_TOKEN": "创建时显示的令牌"
+      }
+    }
+  }
+}
+```
+
+远程连接默认要求 HTTPS；本机回环地址允许 HTTP。受信任内网确需明文时，可以显式设置 `CENTER_MANAGER_ALLOW_INSECURE_HTTP=true`，但令牌和操作数据会以明文传输。请保护客户端配置中的令牌，不要提交到 Git。登录平台后在“MCP 令牌”创建个人令牌，选择有效期、构建和发布权限以及允许发布的中心；令牌仅在创建时显示一次，可随时撤销。读取权限可查看全部中心、版本和任务日志；构建与发布需要管理员账号。账号被删除、角色变化或密码被管理员重置时，令牌失效。账号首次登录后须先在网页修改密码或选择暂时跳过。
+
+可用工具：
+
+- `list_centers`、`list_sources`、`list_versions`、`list_models`、`list_registry_versions`：查询中心、软件 Git 版本、模型清单和已构建镜像。
+- `get_center_status`：查询单个中心的实时运行状态（在线、容器、正在运行的软件版本与模型版本），经 SSH 读取，较查询类工具慢。
+- `get_center_hardware`、`test_center`：硬件检测（GPU/CPU/内存/磁盘，并刷新平台缓存）与 SSH/Docker 连通性测试。
+- `monitoring_status`：统一监控各中心健康信号汇总（监控栈不可达时降级返回 `stack_online=false`）。
+- `list_tasks`：列出任务记录（可按类型过滤，如 `PUBLISH_IMAGE` 查看构建记录），配合 `get_task` 查看详情。
+- `cancel_task`：停止运行中或等待中的任务。
+- `build_image`：传入软件仓库 ID、分支或标签 `ref`、完整 `commit`、版本 `kind`，构建并推送镜像，返回任务。需要平台已配置镜像仓库且构建环境可用。
+- `convert_model`：把模型版本的 ONNX 在指定平台构建机上转换为 TensorRT/登临格式并作为新模型版本入仓，返回任务。需要平台已配置模型转换设置（模型仓库页「转换设置」：指定已登记中心作为构建机、转换镜像与容器内命令；源文件与产物经 OSS 签名 URL 直传直下，不经过管理端；NVIDIA 产物自动按构建机 GPU 型号标注 hardware_profile，版本号自动派生为 `{源版本}-{平台}`）。
+- `plan_release`：传入 `center_ids`，以及可选的 `items`（软件的 `source_id`、`ref`、`commit`、`kind`）和 `model_selections`（模型的 `manifest_key`、`manifest_digest`），查看发布预检。至少选择一个软件或模型版本；软件镜像须先构建并推送。
+- `release`：参数与预检相同，创建发布任务。客户端应先向用户展示预检并确认；该确认依赖客户端，服务端不会将预检结果与确认绑定，但提交时会再次检查目标。
+- `module_action`：对指定中心的模块执行整体操作（`restart` 重启、`stop` 暂停、`deploy` 整体重建），创建任务。需要令牌发布权限且中心在授权范围内；调用前应向用户确认。
+- `compose_publish`：整体发布指定中心的模块 Compose（配置变化后重建受影响服务；内容未变需 `confirm_unchanged=true` 才整体重启），创建任务；与网页「整体发布」同一套 revision 保护。
+- `get_task`、`get_task_logs`：通过任务 ID 查看状态与日志。
+
+例如，可以让客户端“列出软件和模型版本，构建指定软件，然后预检发布到测试中心”；构建成功后确认预检结果，再提交发布并查询任务。指定版本时应使用查询结果中的完整 commit 和模型清单摘要。工具不会自动执行额外的业务功能测试。

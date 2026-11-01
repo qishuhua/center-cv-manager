@@ -383,3 +383,11 @@ func (r readRepo) GetOSSCredential() (domain.OSSCredential, error) {
 	e := r.db.QueryRow("SELECT endpoint,bucket,access_key_id,access_key_secret,images_prefix,models_prefix FROM oss_credentials WHERE id=1").Scan(&v.Endpoint, &v.Bucket, &v.AccessKeyID, &v.AccessKeySecret, &v.ImagesPrefix, &v.ModelsPrefix)
 	return v, e
 }
+
+func (readRepo) GetModelConvertSettings() (domain.ModelConvertSettings, error) {
+	return domain.ModelConvertSettings{}, nil
+}
+
+func (readRepo) SaveModelConvertSettings(domain.ModelConvertSettings) error {
+	return nil
+}
