@@ -1,0 +1,304 @@
+internal/templates/testalarm_test.go
+  s_276ef7d278afb7::t_172f18ac2a8ba3 10,12-14,16,19-20,24,29,32-43,48,55-78
+  s_276ef7d278afb7::t_7031da69e5ea32 79
+internal/store/sqlite.go
+  s_c0c88b744ad3c1::t_360ef3c39cb403 386
+  s_276ef7d278afb7::t_35f3ad143dddd5 97
+  s_c0c88b744ad3c1::t_7d446c124eab23 355
+  s_c0c88b744ad3c1::t_351367e66d6f16 366
+  s_c0c88b744ad3c1::t_43accc5a0c9716 407
+  s_276ef7d278afb7::t_5202ad88b02a91 541-560
+  s_c0c88b744ad3c1::t_71bf3784adf22c 131-133
+internal/templates/embed.go
+  s_c0c88b744ad3c1::t_b38064fb5c040f 216-220
+  s_276ef7d278afb7::t_c5ba872ab39e10 238-251
+cmd/center-diagnostic-tmp/main.go
+  s_276ef7d278afb7::t_064156698990b2 386-393
+internal/store/sqlite_test.go
+  s_c0c88b744ad3c1::t_6f3e668556476f 315,327-329,339-340
+  s_c0c88b744ad3c1::t_9828af9e35076c 300-302
+  s_276ef7d278afb7::t_c2d3599661ba00 33-62
+internal/domain/models.go
+  s_276ef7d278afb7::t_933fc4c4940c32 135-156
+  s_c0c88b744ad3c1::t_08a94e2a1e3e51 33-36
+internal/api/modules.go
+  s_276ef7d278afb7::t_aa22ee4ee9084f 117-153
+  s_276ef7d278afb7::t_0a876f53815091 280-310
+internal/provision/wms.go
+  s_276ef7d278afb7::t_9229e21cbe5e16 128-132
+  s_c0c88b744ad3c1::t_732a6118226c4d 17-20
+  s_276ef7d278afb7::t_0e2a1a9f86d706 72
+  s_c0c88b744ad3c1::t_7c69f168cfadc2 67
+internal/provision/service.go
+  s_c0c88b744ad3c1::t_349f111e6650a7 227
+  s_276ef7d278afb7::t_82ddb3f04e3ef5 230
+README.md
+  s_276ef7d278afb7::t_8eed961134fafa 248,251
+  s_276ef7d278afb7::t_30267e4e9dfdd2 249-250,252
+  s_276ef7d278afb7::t_d283b95c7bdd80 254
+  s_276ef7d278afb7::t_6b7b7b1876f9c3 257
+  s_276ef7d278afb7::t_03d33592e4dda7 258
+  s_276ef7d278afb7::t_3f27d8c478ef7d 245-247
+  s_276ef7d278afb7::t_db6f5853801476 253
+  s_276ef7d278afb7::t_f44530bde4c03c 255-256
+  s_276ef7d278afb7::t_15f7d1f53c4694 259-261
+  s_276ef7d278afb7::t_ecf56a568936e4 216-244
+web/src/style.css
+  s_276ef7d278afb7::t_4a6b371f70e85a 30
+cmd/mcp/main_test.go
+  s_276ef7d278afb7::t_97ff5a35296c40 38-42
+  s_276ef7d278afb7::t_96ffaa5d3606a0 64-66
+  s_276ef7d278afb7::t_2a6ba01dfbeb7c 20,62,67-83
+  s_276ef7d278afb7::t_b623892d7cfe8c 21,27,53,60,63,84,87-102,110-111
+  s_276ef7d278afb7::t_d70a33aa816b45 15
+  s_276ef7d278afb7::t_e60cf5e8d1d471 35,43-50
+  s_276ef7d278afb7::t_a749fae996d897 12-14
+  s_276ef7d278afb7::t_2de7711c034d8b 16-19
+  s_276ef7d278afb7::t_4ba5ada833193f 22-26
+  s_276ef7d278afb7::t_9d623a8bdeb951 28-30,32-34
+  s_276ef7d278afb7::t_71168b0d88672f 36-37
+  s_276ef7d278afb7::t_16bb7ebe405628 51-52
+  s_276ef7d278afb7::t_6dfb085c814518 54-59
+  s_276ef7d278afb7::t_03d18d7e36a2e8 61
+  s_276ef7d278afb7::t_7a1ecc6874c268 85-86
+  s_276ef7d278afb7::t_6fc3ba4cebca82 103-105,107-109
+  s_276ef7d278afb7::t_8c7b58deb96938 1-11,31,106
+internal/provision/player.go
+  s_276ef7d278afb7::t_7f2e42fe3b2ae8 114
+  s_276ef7d278afb7::t_a2fa181cca3e1b 1-6,8-13,15-31,33-75,77-113,115-131
+  s_276ef7d278afb7::t_5e2e4babbe97b9 76
+  s_276ef7d278afb7::t_6656a317070f5c 32
+  s_276ef7d278afb7::t_8bcc89a2bdcb19 7,14
+web/src/App.vue
+  s_c0c88b744ad3c1::t_8b93f9b8b54188 667
+  s_276ef7d278afb7::t_e073cacb2970e1 360-367
+  s_c0c88b744ad3c1::t_83abeb8142b13e 293
+  s_276ef7d278afb7::t_de453e79dd67b4 16
+  s_276ef7d278afb7::t_b3307f7af7dc80 602
+  s_276ef7d278afb7::t_dda8bc81442745 599
+  s_276ef7d278afb7::t_79bc28984af16d 818-848
+  s_c0c88b744ad3c1::t_c0960f86ee3199 42
+  s_276ef7d278afb7::t_24dda06e41df93 15
+  s_c0c88b744ad3c1::t_31754ab4af8b21 538,544,626
+internal/templates/compose/docker-compose.denglin.yml
+  s_c0c88b744ad3c1::t_9f7f58ac95d9ab 189
+internal/templates/missort_test.go
+  s_c0c88b744ad3c1::t_a7cacf44cad980 37-38,49,59-68
+  s_c0c88b744ad3c1::t_b7dd1a7e948b83 85-87,91-95,106
+  s_c0c88b744ad3c1::t_9aa5be86a45d0d 172,176-178,180
+  s_c0c88b744ad3c1::t_1b0ba90fde6bcc 69
+cmd/mcp/main.go
+  s_276ef7d278afb7::t_3bc5ecc439d00c 98,132,139,142,190-192,195-198,202,205-207,212-213,240-262,264,268,289,292,319,325,329
+  s_276ef7d278afb7::t_f9fbeabd7d9a19 14
+  s_276ef7d278afb7::t_d30ff6bcb6fd3c 69-70
+  s_276ef7d278afb7::t_c2d505b467a6b4 215,225-239,269
+  s_276ef7d278afb7::t_a35c062aaa33c9 211,216-217,220-224,306,310,316
+  s_276ef7d278afb7::t_ba0aa5558e8d24 59,63
+  s_276ef7d278afb7::t_5680bab34e788c 68
+  s_276ef7d278afb7::t_eff3a56152a7c0 38-40,73,80,85,89,100,104,108,112,118,121,124,134,144,272,280,330,333
+  s_276ef7d278afb7::t_3019afab6b454c 60-62
+  s_276ef7d278afb7::t_defa40308a0deb 65
+  s_276ef7d278afb7::t_a231f40aa15daa 156-161,174-187
+  s_276ef7d278afb7::t_acfc7595414043 162-173
+  s_276ef7d278afb7::t_c1659b74a61e99 218-219
+  s_276ef7d278afb7::t_904c5e0d8bb049 11-13
+  s_276ef7d278afb7::t_b225b6b09ba57b 15-17,35-37
+  s_276ef7d278afb7::t_dd79ad5a158fd3 41-43,56-58
+  s_276ef7d278afb7::t_20543f70483d1b 64
+  s_276ef7d278afb7::t_311d093a246530 66-67
+  s_276ef7d278afb7::t_f28820226b3822 71-72
+  s_276ef7d278afb7::t_d7871375996233 74-79
+  s_276ef7d278afb7::t_6906e969f82bb9 81-84
+  s_276ef7d278afb7::t_a4074119245096 86-88
+  s_276ef7d278afb7::t_35b22def561bfb 90-92,95-97
+  s_276ef7d278afb7::t_63a63fda77ed2e 99
+  s_276ef7d278afb7::t_b2f1ec206da9ad 101-103
+  s_276ef7d278afb7::t_4d7539f86df3a5 105-107
+  s_276ef7d278afb7::t_ffeb3a1f7d1ab2 109-111
+  s_276ef7d278afb7::t_26a0c54ed3a550 113-117
+  s_276ef7d278afb7::t_aea1d973752655 119-120
+  s_276ef7d278afb7::t_9968b94a28a847 122-123
+  s_276ef7d278afb7::t_9e62e037553ffd 125-127,129-131
+  s_276ef7d278afb7::t_3df7ccc9fac62e 133
+  s_276ef7d278afb7::t_cdfe18f0db4a93 135-138
+  s_276ef7d278afb7::t_d6f5daea434b4a 140-141
+  s_276ef7d278afb7::t_0f18f462688a89 143
+  s_276ef7d278afb7::t_8eb4bf9f5ff5b9 145-147,153-155
+  s_276ef7d278afb7::t_053b929f305e9d 188-189
+  s_276ef7d278afb7::t_656c9902c70b80 193-194
+  s_276ef7d278afb7::t_2f4332b4cfc6b9 199-201
+  s_276ef7d278afb7::t_0396949f339c34 203-204
+  s_276ef7d278afb7::t_be533eb89e083d 208-210
+  s_276ef7d278afb7::t_bc8274e132ce7b 214
+  s_276ef7d278afb7::t_e1df9ca6fac797 263
+  s_276ef7d278afb7::t_3cd6296f5cc82d 265-267
+  s_276ef7d278afb7::t_5e7da3e7833ff9 270-271
+  s_276ef7d278afb7::t_3deee2f7046253 273-275,277-279
+  s_276ef7d278afb7::t_3258c536c5e356 281-283,286-288
+  s_276ef7d278afb7::t_ffbc43f96498d8 290-291
+  s_276ef7d278afb7::t_b21c10ba69741c 293-295,303-305
+  s_276ef7d278afb7::t_196da41dcdbec7 307-309
+  s_276ef7d278afb7::t_27eb4acc600cba 311-315
+  s_276ef7d278afb7::t_ea15cfb2568e14 317-318
+  s_276ef7d278afb7::t_fef123e64f3d2d 320-324
+  s_276ef7d278afb7::t_2611da7087d3dc 326-328
+  s_276ef7d278afb7::t_d9a5205d4469f8 331-332
+  s_276ef7d278afb7::t_69271b6688fc8c 334
+  s_276ef7d278afb7::t_112d7172a6db53 1-10,18-34,44-55,93-94,128,148-152,276,284-285,296-302
+internal/templates/modules.go
+  s_c0c88b744ad3c1::t_8497bbe2463098 101
+  s_276ef7d278afb7::t_ac85e8cc20253e 105
+web/src/types.ts
+  s_276ef7d278afb7::t_96a21e634dce7e 32-33
+  s_c0c88b744ad3c1::t_56eee32131efa6 3
+internal/center/service.go
+  s_c0c88b744ad3c1::t_ff0aad00ede3e7 16
+  s_c0c88b744ad3c1::t_2cf018255fc349 90-94
+  s_c0c88b744ad3c1::t_03a2317cc50580 183-187
+internal/modelasset/convert.go
+  s_276ef7d278afb7::t_1a4dddf9dd33d5 204-227
+  s_276ef7d278afb7::t_545e355e1ddf08 1-17,19-22,24-182,186-203,228-287
+  s_276ef7d278afb7::t_1cb501adbb7021 18,23
+  s_276ef7d278afb7::t_6d72d3d0dbeb9c 183-185
+internal/modelasset/service.go
+  s_276ef7d278afb7::t_0652c83d716dec 31-32
+internal/templates/modules/gateway/nginx/nginx.conf
+  s_276ef7d278afb7::t_e8c8d762ce859b 198-204
+internal/templates/missort.go
+  s_c0c88b744ad3c1::t_2a023177e3bda6 21-23,26-28
+  s_c0c88b744ad3c1::t_66353299317f32 3-6
+  s_c0c88b744ad3c1::t_1243d7bb8fe0d0 204-207,210-211
+  s_c0c88b744ad3c1::t_9f730454fa481e 233
+  s_c0c88b744ad3c1::t_723c392b214cc9 179-182,185-189
+  s_c0c88b744ad3c1::t_c671ca98c8c2b1 29
+web/src/ModelCatalog.vue
+  s_276ef7d278afb7::t_9fefa6157eecf5 3,7,13
+  s_276ef7d278afb7::t_c38ed3739eea5f 134-138
+  s_276ef7d278afb7::t_11c631438b1650 39
+internal/templates/testalarm.go
+  s_276ef7d278afb7::t_1a63c25a4657ea 7-9,14,21,39,42-81
+internal/templates/modules/business/compose.denglin.yml
+  s_c0c88b744ad3c1::t_75a52e6755173b 149
+  s_276ef7d278afb7::t_a91c6642f402e8 183-184
+internal/api/model_convert.go
+  s_276ef7d278afb7::t_3092a6376b54bd 9,11-12,26-27,32-33,35-36,38,41,45,58-59,85-96,98-110,114-119,124,128
+  s_276ef7d278afb7::t_305f423f211efa 97
+  s_276ef7d278afb7::t_b771c2897d0426 1-8,13-25,28-31,34,37,39-40,42-44,46-57,60-84,111-113,120-123,125-127,129
+  s_276ef7d278afb7::t_f8869566418950 10
+internal/api/server.go
+  s_276ef7d278afb7::t_d4ea4deade708b 121
+  s_276ef7d278afb7::t_21df65e8ff24bb 174-175
+  s_276ef7d278afb7::t_befb9a49ac7674 1863-1873
+  s_276ef7d278afb7::t_140bf2250fffe8 85,95-97,1629
+internal/templates/modules/business/compose.nvidia.yml
+  s_276ef7d278afb7::t_762600311ee4b6 183-184
+  s_c0c88b744ad3c1::t_1cf5431fce27bc 149
+internal/modelasset/convert_test.go
+  s_276ef7d278afb7::t_2865d6b375d81b 1-81
+internal/templates/modules/gateway/compose.yml
+  s_276ef7d278afb7::t_6daacf40592088 11
+internal/templates/compose/docker-compose.nvidia.yml
+  s_c0c88b744ad3c1::t_887718b014262e 190
+internal/api/mcp_tokens.go
+  s_276ef7d278afb7::t_c0b2b641bdff68 152,160
+  s_276ef7d278afb7::t_b4c0d32e174fff 18,26,30,35-37,42,46,52,54,56,59-61,68,72,77,90-146,166,170
+  s_276ef7d278afb7::t_5b36e74a78762b 57-58
+  s_276ef7d278afb7::t_3409e7cb76db9a 164
+  s_276ef7d278afb7::t_8dc128536b1678 153-155,165,167
+  s_276ef7d278afb7::t_c2f7282ba162e8 15-17
+  s_276ef7d278afb7::t_787e4a91924d41 19-21,23-25
+  s_276ef7d278afb7::t_374cfa5226c3e6 27-29
+  s_276ef7d278afb7::t_66125969dd3f01 31-34
+  s_276ef7d278afb7::t_384270730ecee1 38-41
+  s_276ef7d278afb7::t_284e86c7327bd6 43-45
+  s_276ef7d278afb7::t_567358a8669053 47-51
+  s_276ef7d278afb7::t_66fa50697eebdd 53
+  s_276ef7d278afb7::t_7ce2909755c1d2 55
+  s_276ef7d278afb7::t_448b8f0efb1c16 62-67
+  s_276ef7d278afb7::t_060c62d466fd1f 69-71
+  s_276ef7d278afb7::t_58162056c057b1 73-76
+  s_276ef7d278afb7::t_d84637fcaf3fe9 78-80,87-89
+  s_276ef7d278afb7::t_71668cfb27a853 147-151
+  s_276ef7d278afb7::t_9e715a48389e48 156-159
+  s_276ef7d278afb7::t_25483b841a73e6 161-163
+  s_276ef7d278afb7::t_d6184fbb28be42 168-169
+  s_276ef7d278afb7::t_b693920a06eb2f 1-14,22,81-86
+CLAUDE.md
+  s_c0c88b744ad3c1::t_7659579e434c3a 73
+  s_c0c88b744ad3c1::t_76378902cb2d61 84
+  s_276ef7d278afb7::t_88e36f81684260 86
+internal/center/service_test.go
+  s_c0c88b744ad3c1::t_df00a3ae2c72da 83-94
+internal/api/mcp_tokens_test.go
+  s_c89c01735a61ac::t_ee814baed47a7d 1-46
+internal/api/software_publish.go
+  s_5203c5b2b3e256::t_0e823564699622 80
+internal/auth/manager.go
+  s_6f4dce646f419b::t_b4e03a0033a1d7 62-63,91,122,330,353-355,378,424
+internal/auth/token.go
+  s_c89c01735a61ac::t_fa4fe7de49cd16 1-148
+internal/auth/token_json.go
+  s_c89c01735a61ac::t_cb2b5585f71e63 1-24
+internal/auth/token_test.go
+  s_c89c01735a61ac::t_9a9c65d5333bb6 1-60
+internal/templates/modules/gateway/nginx/player.html
+  s_dc39fe08086701::t_f68addd22a0e3e 1-267
+web/src/McpTokens.vue
+  s_c89c01735a61ac::t_8f86048ca9a786 1-22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "85beb98b5be9e126628f83f8114d4b82d3cc2270",
+  "prompts": {},
+  "sessions": {
+    "s_276ef7d278afb7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a86e3a24-56f2-4a26-bf47-1ea6955470be",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_5203c5b2b3e256": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cc962483-8acb-4ba6-ac79-44d07fbf2bee",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_6f4dce646f419b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d4998ff7-c0a6-48ae-8e66-fd45d006723f",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_c0c88b744ad3c1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "04de00dd-4429-4e42-84ab-238884a94c0b",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_c89c01735a61ac": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a18d50-1c9c-7e43-8125-51755c18bfc4",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_dc39fe08086701": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1925b-5e43-7290-84bf-30080bac62f4",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
