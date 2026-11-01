@@ -1,0 +1,49 @@
+internal/provision/service.go
+  s_08dac949fe3edc::t_836a957ee27e1e 233
+  s_08dac949fe3edc::t_a0b501a8789b64 242
+  s_08dac949fe3edc::t_cb04a6956a89e8 211-217
+CLAUDE.md
+  s_08dac949fe3edc::t_e04846ecf0e9b1 68
+  s_08dac949fe3edc::t_d50a101b528d5b 54
+internal/provision/modules.go
+  s_08dac949fe3edc::t_8469c613cd2486 64,67-69
+internal/provision/alert_silence.go
+  s_08dac949fe3edc::t_375b6edbb29713 59-69
+  s_08dac949fe3edc::t_84b0a432f27c8b 1-58,70-103
+internal/monitor/service.go
+  s_08dac949fe3edc::t_e7cc75e6c2b8bd 205
+  s_08dac949fe3edc::t_67e9239f7f38f2 61-62
+  s_08dac949fe3edc::t_8f9f4f72d85734 81-82
+internal/provision/wms.go
+  s_08dac949fe3edc::t_3531d2c0961b57 25-28
+  s_08dac949fe3edc::t_70bf4ff3dfd854 136-140
+internal/api/center_notify.go
+  s_08dac949fe3edc::t_b67b952529f3e4 10
+internal/templates/modules_test.go
+  s_08dac949fe3edc::t_ae919a349ecb1d 73-87
+internal/api/server.go
+  s_08dac949fe3edc::t_66c20494d8b04a 256-261
+  s_08dac949fe3edc::t_55917deee35db3 268-269
+internal/templates/modules.go
+  s_08dac949fe3edc::t_9352745ac7080e 12-18
+internal/provision/alert_silence_test.go
+  s_08dac949fe3edc::t_f58ee91eeb7656 1-14,16-23,25-41
+  s_08dac949fe3edc::t_cadffcfeeb04ba 24
+  s_08dac949fe3edc::t_608456e0c83bf7 15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "a10db29d1b715db2396efd8ae425f02104cf8635",
+  "prompts": {},
+  "sessions": {
+    "s_08dac949fe3edc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3aa9304-746f-4b64-aae6-42aa64412974",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
