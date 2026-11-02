@@ -1,0 +1,45 @@
+web/src/style.css
+  s_08dac949fe3edc::t_6d3217985724b5 23-24
+internal/provision/modules.go
+  s_08dac949fe3edc::t_87a168f5589c36 67
+internal/templates/modules.go
+  s_08dac949fe3edc::t_f14a1cb5b198d5 12
+internal/provision/wms.go
+  s_08dac949fe3edc::t_ca48afeba9c373 26,136
+internal/monitor/service.go
+  s_08dac949fe3edc::t_bd68fb567b135a 61,81-82,205
+internal/templates/modules_test.go
+  s_08dac949fe3edc::t_0272332c078e7e 75
+internal/api/server.go
+  s_08dac949fe3edc::t_2c09d8b8f6a9d0 257
+internal/provision/service.go
+  s_08dac949fe3edc::t_809fd4f95ee7af 211
+web/src/App.vue
+  s_08dac949fe3edc::t_99b2a5ef85c881 670
+  s_08dac949fe3edc::t_4d8c751710a076 673
+  s_08dac949fe3edc::t_58e1ed0ebf1ffb 566,570,576,720
+  s_08dac949fe3edc::t_68f0d51ab27e77 648-669,671-672,674-679
+internal/provision/alert_silence.go
+  s_08dac949fe3edc::t_f85b67abc58699 26,36,91,96,99
+CLAUDE.md
+  s_08dac949fe3edc::t_25d226350017e6 54,68
+  s_08dac949fe3edc::t_d565aa2a51268f 85
+internal/api/center_notify.go
+  s_08dac949fe3edc::t_6bb3195fbfbf55 10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "e88934f1c61bff692239fb0f2e49050a1da9e03c",
+  "prompts": {},
+  "sessions": {
+    "s_08dac949fe3edc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3aa9304-746f-4b64-aae6-42aa64412974",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
