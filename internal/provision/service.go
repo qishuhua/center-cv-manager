@@ -208,7 +208,7 @@ func (s *Service) Initialize(ctx context.Context, centerID string, r Reporter) e
 	if err != nil {
 		return err
 	}
-	// 平台告警关闭（test_mode）的中心初始化即写入占位地址：中心本地
+	// 监控平台告警关闭（test_mode）的中心初始化即写入占位地址：中心本地
 	// alertmanager 评估照常、通知不外发；重新打开后经保存中心的同步路径
 	//（ensurePlatformAlerts）恢复真实 Webhook。
 	alertWebhook := alertConfig.FeishuWebhook

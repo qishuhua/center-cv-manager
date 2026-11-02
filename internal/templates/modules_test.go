@@ -72,7 +72,7 @@ func TestIndependentModuleTemplates(t *testing.T) {
 }
 
 func TestSilencedWebhookKeepsReceiver(t *testing.T) {
-	// 平台告警静默中心经占位地址静默：receivers 与 url_file 保持原样
+	// 监控平台告警静默中心经占位地址静默：receivers 与 url_file 保持原样
 	//（重载后发送必然失败仅记日志），重新打开时只换回文件内容即可恢复。
 	files, err := RenderModules("nvidia", RenderOptions{Workers: 1, ServerName: "静默中心", FeishuWebhook: SilencedFeishuWebhook})
 	if err != nil {

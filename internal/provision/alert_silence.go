@@ -23,7 +23,7 @@ func alertWebhookFile(m domain.ComposeModule) string {
 	return path.Join(path.Dir(m.ComposeFile), "alerting", "feishu-webhook-url")
 }
 
-// alertWebhookValue 返回中心侧 feishu-webhook-url 的期望内容：平台告警关闭
+// alertWebhookValue 返回中心侧 feishu-webhook-url 的期望内容：监控平台告警关闭
 // （test_mode）→ 占位地址（发送必然失败仅记日志）；告警启用 → 全局飞书
 // Webhook；未配置时为空（与初始化渲染「未配置即空文件 + 无 receivers」同口径）。
 func alertWebhookValue(testMode bool, configuredWebhook string) string {
@@ -33,7 +33,7 @@ func alertWebhookValue(testMode bool, configuredWebhook string) string {
 	return configuredWebhook
 }
 
-// ensurePlatformAlerts 把「平台告警」开关同步到中心侧 alertmanager：静默中心
+// ensurePlatformAlerts 把「监控平台告警」开关同步到中心侧 alertmanager：静默中心
 // 的 monitoring/alerting/feishu-webhook-url 换成占位地址，重新打开后恢复全局
 // 飞书 Webhook。文件是 bind mount、写入即对容器可见，再向 alertmanager 容器
 // 发 SIGHUP 重载（url_file 仅在配置加载时读取）即时生效，无需整体发布、不
@@ -88,15 +88,15 @@ func (s *Service) ensurePlatformAlerts(ctx context.Context, remote *sshx.DockerC
 	}
 	// 容器不在运行（监控模块暂停/未启动）时略过：下次启动自然读到新文件。
 	if err = remote.Client.ContainerKill(ctx, alertmanagerContainer, "SIGHUP"); err != nil && !errdefs.IsNotFound(err) && !errdefs.IsConflict(err) {
-		return fmt.Errorf("平台告警开关已写入，但重载中心 Alertmanager 失败（重启监控模块后生效）: %w", err)
+		return fmt.Errorf("监控平台告警开关已写入，但重载中心 Alertmanager 失败（重启监控模块后生效）: %w", err)
 	}
 	if advancePublishState {
 		post, postErr := s.composePublishPlan(ctx, remote, *c, m.ID)
 		if postErr != nil {
-			return fmt.Errorf("平台告警开关已生效，但刷新监控模块发布指纹失败（可忽略，整体发布时自动对齐）: %w", postErr)
+			return fmt.Errorf("监控平台告警开关已生效，但刷新监控模块发布指纹失败（可忽略，整体发布时自动对齐）: %w", postErr)
 		}
 		if err = writePublishedState(ctx, remote, post.File, composePublishedState{Content: post.contentRevision, Resolved: post.resolvedRevision, Files: post.filesRevision}); err != nil {
-			return fmt.Errorf("平台告警开关已生效，但更新监控模块发布指纹失败: %w", err)
+			return fmt.Errorf("监控平台告警开关已生效，但更新监控模块发布指纹失败: %w", err)
 		}
 	}
 	return nil

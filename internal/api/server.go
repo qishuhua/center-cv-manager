@@ -254,7 +254,7 @@ func (s *Server) saveCenter(c *gin.Context) {
 		return
 	}
 	// 中心托管设置同步到远端（错分检测、Debug 模式、存图、飞书告警测试 →
-	// business 模块 module.env + Compose；平台告警开关 → monitoring 模块
+	// business 模块 module.env + Compose；监控平台告警开关 → monitoring 模块
 	// alertmanager Webhook 文件 + SIGHUP 即时静默/恢复）：保存即幂等同步，
 	// 不比较新旧值——远端文件无变化时只读比对、零写入，而上次同步失败的
 	// 中心（记录已更新、远端仍旧值）在任意一次保存时自动重试，避免漂移被

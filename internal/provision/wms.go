@@ -23,7 +23,7 @@ import (
 // FEISHU_WEBHOOK_URL）。compose.yml 的错分/告警插值行经 Ensure* 幂等兜底
 // （防远端手工删改）。写入只置 ConfigChanged 等待整体发布生效；调用方需先
 // 持久化中心字段。末尾另同步两处不等待发布的设置：网关播放器静态页
-// （ensureGatewayPlayer，置 gateway 待发布）与平台告警开关的中心侧
+// （ensureGatewayPlayer，置 gateway 待发布）与监控平台告警开关的中心侧
 // alertmanager 静默（ensurePlatformAlerts，SIGHUP 即时生效）。legacy 中心
 // 不支持。
 func (s *Service) ApplyBusinessSettings(ctx context.Context, centerID string) error {
@@ -133,7 +133,7 @@ func (s *Service) ApplyBusinessSettings(ctx context.Context, centerID string) er
 		if err = s.ensureGatewayPlayer(ctx, remote, &c); err != nil {
 			return err
 		}
-		// 平台告警开关同步中心侧 alertmanager（Webhook 文件 + SIGHUP 即时
+		// 监控平台告警开关同步中心侧 alertmanager（Webhook 文件 + SIGHUP 即时
 		// 生效，不置待发布），与管理端通知静默、统一监控剔除同口径。
 		if err = s.ensurePlatformAlerts(ctx, remote, &c); err != nil {
 			return err

@@ -563,17 +563,17 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
 
       <template v-else-if="section==='centers'">
         <div class="toolbar"><div><p>SSH 凭据加密保存在开发机；所有中心共用一套飞书告警 Webhook。</p><el-tag :type="alertCredential.configured?'success':'warning'">{{alertCredential.configured?'飞书告警已配置':'尚未配置飞书告警'}}</el-tag></div><div><el-button :icon="Lock" @click="editAlertCredential">配置飞书告警</el-button><el-button type="primary" :icon="Plus" @click="editCenter()">添加中心</el-button></div></div>
-        <div class="cards"><div class="server-card" v-for="c in centers" :key="c.id"><div class="server-head"><div class="server-icon"><Connection/></div><div><h3>{{c.name}}</h3><p>{{c.username}}@{{c.host}}:{{c.port}}</p></div><el-tag size="small" :type="c.deployment?(c.deployment.status==='ready'?'success':c.deployment.status==='paused'?'warning':c.deployment.status==='waiting_business'?'warning':c.deployment.status==='failed'?'danger':'info'):(c.initialized_at?'success':'warning')">{{c.deployment?(c.deployment.status==='ready'?'已就绪':c.deployment.status==='paused'?'已暂停':c.deployment.status==='waiting_business'?'等待业务发布':c.deployment.status==='failed'?'初始化失败':'待初始化'):(c.initialized_at?'已初始化':'待初始化')}}</el-tag></div><p class="desc">{{c.description||'暂无说明'}}</p><div class="hardware-strip"><span><small>检测平台</small><b>{{acceleratorName(c.detected_accelerator||c.accelerator)}}</b></span><span><small>逻辑 CPU</small><b>{{c.cpu_count||'-'}}</b></span><span><small>物理 GPU</small><b>{{c.gpu_count||'-'}}</b></span></div><div class="detail"><span>最近初始化</span><code>{{fmt(c.initialized_at)}}</code></div><div class="detail"><span>访问端口</span><code>{{c.console_port||8080}}</code></div><div class="detail"><span>错分检测</span><code>{{!c.wms_url?'未启用':c.mis_sort_enabled===false?'已配置·未启用':'已启用'}}</code></div><div v-if="c.test_mode" class="detail"><span>平台告警</span><code>已静默</code></div><div class="actions center-actions"><el-button type="primary" @click="openCenterFromCard(c)">运行详情</el-button><el-button plain :loading="hardwareDetectingId===c.id" :disabled="!!hardwareDetectingId&&hardwareDetectingId!==c.id" @click="detectCenter(c)">检测硬件</el-button><el-button v-if="!c.initialized_at" type="primary" plain :loading="!!initializationTask(c)" :disabled="!!initializationTask(c)" @click="initializeCenter(c)">初始化部署</el-button><el-button @click="editCenter(c)">编辑连接</el-button><el-button type="danger" plain @click="removeCenter(c)">删除</el-button></div></div><el-empty v-if="!centers.length" description="尚未添加中心服务器"/></div>
+        <div class="cards"><div class="server-card" v-for="c in centers" :key="c.id"><div class="server-head"><div class="server-icon"><Connection/></div><div><h3>{{c.name}}</h3><p>{{c.username}}@{{c.host}}:{{c.port}}</p></div><el-tag size="small" :type="c.deployment?(c.deployment.status==='ready'?'success':c.deployment.status==='paused'?'warning':c.deployment.status==='waiting_business'?'warning':c.deployment.status==='failed'?'danger':'info'):(c.initialized_at?'success':'warning')">{{c.deployment?(c.deployment.status==='ready'?'已就绪':c.deployment.status==='paused'?'已暂停':c.deployment.status==='waiting_business'?'等待业务发布':c.deployment.status==='failed'?'初始化失败':'待初始化'):(c.initialized_at?'已初始化':'待初始化')}}</el-tag></div><p class="desc">{{c.description||'暂无说明'}}</p><div class="hardware-strip"><span><small>检测平台</small><b>{{acceleratorName(c.detected_accelerator||c.accelerator)}}</b></span><span><small>逻辑 CPU</small><b>{{c.cpu_count||'-'}}</b></span><span><small>物理 GPU</small><b>{{c.gpu_count||'-'}}</b></span></div><div class="detail"><span>最近初始化</span><code>{{fmt(c.initialized_at)}}</code></div><div class="detail"><span>访问端口</span><code>{{c.console_port||8080}}</code></div><div class="detail"><span>错分检测</span><code>{{!c.wms_url?'未启用':c.mis_sort_enabled===false?'已配置·未启用':'已启用'}}</code></div><div v-if="c.test_mode" class="detail"><span>监控平台告警</span><code>已静默</code></div><div class="actions center-actions"><el-button type="primary" @click="openCenterFromCard(c)">运行详情</el-button><el-button plain :loading="hardwareDetectingId===c.id" :disabled="!!hardwareDetectingId&&hardwareDetectingId!==c.id" @click="detectCenter(c)">检测硬件</el-button><el-button v-if="!c.initialized_at" type="primary" plain :loading="!!initializationTask(c)" :disabled="!!initializationTask(c)" @click="initializeCenter(c)">初始化部署</el-button><el-button @click="editCenter(c)">编辑连接</el-button><el-button type="danger" plain @click="removeCenter(c)">删除</el-button></div></div><el-empty v-if="!centers.length" description="尚未添加中心服务器"/></div>
       </template>
 
       <template v-else-if="section==='monitoring'">
-        <div class="toolbar"><div><p>开发机统一监控：每个中心一条健康信号与失联告警，指标和日志仍保存在中心本地，Grafana 经中心网关（SSH 主机 + 访问端口，与中心 Grafana 入口同址）直接查询。完成硬件检测的中心自动纳入；关闭平台告警的中心不探测。</p><el-tag :type="monitoringStatus?.stack_online?'success':'warning'">{{monitoringStatus?.stack_online?'监控栈运行中':'监控栈未启动或不可达'}}</el-tag></div><div><el-button :icon="Refresh" :loading="monitoringLoading" @click="loadMonitoringStatus">刷新状态</el-button><el-button type="primary" @click="openGrafanaDashboard()">打开 Grafana</el-button></div></div>
+        <div class="toolbar"><div><p>开发机统一监控：每个中心一条健康信号与失联告警，指标和日志仍保存在中心本地，Grafana 经中心网关（SSH 主机 + 访问端口，与中心 Grafana 入口同址）直接查询。完成硬件检测的中心自动纳入；关闭监控平台告警的中心不探测。</p><el-tag :type="monitoringStatus?.stack_online?'success':'warning'">{{monitoringStatus?.stack_online?'监控栈运行中':'监控栈未启动或不可达'}}</el-tag></div><div><el-button :icon="Refresh" :loading="monitoringLoading" @click="loadMonitoringStatus">刷新状态</el-button><el-button type="primary" @click="openGrafanaDashboard()">打开 Grafana</el-button></div></div>
         <el-alert v-if="monitoringStatus?.error&&!monitoringStatus.stack_online" :title="monitoringStatus.error" type="warning" :closable="false" show-icon style="margin-bottom:16px"/>
         <div class="cards" v-loading="monitoringLoading">
           <div class="server-card" v-for="item in monitoringStatus?.centers||[]" :key="item.center_id">
             <div class="server-head"><div class="server-icon"><DataLine/></div><div><h3>{{item.name}}</h3><p>{{item.target||item.reason}}</p></div><el-tag size="small" :type="monitorStateType(item)">{{monitorStateText(item)}}</el-tag></div>
             <div class="detail"><span>拉取地址</span><code>{{item.target||'-'}}</code></div>
-            <div class="detail"><span>失联告警</span><code>{{!item.monitored?'-':item.test_mode?'静默（平台告警关闭）':'开启（连续 3 分钟失联通知飞书）'}}</code></div>
+            <div class="detail"><span>失联告警</span><code>{{!item.monitored?'-':item.test_mode?'静默（监控平台告警关闭）':'开启（连续 3 分钟失联通知飞书）'}}</code></div>
             <div v-if="!item.monitored&&item.reason" class="detail"><span>未纳入原因</span><code>{{item.reason}}</code></div>
             <div class="actions center-actions"><el-button type="primary" :disabled="!item.monitored" @click="openGrafanaDashboard(item.site)">查看仪表盘</el-button></div>
           </div>
@@ -645,29 +645,39 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
 
   <el-dialog v-model="centerDialog" :title="centerForm.id?'编辑中心':'添加中心'" width="620px">
     <el-form :model="centerForm" label-width="110px">
-      <div class="form-grid"><el-form-item label="名称"><el-input v-model="centerForm.name"/></el-form-item><el-form-item label="SSH 主机"><el-input v-model="centerForm.host"/></el-form-item><el-form-item label="SSH 端口"><el-input-number v-model="centerForm.port" :min="1" :max="65535"/></el-form-item><el-form-item label="用户名"><el-input v-model="centerForm.username"/></el-form-item><el-form-item label="访问端口"><el-input-number v-model="centerForm.console_port" :min="1" :max="65535"/><div class="form-tip">Nginx 对外映射端口（默认 8080），防火墙映射不同时填映射后的端口，用于打开 Grafana / Kibana</div></el-form-item></div>
-      <el-form-item label="认证方式"><el-radio-group v-model="centerForm.auth_type"><el-radio-button value="password">密码</el-radio-button><el-radio-button value="private_key">私钥</el-radio-button></el-radio-group></el-form-item>
-      <el-form-item v-if="centerForm.auth_type==='password'" label="SSH 密码"><el-input v-model="centerForm.password" type="password" show-password placeholder="编辑时留空保留原密码"/></el-form-item>
-      <template v-else><el-form-item label="私钥 PEM"><el-input v-model="centerForm.private_key" type="textarea" :rows="5" placeholder="编辑时留空保留原私钥"/></el-form-item><el-form-item label="私钥口令"><el-input v-model="centerForm.passphrase" type="password" show-password/></el-form-item></template>
-      <el-form-item label="Docker Socket"><el-input v-model="centerForm.docker_socket"/></el-form-item>
-      <el-form-item label="加速卡类型"><el-select v-model="centerForm.accelerator" style="width:100%"><el-option label="自动识别（推荐）" value="auto"/><el-option label="NVIDIA" value="nvidia"/><el-option label="登临" value="denglin"/><el-option label="仅 CPU" value="cpu"/></el-select></el-form-item>
-      <div class="switch-row">
-        <label class="switch-item"><span>平台告警</span><el-switch :model-value="!centerForm.test_mode" @change="(v:string|number|boolean)=>centerForm.test_mode=!v"/></label>
-        <label class="switch-item"><span>debug日志</span><el-switch v-model="centerForm.debug_log_enabled"/></label>
-        <label class="switch-item"><span>保存每帧</span><el-switch v-model="centerForm.save_image_enabled"/></label>
-        <label class="switch-item"><span>仅解码模式</span><el-switch v-model="centerForm.decode_only_enabled"/></label>
-        <label class="switch-item"><span>单实例模式</span><el-switch v-model="centerForm.single_instance_enabled"/></label>
-        <label class="switch-item"><span>飞书告警测试</span><el-switch v-model="centerForm.test_alarm_enabled"/></label>
-        <label class="switch-item"><span>错分检测</span><el-switch v-model="misSortEnabled" @change="onMisSortToggle"/></label>
+      <div class="form-section">
+        <div class="form-section-title"><h4>连接</h4><p>SSH 登录与控制台访问入口</p></div>
+        <div class="form-grid"><el-form-item label="名称"><el-input v-model="centerForm.name"/></el-form-item><el-form-item label="SSH 主机"><el-input v-model="centerForm.host"/></el-form-item><el-form-item label="用户名"><el-input v-model="centerForm.username"/></el-form-item><el-form-item label="SSH 端口"><el-input-number v-model="centerForm.port" :min="1" :max="65535"/></el-form-item><el-form-item label="访问端口"><el-input-number v-model="centerForm.console_port" :min="1" :max="65535"/></el-form-item><el-form-item label="认证方式"><el-radio-group v-model="centerForm.auth_type"><el-radio-button value="password">密码</el-radio-button><el-radio-button value="private_key">私钥</el-radio-button></el-radio-group></el-form-item></div>
+        <el-form-item v-if="centerForm.auth_type==='password'" label="SSH 密码"><el-input v-model="centerForm.password" type="password" show-password placeholder="编辑时留空保留原密码"/></el-form-item>
+        <template v-else><el-form-item label="私钥 PEM"><el-input v-model="centerForm.private_key" type="textarea" :rows="5" placeholder="编辑时留空保留原私钥"/></el-form-item><el-form-item label="私钥口令"><el-input v-model="centerForm.passphrase" type="password" show-password/></el-form-item></template>
       </div>
-      <el-form-item v-if="centerForm.test_alarm_enabled" label="飞书机器人 URL"><el-input v-model="centerForm.feishu_webhook_url" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/你的标识"/></el-form-item>
-      <template v-if="misSortEnabled">
-        <el-form-item label="WMS 服务地址"><el-input v-model="centerForm.wms_url" placeholder="请输入 WMS 服务基地址，含协议、主机和端口，不含路径"/></el-form-item>
-        <el-form-item label="WMS 鉴权 misAuth"><el-input v-model="centerForm.mis_auth" placeholder="留空使用默认 20260606123a"/></el-form-item>
-        <el-form-item label="轮询周期（秒）"><el-input-number v-model="centerForm.mis_sort_interval_seconds" :min="10" :max="86400" :step="60" style="width:100%"/><div class="form-tip">ingress 摄像机配置轮询周期，默认 3600 秒（1 小时），保存后随业务模块整体发布生效</div></el-form-item>
-      </template>
-      <el-form-item :label="centerForm.deployment?'部署目录锚点':'Compose 文件'"><el-input v-model="centerForm.compose_file" placeholder="例如 ~/.local/share/center-manager/deploy/docker-compose.yml"/><div class="form-tip">{{centerForm.deployment?'模块化中心此路径仅作部署目录锚点，实际入口为部署目录下各模块的 compose.yml + module.env，修改需谨慎。':'默认使用 SSH 用户家目录；初始化后会保存解析出的绝对路径。文件已存在时只导入，不会自动覆盖。'}}</div></el-form-item>
-      <el-form-item label="说明"><el-input v-model="centerForm.description" type="textarea"/></el-form-item>
+      <div class="form-section">
+        <div class="form-section-title"><h4>部署</h4><p>Docker 连接、硬件平台与部署路径</p></div>
+        <div class="form-grid"><el-form-item label="Docker Socket"><el-input v-model="centerForm.docker_socket"/></el-form-item><el-form-item label="加速卡类型"><el-select v-model="centerForm.accelerator" style="width:100%"><el-option label="自动识别（推荐）" value="auto"/><el-option label="NVIDIA" value="nvidia"/><el-option label="登临" value="denglin"/><el-option label="仅 CPU" value="cpu"/></el-select></el-form-item></div>
+        <el-form-item :label="centerForm.deployment?'部署目录锚点':'Compose 文件'"><el-input v-model="centerForm.compose_file" placeholder="例如 ~/.local/share/center-manager/deploy/docker-compose.yml"/><div class="form-tip">{{centerForm.deployment?'模块化中心此路径仅作部署目录锚点，实际入口为部署目录下各模块的 compose.yml + module.env，修改需谨慎。':'默认使用 SSH 用户家目录；初始化后会保存解析出的绝对路径。文件已存在时只导入，不会自动覆盖。'}}</div></el-form-item>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title"><h4>功能开关</h4><p>保存时同步远端，部分需随业务模块整体发布生效</p></div>
+        <div class="switch-row">
+          <label class="switch-item"><span>监控平台告警</span><el-switch :model-value="!centerForm.test_mode" @change="(v:string|number|boolean)=>centerForm.test_mode=!v"/></label>
+          <label class="switch-item"><span>debug日志</span><el-switch v-model="centerForm.debug_log_enabled"/></label>
+          <label class="switch-item"><span>保存每帧</span><el-switch v-model="centerForm.save_image_enabled"/></label>
+          <label class="switch-item"><span>仅解码模式</span><el-switch v-model="centerForm.decode_only_enabled"/></label>
+          <label class="switch-item"><span>单实例模式</span><el-switch v-model="centerForm.single_instance_enabled"/></label>
+          <label class="switch-item"><span>飞书告警测试</span><el-switch v-model="centerForm.test_alarm_enabled"/></label>
+          <label class="switch-item"><span>错分检测</span><el-switch v-model="misSortEnabled" @change="onMisSortToggle"/></label>
+        </div>
+        <div v-if="centerForm.test_alarm_enabled" class="switch-extra"><el-form-item label="飞书 Webhook"><el-input v-model="centerForm.feishu_webhook_url" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/你的标识"/></el-form-item></div>
+        <div v-if="misSortEnabled" class="switch-extra">
+          <el-form-item label="WMS 服务地址"><el-input v-model="centerForm.wms_url" placeholder="请输入 WMS 服务基地址，含协议、主机和端口，不含路径"/></el-form-item>
+          <el-form-item label="WMS misAuth"><el-input v-model="centerForm.mis_auth" placeholder="留空使用默认 20260606123a"/></el-form-item>
+          <el-form-item label="轮询周期（秒）"><el-input-number v-model="centerForm.mis_sort_interval_seconds" :min="10" :max="86400" :step="60" style="width:100%"/><div class="form-tip">ingress 摄像机配置轮询周期，默认 3600 秒（1 小时），保存后随业务模块整体发布生效</div></el-form-item>
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-title"><h4>备注</h4></div>
+        <el-form-item label="说明"><el-input v-model="centerForm.description" type="textarea" :rows="3"/></el-form-item>
+      </div>
     </el-form>
     <template #footer><el-button @click="centerDialog=false">取消</el-button><el-button type="primary" @click="saveCenter">保存</el-button></template>
   </el-dialog>
@@ -707,7 +717,7 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
     <div v-loading="centerOverviewLoading||centerOperationSubmitting" class="center-detail">
       <el-alert v-if="activeCenterOverview?.error" :title="activeCenterOverview.error" type="error" :closable="false" show-icon/>
       <template v-else-if="activeCenterOverview">
-        <el-descriptions :column="3" border><el-descriptions-item label="Docker 状态"><el-tag :type="activeCenterOverview.online?'success':'danger'">{{activeCenterOverview.online?'在线':'异常'}}</el-tag></el-descriptions-item><el-descriptions-item label="加速卡">{{acceleratorName(activeCenterOverview.accelerator)}}</el-descriptions-item><el-descriptions-item label="Compose 配置"><span>{{activeCenterOverview.center.deployment ? `${activeCenterOverview.center.deployment.modules.length} 个独立模块` : '待同步为独立模块'}}</span></el-descriptions-item><el-descriptions-item label="错分检测"><el-tag :type="activeCenterOverview.center.wms_url?'success':'info'" size="small">{{activeCenterOverview.center.wms_url?'已启用':'未启用'}}</el-tag></el-descriptions-item><el-descriptions-item label="平台告警"><el-tag :type="activeCenterOverview.center.test_mode?'warning':'success'" size="small">{{activeCenterOverview.center.test_mode?'静默':'开启'}}</el-tag></el-descriptions-item><el-descriptions-item v-if="activeCenterOverview.center.wms_url" label="WMS 地址"><code>{{activeCenterOverview.center.wms_url}}</code></el-descriptions-item></el-descriptions>
+        <el-descriptions :column="3" border><el-descriptions-item label="Docker 状态"><el-tag :type="activeCenterOverview.online?'success':'danger'">{{activeCenterOverview.online?'在线':'异常'}}</el-tag></el-descriptions-item><el-descriptions-item label="加速卡">{{acceleratorName(activeCenterOverview.accelerator)}}</el-descriptions-item><el-descriptions-item label="Compose 配置"><span>{{activeCenterOverview.center.deployment ? `${activeCenterOverview.center.deployment.modules.length} 个独立模块` : '待同步为独立模块'}}</span></el-descriptions-item><el-descriptions-item label="错分检测"><el-tag :type="activeCenterOverview.center.wms_url?'success':'info'" size="small">{{activeCenterOverview.center.wms_url?'已启用':'未启用'}}</el-tag></el-descriptions-item><el-descriptions-item label="监控平台告警"><el-tag :type="activeCenterOverview.center.test_mode?'warning':'success'" size="small">{{activeCenterOverview.center.test_mode?'静默':'开启'}}</el-tag></el-descriptions-item><el-descriptions-item v-if="activeCenterOverview.center.wms_url" label="WMS 地址"><code>{{activeCenterOverview.center.wms_url}}</code></el-descriptions-item></el-descriptions>
         <div class="center-runtime-actions">
           <div class="center-runtime-actions-head">
             <strong>中心状态</strong>
