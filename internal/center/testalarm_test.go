@@ -44,3 +44,19 @@ func TestCenterTestAlarmWebhookPlain(t *testing.T) {
 		t.Fatal("重新开启时缺少 URL 应拒绝")
 	}
 }
+
+func TestCenterMisSortSwitchRequiresWMSURL(t *testing.T) {
+	cipher, err := secret.LoadOrCreate(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := New(&resetRepository{}, cipher)
+	base := domain.Center{Name: "中心", Host: "host", Username: "root", AuthType: "password", Password: "pw", MisSortEnabled: true}
+	if _, err := s.Save(base); err == nil {
+		t.Fatal("开启错分检测时缺少 WMS 服务地址应拒绝")
+	}
+	base.MisSortEnabled = false
+	if _, err := s.Save(base); err != nil {
+		t.Fatalf("关闭开关允许地址留空: %v", err)
+	}
+}

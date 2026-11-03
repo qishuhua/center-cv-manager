@@ -95,6 +95,11 @@ func validate(v domain.Center) error {
 	if v.TestAlarmEnabled && v.FeishuWebhookURL == "" {
 		return fmt.Errorf("开启飞书告警测试时必须填写机器人 URL")
 	}
+	// 与飞书告警测试同口径：开关只管启停，开启时配置必须齐全，避免保存出
+	// “开关开着、实际不生效”的静默状态（编辑页配置常驻可编辑，关闭不清空）。
+	if v.MisSortEnabled && v.WMSURL == "" {
+		return fmt.Errorf("开启错分检测时必须填写 WMS 服务地址")
+	}
 	return nil
 }
 

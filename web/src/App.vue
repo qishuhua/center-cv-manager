@@ -667,16 +667,12 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
           <label class="switch-item"><span>飞书告警测试</span><el-switch v-model="centerForm.test_alarm_enabled"/></label>
           <label class="switch-item"><span>错分检测</span><el-switch v-model="misSortEnabled" @change="onMisSortToggle"/></label>
         </div>
-        <div v-if="centerForm.test_alarm_enabled" class="switch-extra"><el-form-item label="飞书 Webhook"><el-input v-model="centerForm.feishu_webhook_url" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/你的标识"/></el-form-item></div>
-        <div v-if="misSortEnabled" class="switch-extra">
-          <el-form-item label="WMS 服务地址"><el-input v-model="centerForm.wms_url" placeholder="请输入 WMS 服务基地址，含协议、主机和端口，不含路径"/></el-form-item>
+        <div class="switch-extra"><el-form-item label="飞书 Webhook"><el-input v-model="centerForm.feishu_webhook_url" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/你的标识"/><div class="form-tip">中心自有的测试告警机器人，仅开启「飞书告警测试」时下发；地址始终保留在此，关闭开关不会清空</div></el-form-item></div>
+        <div class="switch-extra">
+          <el-form-item label="WMS 服务地址"><el-input v-model="centerForm.wms_url" placeholder="请输入 WMS 服务基地址，含协议、主机和端口，不含路径"/><div class="form-tip">开启「错分检测」且填写服务地址后启用；配置始终保留在此，关闭开关不会清空</div></el-form-item>
           <el-form-item label="WMS misAuth"><el-input v-model="centerForm.mis_auth" placeholder="留空使用默认 20260606123a"/></el-form-item>
           <el-form-item label="轮询周期（秒）"><el-input-number v-model="centerForm.mis_sort_interval_seconds" :min="10" :max="86400" :step="60" style="width:100%"/><div class="form-tip">ingress 摄像机配置轮询周期，默认 3600 秒（1 小时），保存后随业务模块整体发布生效</div></el-form-item>
         </div>
-      </div>
-      <div class="form-section">
-        <div class="form-section-title"><h4>备注</h4></div>
-        <el-form-item label="说明"><el-input v-model="centerForm.description" type="textarea" :rows="3"/></el-form-item>
       </div>
     </el-form>
     <template #footer><el-button @click="centerDialog=false">取消</el-button><el-button type="primary" @click="saveCenter">保存</el-button></template>
