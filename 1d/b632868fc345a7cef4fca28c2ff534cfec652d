@@ -1,0 +1,31 @@
+web/src/CenterTasksPage.vue
+  s_f65401c15f02ed::t_a1ae06bca52a93 89
+  s_f65401c15f02ed::t_147f9d61b44bbb 108
+internal/centertask/centertask_test.go
+  s_f65401c15f02ed::t_594ae77f554aad 35-36,50-51,54-55
+  s_f65401c15f02ed::t_430d2d950ace65 89-91,95-97,105-106
+CLAUDE.md
+  s_f65401c15f02ed::t_a753aa3b9f184f 92
+  s_f65401c15f02ed::t_dd957ba36d13d6 65
+internal/centertask/centertask.go
+  s_f65401c15f02ed::t_3744370ee91b3a 23-25,33,35
+  s_f65401c15f02ed::t_e5054758e0dce5 95-108
+web/src/types.ts
+  s_f65401c15f02ed::t_56611b1dbc9517 40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "1db632868fc345a7cef4fca28c2ff534cfec652d",
+  "prompts": {},
+  "sessions": {
+    "s_f65401c15f02ed": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "14460e89-a865-44c4-94f9-064eac86b98a",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
