@@ -37,4 +37,4 @@ export interface HardwareDisk {device:string;mount_point:string;total_bytes:numb
 export interface HardwareInfo {accelerator:string;cpu:{model:string;sockets:number;physical_cores:number;logical_cores:number};gpus:HardwareGPU[];memory:{total_bytes:number};disks:HardwareDisk[];detected_at:string}
 
 export interface ComposeModule {id:string;name:string;project:string;compose_file:string;enabled:boolean;depends_on:string[];init_services:string[];model_services:string[];ready_urls:string[];timeout:number;status:string;runtime_status?:string;error?:string;revision:string;applied_revision:string;updated_at:string}
-export interface CenterTask {task_id:string;camera?:string;status:string;violation_type?:number;video_type?:string;start_time:number;end_time?:number;error?:string}
+export interface CenterTask {task_id:string;camera?:string;status:string;violation_type?:number;video_type?:string;created_time?:number;start_time:number;end_time?:number;error?:string}

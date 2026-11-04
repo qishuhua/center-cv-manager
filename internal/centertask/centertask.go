@@ -20,7 +20,9 @@ import (
 	"center-cv-manager/internal/domain"
 )
 
-// Task 是中心任务状态的传输结构。时间为 epoch 毫秒，由前端负责格式化；
+// Task 是中心任务状态的传输结构。时间为 epoch 毫秒，由前端负责格式化：
+// created_time 为任务创建时间（旧台账条目缺失时省略），start_time/end_time
+// 为流窗口起止（与执行状态无关，历史回放任务的窗口可能早于创建时间）。
 // Status 约定 created/running/finished/failed，未知值原样透传。
 type Task struct {
 	TaskID        string `json:"task_id"`
@@ -28,8 +30,9 @@ type Task struct {
 	Status        string `json:"status"`
 	ViolationType int    `json:"violation_type,omitempty"`
 	VideoType     string `json:"video_type,omitempty"` // "1" 历史回放 / "2" 实时
+	CreatedTime   int64  `json:"created_time,omitempty"`
 	StartTime     int64  `json:"start_time"`
-	EndTime       *int64 `json:"end_time,omitempty"`
+	EndTime       int64  `json:"end_time,omitempty"`
 	Error         string `json:"error,omitempty"`
 }
 
@@ -89,8 +92,19 @@ func (s *Service) List(ctx context.Context, c domain.Center) ([]Task, error) {
 	if tasks == nil {
 		tasks = []Task{}
 	}
-	// 网关返回顺序不确定（Redis 集合无序），统一按开始时间降序，保证
-	// 前端分页顺序稳定、最新任务在前。
-	sort.SliceStable(tasks, func(i, j int) bool { return tasks[i].StartTime > tasks[j].StartTime })
+	// 网关返回顺序不确定（Redis 集合无序），统一按创建时间降序（最新投递
+	// 在前），旧台账条目无创建时间时回退窗口开始时间，保证前端分页顺序稳定。
+	createdOrStart := func(t Task) int64 {
+		if t.CreatedTime > 0 {
+			return t.CreatedTime
+		}
+		return t.StartTime
+	}
+	sort.SliceStable(tasks, func(i, j int) bool {
+		if keyI, keyJ := createdOrStart(tasks[i]), createdOrStart(tasks[j]); keyI != keyJ {
+			return keyI > keyJ
+		}
+		return tasks[i].TaskID < tasks[j].TaskID
+	})
 	return tasks, nil
 }

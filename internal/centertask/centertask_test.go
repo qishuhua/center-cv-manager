@@ -32,8 +32,8 @@ func TestListDecodesTasks(t *testing.T) {
 		gotPath = r.URL.Path
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`[
-			{"task_id":"task-1","camera":"北门-01","status":"running","start_time":1762000000000},
-			{"task_id":"task-2","camera":"南门-02","status":"finished","start_time":1761900000000,"end_time":1761903600000}
+			{"task_id":"task-1","camera":"北门-01","status":"running","created_time":1762000500000,"start_time":1762000000000,"end_time":1762003600000},
+			{"task_id":"task-2","camera":"南门-02","status":"finished","created_time":1761900500000,"start_time":1761900000000,"end_time":1761903600000}
 		]`))
 	}))
 	defer server.Close()
@@ -47,11 +47,12 @@ func TestListDecodesTasks(t *testing.T) {
 	if len(tasks) != 2 {
 		t.Fatalf("应解析 2 条任务，实际 %d", len(tasks))
 	}
-	if tasks[0].TaskID != "task-1" || tasks[0].Status != "running" || tasks[0].EndTime != nil {
+	// end_time 是流窗口结束（与执行状态无关），运行中任务同样返回。
+	if tasks[0].TaskID != "task-1" || tasks[0].Status != "running" || tasks[0].EndTime != 1762003600000 || tasks[0].CreatedTime != 1762000500000 {
 		t.Fatalf("运行中任务解析错误: %+v", tasks[0])
 	}
-	if tasks[1].EndTime == nil || *tasks[1].EndTime != 1761903600000 {
-		t.Fatalf("已结束任务应带结束时间: %+v", tasks[1])
+	if tasks[1].EndTime != 1761903600000 {
+		t.Fatalf("已结束任务应带窗口结束时间: %+v", tasks[1])
 	}
 }
 
@@ -85,14 +86,15 @@ func TestGatewayURLDefaultsConsolePort(t *testing.T) {
 	}
 }
 
-func TestListSortsByStartTimeDesc(t *testing.T) {
-	// 网关返回乱序时也应按开始时间降序，保证前端分页顺序稳定。
+func TestListSortsByCreatedTimeDesc(t *testing.T) {
+	// 按创建时间降序（最新投递在前）；历史回放任务窗口在过去、创建时间
+	// 最新，应排在最前；无创建时间的旧台账条目回退窗口开始时间垫底。
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`[
-			{"task_id":"old","status":"finished","start_time":1761900000000,"end_time":1761903600000},
-			{"task_id":"new","status":"running","start_time":1762000000000},
-			{"task_id":"mid","status":"created","start_time":1761950000000}
+			{"task_id":"old-entry","status":"created","start_time":1761900000000,"end_time":1761903600000},
+			{"task_id":"new-playback","status":"running","created_time":1762000500000,"start_time":1761000000000,"end_time":1761003600000},
+			{"task_id":"mid","status":"created","created_time":1761950000000,"start_time":1761950000000,"end_time":1761953600000}
 		]`))
 	}))
 	defer server.Close()
@@ -100,8 +102,8 @@ func TestListSortsByStartTimeDesc(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tasks) != 3 || tasks[0].TaskID != "new" || tasks[1].TaskID != "mid" || tasks[2].TaskID != "old" {
-		t.Fatalf("应按 start_time 降序排列，实际 %v", tasks)
+	if len(tasks) != 3 || tasks[0].TaskID != "new-playback" || tasks[1].TaskID != "mid" || tasks[2].TaskID != "old-entry" {
+		t.Fatalf("应按创建时间降序排列（缺失回退窗口开始），实际 %v", tasks)
 	}
 }
 

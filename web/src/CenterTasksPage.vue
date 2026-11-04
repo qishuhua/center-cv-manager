@@ -86,7 +86,7 @@ watch(selectedId, () => {
     <div class="panel-title">
       <div>
         <h2>任务状态</h2>
-        <p>中心业务任务的运行清单（摄像机、任务名称、视频流类型、起止时间、运行状态），经中心网关每 15 秒自动刷新，数据保存在中心本地。</p>
+        <p>中心业务任务的运行清单（摄像机、任务名称、视频流类型、创建与起止时间、运行状态；起止时间为流窗口时间，与执行状态无关），经中心网关每 15 秒自动刷新，数据保存在中心本地。</p>
       </div>
       <div class="center-tasks-toolbar">
         <el-select v-model="selectedId" filterable placeholder="选择中心" style="width:240px">
@@ -105,6 +105,7 @@ watch(selectedId, () => {
       <el-table-column label="摄像机名称" min-width="240"><template #default="{row}">{{ row.camera || '-' }}</template></el-table-column>
       <el-table-column label="任务名称" width="140"><template #default="{row}">{{ taskName(row) }}</template></el-table-column>
       <el-table-column label="视频流类型" width="110"><template #default="{row}">{{ streamType(row) }}</template></el-table-column>
+      <el-table-column label="创建时间" width="190"><template #default="{row}">{{ fmtTime(row.created_time) }}</template></el-table-column>
       <el-table-column label="开始时间" width="190"><template #default="{row}">{{ fmtTime(row.start_time) }}</template></el-table-column>
       <el-table-column label="结束时间" width="190"><template #default="{row}">{{ fmtTime(row.end_time) }}</template></el-table-column>
       <el-table-column label="运行状态" width="110">
