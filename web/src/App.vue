@@ -398,7 +398,7 @@ async function applyCenterVersionChanges(){if(!guardAdminAction())return;
   const summary=parts.join('、')
   const detail=softwareRows.map(row=>`${row.source!.name}→${selectedCenterSoftwareVersion(row)!.version}`).join('、')
   try{
-    await ElMessageBox.confirm(`将发布 ${summary}${detail?`（${detail}）`:''}，软件经反向隧道拉取镜像并重建对应服务${modelSelections.length&&!items.length?'，模型随后同步并仅重启使用模型的服务':''}，服务会短暂中断。是否继续？`,'确认发布版本',{type:'warning',confirmButtonText:'确认发布',cancelButtonText:'取消',closeOnClickModal:false})
+    await ElMessageBox.confirm(`将发布 ${summary}${detail?`（${detail}）`:''}，软件经反向隧道拉取镜像并重建对应服务${modelSelections.length&&!items.length?'，模型随后同步并重启业务模块':""}，服务会短暂中断。是否继续？`,'确认发布版本',{type:'warning',confirmButtonText:'确认发布',cancelButtonText:'取消',closeOnClickModal:false})
     centerVersionApplying.value='publish'
     centerVersionApplyingCenter.value=centerID
     const workflowID=beginCenterRelease(`发布 ${summary}`,'统一发布预检')

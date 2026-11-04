@@ -1211,7 +1211,7 @@ func (s *Server) runModelReleaseLocked(ctx context.Context, centerID string, ite
 	if err := s.models.ReleaseCenter(ctx, centerID, items, phaseReporter{reporter: h, prefix: "阶段 1/2：模型发布", start: 0, end: 75}); err != nil {
 		return err
 	}
-	h.Log("阶段 2/2：仅重启使用模型的服务")
+	h.Log("阶段 2/2：重启业务模块加载新模型")
 	if err := s.centerActions.RestartModels(ctx, centerID, nil, h); err != nil {
 		return err
 	}
