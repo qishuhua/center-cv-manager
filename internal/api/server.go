@@ -23,6 +23,7 @@ import (
 	"center-cv-manager/internal/center"
 	"center-cv-manager/internal/centeraction"
 	"center-cv-manager/internal/centerlock"
+	"center-cv-manager/internal/centertask"
 	"center-cv-manager/internal/deploy"
 	"center-cv-manager/internal/domain"
 	"center-cv-manager/internal/modelasset"
@@ -54,14 +55,15 @@ type Server struct {
 	alerts           *alerting.Service
 	registries       *registry.Service
 	monitors         *monitor.Service
+	cvTasks          *centertask.Service
 	store            *store.Store
 	tasks            *task.Manager
 	sourceRoot       string
 	static           fs.FS
 }
 
-func New(authManager *auth.Manager, centers *center.Service, centerActions *centeraction.Service, sources *source.Service, builds *build.Service, deployments *deploy.Service, provisioning *provision.Service, baseImages *baseimage.Service, models *modelasset.Service, alerts *alerting.Service, registries *registry.Service, monitors *monitor.Service, st *store.Store, tasks *task.Manager, sourceRoot string, static fs.FS) *Server {
-	return &Server{auth: authManager, centers: centers, centerActions: centerActions, sources: sources, builds: builds, deployments: deployments, provisioning: provisioning, baseImages: baseImages, models: models, alerts: alerts, registries: registries, monitors: monitors, store: st, tasks: tasks, sourceRoot: sourceRoot, static: static}
+func New(authManager *auth.Manager, centers *center.Service, centerActions *centeraction.Service, sources *source.Service, builds *build.Service, deployments *deploy.Service, provisioning *provision.Service, baseImages *baseimage.Service, models *modelasset.Service, alerts *alerting.Service, registries *registry.Service, monitors *monitor.Service, cvTasks *centertask.Service, st *store.Store, tasks *task.Manager, sourceRoot string, static fs.FS) *Server {
+	return &Server{auth: authManager, centers: centers, centerActions: centerActions, sources: sources, builds: builds, deployments: deployments, provisioning: provisioning, baseImages: baseImages, models: models, alerts: alerts, registries: registries, monitors: monitors, cvTasks: cvTasks, store: st, tasks: tasks, sourceRoot: sourceRoot, static: static}
 }
 
 type envelope struct {
@@ -105,6 +107,7 @@ func (s *Server) Router() *gin.Engine {
 	api.GET("/centers/:id/software/images", s.centerSoftwareImages)
 	api.GET("/centers/:id/software/registry-versions", s.centerRegistryVersions)
 	api.GET("/centers/:id/overview", s.centerOverview)
+	api.GET("/centers/:id/tasks", s.centerTasks)
 	api.GET("/centers/:id/models", s.centerModels)
 	api.GET("/overview", s.overview)
 	api.GET("/sources", s.listSources)

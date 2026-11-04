@@ -44,6 +44,28 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  # 中心任务状态存储（redis:7.2）：ingress 是唯一写入方，落当前任务清单
+  # （taskid、开始/结束时间、运行状态）；查询一律经网关 /api/v1/tasks，
+  # 不向中心局域网暴露端口。host 网络只绑回环；noeviction 禁止逐出正在
+  # 运行的任务记录；AOF everysec 保证容器重启不丢状态。
+  redis:
+    image: redis:7.2-alpine
+    pull_policy: missing
+    container_name: redis
+    restart: unless-stopped
+    network_mode: host
+    command: ["redis-server", "--bind", "127.0.0.1", "--appendonly", "yes", "--appendfsync", "everysec", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
 volumes:
   rabbitmq-data:
     name: ${CENTER_CV_DATA_PREFIX:-center-cv-infra}_rabbitmq-data
+  redis-data:
+    name: ${CENTER_CV_DATA_PREFIX:-center-cv-infra}_redis-data

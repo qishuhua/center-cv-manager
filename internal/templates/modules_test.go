@@ -30,6 +30,27 @@ func TestIndependentModuleTemplates(t *testing.T) {
 						t.Fatal("cAdvisor healthcheck must use its configured port 8084")
 					}
 				}
+				if id == "infra" {
+					// 任务状态存储 redis：host 网络仅回环、AOF 持久化、禁止逐出
+					// 运行中的任务记录，数据卷随模块前缀命名。
+					content := files[id+"/compose.yml"]
+					for _, want := range []string{"image: redis:7.2-alpine", `"--bind", "127.0.0.1"`, `"--appendonly", "yes"`, `"--maxmemory-policy", "noeviction"`} {
+						if !strings.Contains(content, want) {
+							t.Fatalf("infra redis 配置缺少 %s", want)
+						}
+					}
+					redis, _ := services["redis"].(map[string]any)
+					if redis == nil {
+						t.Fatal("infra 模块应包含 redis 服务")
+					}
+					if _, hasPorts := redis["ports"]; hasPorts {
+						t.Fatal("redis host 网络不能配置 ports")
+					}
+					volumes, _ := doc["volumes"].(map[string]any)
+					if _, ok := volumes["redis-data"]; !ok {
+						t.Fatal("redis 数据卷未定义")
+					}
+				}
 				for name, value := range services {
 					svc := value.(map[string]any)
 					switch deps := svc["depends_on"].(type) {

@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Connection, DataLine, Delete, Download, Files, Lock, Monitor, Operation, Plus, Promotion, Refresh, SwitchButton, UploadFilled, User, VideoPlay } from '@element-plus/icons-vue'
+import { Connection, DataLine, Delete, Download, Files, Lock, Monitor, Operation, Plus, Promotion, Refresh, SwitchButton, UploadFilled, User, VideoCamera, VideoPlay } from '@element-plus/icons-vue'
 import http,{eventURL} from './api'
 import ModelCatalog from './ModelCatalog.vue'
 import ModelUploadDialog from './ModelUploadDialog.vue'
 import TerminalPage from './TerminalPage.vue'
 import ModuleManager from './ModuleManager.vue'
+import CenterTasksPage from './CenterTasksPage.vue'
 import InitializeCenterDialog from './InitializeCenterDialog.vue'
 const initializationDialog=ref<InstanceType<typeof InitializeCenterDialog>>()
 const initializationTask=(c:Center)=>tasks.value.find(t=>t.type==='INITIALIZE_CENTER'&&t.params?.center_id===c.id&&['PENDING','RUNNING'].includes(t.status))
@@ -38,7 +39,7 @@ function guardAdminAction(){
 }
 const loginForm=reactive({username:'',password:''}),passwordForm=reactive({old_password:'',new_password:'',confirm_password:''})
 const passwordDialog=ref(false),passwordSaving=ref(false)
-const centerDialog=ref(false),sourceDialog=ref(false),gitCredentialDialog=ref(false),ossCredentialDialog=ref(false),alertCredentialDialog=ref(false),modelUploadDialog=ref(false),modelUploadTarget=ref(''),logDrawer=ref(false),centerOverviewDrawer=ref(false),centerOperationDialog=ref(false),centerReleaseDialog=ref(false),composeDrawer=ref(false),hardwareDialog=ref(false)
+const centerDialog=ref(false),sourceDialog=ref(false),gitCredentialDialog=ref(false),ossCredentialDialog=ref(false),alertCredentialDialog=ref(false),modelUploadDialog=ref(false),modelUploadTarget=ref(''),logDrawer=ref(false),centerOverviewDrawer=ref(false),centerOperationDialog=ref(false),centerReleaseDialog=ref(false),composeDrawer=ref(false),hardwareDialog=ref(false),tasksPageCenterId=ref('')
 const centerForm=reactive<Center>({name:'',host:'',port:22,console_port:8080,username:'root',auth_type:'password',password:'',private_key:'',passphrase:'',docker_socket:'/var/run/docker.sock',accelerator:'auto',cpu_count:0,gpu_count:0,compose_file:'~/.local/share/center-manager/deploy/docker-compose.yml',description:'',wms_url:'',mis_auth:'',mis_sort_enabled:false,mis_sort_interval_seconds:3600,test_mode:false,debug_log_enabled:false,save_image_enabled:false,decode_only_enabled:false,single_instance_enabled:false,test_alarm_enabled:false,feishu_webhook_url:''})
 const misSortEnabled=ref(false)
 // 开关只控制启用状态：关闭时 WMS/misAuth 原值保留（表单隐藏但提交原值），
@@ -212,6 +213,8 @@ async function refreshActiveCenterOverview(){if(!activeCenterOverview.value?.cen
 async function refreshCenterManagement(){await Promise.all([refreshActiveCenterOverview(),loadCenterVersionOptions(),registrySettings.configured?loadCenterRegistryVersions():Promise.resolve()]);syncCenterVersionSelections();syncCenterSoftwareSelections()}
 async function openCenterOverview(item:CenterOverview){for(const key of Object.keys(centerModelSelections))delete centerModelSelections[key];activeCenterOverview.value=item;centerOverviewDrawer.value=true;await Promise.all([refreshActiveCenterOverview(),loadCenterVersionOptions(),registrySettings.configured?loadCenterRegistryVersions():Promise.resolve()]);syncCenterVersionSelections();syncCenterSoftwareSelections()}
 async function openCenterFromCard(center:Center){await openCenterOverview({center,online:false,containers:[],versions:[],models:[]})}
+// 从中心详情跳转独立的「任务状态」整页（与 SSH 终端同款整页模式）。
+function openCenterTasks(center:Center){tasksPageCenterId.value=center.id||'';centerOverviewDrawer.value=false;void selectSection('center-tasks')}
 // 中心网关 Nginx 在中心本机监听 8080，公网端口由防火墙映射，各中心可能不同（console_port）；
 // Grafana 监控与 Kibana 日志页面均经它对外提供。
 function openCenterConsole(center:Center,path:string){window.open(`http://${center.host}:${center.console_port||8080}${path}`,'_blank','noopener')}
@@ -529,6 +532,7 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
         <el-menu-item index="overview"><el-icon><Monitor/></el-icon>总览</el-menu-item>
         <el-menu-item index="centers"><el-icon><Connection/></el-icon>中心服务器</el-menu-item>
         <el-menu-item index="monitoring"><el-icon><DataLine/></el-icon>统一监控</el-menu-item>
+        <el-menu-item index="center-tasks"><el-icon><VideoCamera/></el-icon>任务状态</el-menu-item>
         <el-menu-item index="terminal"><el-icon><Operation/></el-icon>SSH 终端</el-menu-item>
         <el-menu-item index="base-images"><el-icon><UploadFilled/></el-icon>基础镜像</el-menu-item>
         <el-menu-item index="models"><el-icon><Download/></el-icon>模型仓库</el-menu-item>
@@ -541,7 +545,7 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
       <div class="account"><span><el-icon><User/></el-icon>{{authState.username}}<el-tag size="small" :type="isAdmin?'primary':'info'" effect="plain">{{isAdmin?'管理员':'查看用户'}}</el-tag></span><button title="修改密码" aria-label="修改密码" @click="openPasswordDialog"><el-icon><Lock/></el-icon><span class="account-label">修改密码</span></button><button title="退出" aria-label="退出" @click="logout"><el-icon><SwitchButton/></el-icon>退出</button></div>
     </el-aside>
     <el-main class="main" :class="{'terminal-main':section==='terminal'}" v-loading="loading">
-      <header v-if="section!=='terminal'"><div><h1>{{section==='overview'?'运行总览':section==='centers'?'中心服务器':section==='terminal'?'SSH 终端':section==='base-images'?'基础镜像':section==='models'?'模型仓库':section==='sources'?'软件仓库':section==='releases'?'版本发布':section==='users'?'用户管理':section==='mcp-tokens'?'MCP 令牌':'任务与日志'}}</h1><p v-if="['terminal','releases','base-images','models','sources','users'].includes(section)">{{section==='terminal'?'连接已配置的中心服务器并进行交互式运维':section==='releases'?'从镜像仓库选择软件镜像版本，与模型版本一起发布到各中心':section==='base-images'?'从 OSS 按中心显卡类型下载并更新基础镜像':section==='models'?'上传和发布按硬件格式组织的模型版本':section==='sources'?'管理软件源码地址，构建并发布镜像版本到镜像仓库':section==='users'?'管理登录账号与角色；普通用户仅可查看各中心状态':''}}</p></div><el-button :icon="Refresh" circle @click="refreshCurrent"/></header>
+      <header v-if="section!=='terminal'"><div><h1>{{section==='overview'?'运行总览':section==='centers'?'中心服务器':section==='terminal'?'SSH 终端':section==='center-tasks'?'任务状态':section==='base-images'?'基础镜像':section==='models'?'模型仓库':section==='sources'?'软件仓库':section==='releases'?'版本发布':section==='users'?'用户管理':section==='mcp-tokens'?'MCP 令牌':'任务与日志'}}</h1><p v-if="['terminal','releases','base-images','models','sources','users','center-tasks'].includes(section)">{{section==='terminal'?'连接已配置的中心服务器并进行交互式运维':section==='releases'?'从镜像仓库选择软件镜像版本，与模型版本一起发布到各中心':section==='base-images'?'从 OSS 按中心显卡类型下载并更新基础镜像':section==='models'?'上传和发布按硬件格式组织的模型版本':section==='sources'?'管理软件源码地址，构建并发布镜像版本到镜像仓库':section==='users'?'管理登录账号与角色；普通用户仅可查看各中心状态':'按中心查看业务任务的运行清单，数据保存在中心本地，经中心网关只读拉取'}}</p></div><el-button :icon="Refresh" circle @click="refreshCurrent"/></header>
 
       <template v-if="section==='overview'">
         <div class="overview-dashboard" v-loading="overviewLoading">
@@ -579,6 +583,10 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
           </div>
           <el-empty v-if="monitoringStatus&&!monitoringStatus.centers.length&&!monitoringLoading" description="尚未登记中心服务器"/>
         </div>
+      </template>
+
+      <template v-else-if="section==='center-tasks'">
+        <CenterTasksPage :centers="centers" :initial-center-id="tasksPageCenterId"/>
       </template>
 
       <template v-else-if="section==='terminal'">
@@ -720,6 +728,7 @@ onUnmounted(()=>{centerReleaseWorkflowID++;window.clearTimeout(deploymentPollTim
             <small>各 Compose 配置请在下方分别查看和编辑。</small>
             <el-button :icon="Monitor" @click="openCenterConsole(activeCenterOverview.center,'/grafana/')">Grafana 监控</el-button>
             <el-button :icon="Files" @click="openCenterConsole(activeCenterOverview.center,'/kibana/')">Kibana 日志</el-button>
+            <el-button :icon="VideoCamera" @click="openCenterTasks(activeCenterOverview.center)">任务状态</el-button>
             <el-button v-if="isAdmin&&(activeCenterOverview.center.deployment?.status==='paused'||!activeCenterOverview.center.deployment)" type="primary" plain :disabled="centerOperationSubmitting" @click="resumeCenter(activeCenterOverview.center)">恢复中心</el-button><el-button v-if="isAdmin&&(!activeCenterOverview.center.deployment||(activeCenterOverview.center.deployment.status!=='reset'&&activeCenterOverview.center.deployment.status!=='paused'))" type="warning" plain :disabled="centerOperationSubmitting" @click="pauseCenter(activeCenterOverview.center)">暂停中心</el-button><el-button v-if="isAdmin" type="danger" plain :disabled="centerOperationSubmitting" @click="resetCenterDeployment(activeCenterOverview.center)">重置中心</el-button><el-button :icon="Refresh" :loading="centerOverviewLoading||modelsLoading" @click="refreshCenterManagement">刷新中心状态</el-button>
           </div>
         </div>

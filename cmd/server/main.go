@@ -15,6 +15,7 @@ import (
 	"center-cv-manager/internal/build"
 	"center-cv-manager/internal/center"
 	"center-cv-manager/internal/centeraction"
+	"center-cv-manager/internal/centertask"
 	"center-cv-manager/internal/deploy"
 	"center-cv-manager/internal/modelasset"
 	"center-cv-manager/internal/monitor"
@@ -89,6 +90,8 @@ func main() {
 	if err := monitors.Sync(); err != nil {
 		log.Printf("统一监控配置同步失败: %v", err)
 	}
+	// 中心业务任务状态查询：经各中心网关只读拉取 ingress 聚合的任务清单。
+	cvTasks := centertask.New()
 	// 前端由 web 容器（nginx）提供时 API 不携带静态文件；目录缺失仅提供 API，
 	// make dev 直跑时仍可直接服务 web/dist。
 	static := fs.FS(nil)
@@ -97,7 +100,7 @@ func main() {
 	} else {
 		log.Printf("前端静态目录 %s 不存在，仅提供 API（compose 形态前端由 web 容器提供）", *webDir)
 	}
-	server := api.New(authManager, centers, centerActions, sources, builds, deployments, provisioning, baseImages, models, alerts, registries, monitors, st, tasks, filepath.Join(abs, "sources"), static)
+	server := api.New(authManager, centers, centerActions, sources, builds, deployments, provisioning, baseImages, models, alerts, registries, monitors, cvTasks, st, tasks, filepath.Join(abs, "sources"), static)
 	fmt.Printf("中心数字化管理平台 listening on http://%s\n", *listen)
 	if e = server.Router().Run(*listen); e != nil {
 		log.Fatal(e)
