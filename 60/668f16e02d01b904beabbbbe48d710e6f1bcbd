@@ -1,0 +1,22 @@
+web/src/CenterTasksPage.vue
+  s_b47dc8456de65b::t_c13efc62cee4f3 149,151
+  s_b47dc8456de65b::t_261d112372f997 49-52
+CLAUDE.md
+  s_b47dc8456de65b::t_8badaa9f9b69f4 92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "60668f16e02d01b904beabbbbe48d710e6f1bcbd",
+  "prompts": {},
+  "sessions": {
+    "s_b47dc8456de65b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "db838ac8-efed-4f0b-bdf7-68ba4e1a773a",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
