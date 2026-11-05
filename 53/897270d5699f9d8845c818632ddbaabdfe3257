@@ -1,0 +1,48 @@
+CLAUDE.md
+  s_b47dc8456de65b::t_60da72940662ce 65
+  s_b47dc8456de65b::t_336ae6bb009dba 92
+internal/centertask/centertask.go
+  s_b47dc8456de65b::t_2b42dcd4b69248 27-31,42-43
+  s_b47dc8456de65b::t_dfd709554dcc49 2-4
+  s_8d858791c527bd::t_9c78a95763f846 26
+internal/centertask/centertask_test.go
+  s_b47dc8456de65b::t_124895f1cdd97c 35
+  s_8d858791c527bd::t_fe149a494ee5e9 36
+  s_8d858791c527bd::t_5bdcc6ef9e5ed6 54-58,67-68
+  s_b47dc8456de65b::t_ebc01db4e6b652 59-66
+web/src/CenterTasksPage.vue
+  s_b47dc8456de65b::t_06d8157c30b05f 48-69
+  s_b47dc8456de65b::t_5755edcc3fb350 199
+  s_b47dc8456de65b::t_8c380a53ae0558 155-161,164-167,178-179
+  s_8d858791c527bd::t_b983d6daa236cb 20-36
+  s_8d858791c527bd::t_6fd52b901c3bb7 70-75
+  s_8d858791c527bd::t_ea9e51a971b9b0 148,150-154,162,172-177
+  s_8d858791c527bd::t_0f460992d1c33d 149
+  s_b47dc8456de65b::t_9aeb2a5e212afa 132
+web/src/types.ts
+  s_b47dc8456de65b::t_0b072ecab3a592 40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "53897270d5699f9d8845c818632ddbaabdfe3257",
+  "prompts": {},
+  "sessions": {
+    "s_8d858791c527bd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0fffb339-4fda-4510-8ecd-da1bb80f8937",
+        "model": "unknown"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    },
+    "s_b47dc8456de65b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "db838ac8-efed-4f0b-bdf7-68ba4e1a773a",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
