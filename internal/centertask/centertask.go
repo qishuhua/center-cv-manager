@@ -1,6 +1,7 @@
 // Package centertask 经中心网关查询业务任务的运行状态。数据源是中心本地
-// Redis（infra 模块部署，ingress 是唯一写入方），ingress 在网关
-// /api/v1/tasks 提供只读聚合接口；本包只负责拉取与错误翻译，不改变远端
+// Redis（infra 模块部署；ingress 发布确认后建档，Worker 经 Lua 原子更新
+// 状态/心跳/错误，终态防回退），ingress 在网关 /api/v1/tasks 提供只读
+// 聚合接口；本包只负责拉取与错误翻译，不改变远端
 // 状态，因此不套 centerlock、不做任务记录。任务量千级，整包返回全量清单，
 // 分页展示由前端完成。
 package centertask
@@ -22,7 +23,12 @@ import (
 
 // Task 是中心任务状态的传输结构。时间为 epoch 毫秒，由前端负责格式化：
 // created_time 为任务创建时间（旧台账条目缺失时省略），start_time/end_time
-// 为流窗口起止（与执行状态无关，历史回放任务的窗口可能早于创建时间）。
+// 为流窗口起止（与执行状态无关，历史回放任务的窗口可能早于创建时间），
+// finished_time 为任务执行终态时间（预留：台账已随 Worker 终态上报记录
+// 状态变化时刻，查询接口暂不输出，缺失为零值由前端显示占位），
+// heartbeat_time 为 Worker 上报心跳（随每次上报刷新，活任务约每 5 秒
+// 前进，Worker 崩溃/重启后冻结；未上报时省略——前端据此对 running 任务
+// 判定疑似失联，Worker 重启不回写旧任务终态，该判定由查询方完成）。
 // Status 约定 created/running/finished/failed，未知值原样透传。
 type Task struct {
 	TaskID        string `json:"task_id"`
@@ -33,6 +39,8 @@ type Task struct {
 	CreatedTime   int64  `json:"created_time,omitempty"`
 	StartTime     int64  `json:"start_time"`
 	EndTime       int64  `json:"end_time,omitempty"`
+	HeartbeatTime int64  `json:"heartbeat_time,omitempty"` // Worker 上报心跳，未上报时省略
+	FinishedTime  int64  `json:"finished_time,omitempty"`  // 任务执行终态时间，查询接口暂不输出（预留）
 	Error         string `json:"error,omitempty"`
 }
 

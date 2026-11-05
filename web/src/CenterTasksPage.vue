@@ -17,8 +17,23 @@ const page = ref(1)
 const pageSize = ref(50)
 const pageSizes = [20, 50, 100]
 
-// 任务名称按已登记类型显示；未登记的类型回退为「类型 N」。
-const typeNames: Record<number, string> = { 7: '快件拥堵', 8: '卡包挂包', 9: '交叉带错分', 10: '末端错分', 11: '堆场检测' }
+// 任务类型文案全量对应 Worker 的 ViolationType 枚举（yl-alg-alg-center-cv-service
+// src/common/utils.h，1~13，与其 docs/API_PROTOCOL.md 同口径）；未登记的类型回退为「类型 N」。
+const typeNames: Record<number, string> = {
+  1: '暴力分拣',
+  2: '车辆倒车人员安全检测',
+  3: '倚靠护栏',
+  4: '翻越皮带线',
+  5: '长发',
+  6: '在岗检测',
+  7: '快件拥堵',
+  8: '卡包挂包',
+  9: '交叉带错分检测',
+  10: '末端错分检测',
+  11: '堆场检测',
+  12: '火情检测',
+  13: '倒地未起',
+}
 const statusNames: Record<string, string> = { created: '待执行', running: '运行中', finished: '已结束', succeeded: '已结束', failed: '失败' }
 const statusTagTypes: Record<string, 'success' | 'danger' | 'info'> = { created: 'info', running: 'success', finished: 'info', succeeded: 'info', failed: 'danger' }
 
@@ -28,6 +43,34 @@ function taskName(t: CenterTask) {
 }
 function streamType(t: CenterTask) {
   return t.video_type === '2' ? '实时' : t.video_type === '1' ? '历史' : '-'
+}
+
+// 心跳时间为 Worker 上报心跳：活任务约每 5 秒前进，Worker 崩溃/重启后
+// 冻结。相对展示比绝对时间更直观（悬停查看绝对时间），未上报（旧版
+// 中心、待执行任务）显示 -。
+function heartbeatAgo(t: CenterTask) {
+  if (!t.heartbeat_time) return '-'
+  const seconds = Math.max(0, Math.round((Date.now() - t.heartbeat_time) / 1000))
+  if (seconds < 5) return '刚刚'
+  if (seconds < 60) return `${seconds} 秒前`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes} 分钟前`
+  return new Date(t.heartbeat_time).toLocaleString('zh-CN', { hour12: false })
+}
+
+// 失联判定（ingress api.md 约定由查询方完成）：运行中任务心跳超 30 秒
+// 未更新即疑似失联——Worker 崩溃/重启后不回写旧任务终态，台账保持
+// running 且心跳冻结，直到窗口结束 + 10 分钟 TTL 清理。未上报心跳的
+// 运行中任务（旧版中心）无法判定，不标记。
+const LOST_CONTACT_MS = 30_000
+function lostContact(t: CenterTask) {
+  return t.status === 'running' && !!t.heartbeat_time && Date.now() - t.heartbeat_time > LOST_CONTACT_MS
+}
+
+// 任务控制（预留）：后续做任务停止等操作，当前只对进行中的任务渲染禁用
+// 的停止入口，已结束/失败的任务显示占位。
+function controllable(t: CenterTask) {
+  return t.status === 'running' || t.status === 'created'
 }
 
 async function load(silent = false) {
@@ -86,7 +129,7 @@ watch(selectedId, () => {
     <div class="panel-title">
       <div>
         <h2>任务状态</h2>
-        <p>中心业务任务的运行清单（摄像机、任务名称、视频流类型、创建与起止时间、运行状态；起止时间为流窗口时间，与执行状态无关），经中心网关每 15 秒自动刷新，数据保存在中心本地。</p>
+        <p>中心业务任务的运行清单（流开始/流结束为流窗口时间，与执行状态无关；任务开始时间为任务创建时间；任务结束时间与任务控制为预留；心跳时间为 Worker 上报心跳，运行中任务超 30 秒未更新标记疑似失联），经中心网关每 15 秒自动刷新，数据保存在中心本地。</p>
       </div>
       <div class="center-tasks-toolbar">
         <el-select v-model="selectedId" filterable placeholder="选择中心" style="width:240px">
@@ -102,17 +145,36 @@ watch(selectedId, () => {
     </div>
     <el-alert v-if="error" :title="error" type="warning" :closable="false" show-icon style="margin-bottom:12px"/>
     <el-table :data="paged" v-loading="loading" empty-text="当前没有任务记录" max-height="calc(100vh - 320px)">
-      <el-table-column label="摄像机名称" min-width="240"><template #default="{row}">{{ row.camera || '-' }}</template></el-table-column>
-      <el-table-column label="任务名称" width="140"><template #default="{row}">{{ taskName(row) }}</template></el-table-column>
-      <el-table-column label="视频流类型" width="110"><template #default="{row}">{{ streamType(row) }}</template></el-table-column>
-      <el-table-column label="创建时间" width="190"><template #default="{row}">{{ fmtTime(row.created_time) }}</template></el-table-column>
-      <el-table-column label="开始时间" width="190"><template #default="{row}">{{ fmtTime(row.start_time) }}</template></el-table-column>
-      <el-table-column label="结束时间" width="190"><template #default="{row}">{{ fmtTime(row.end_time) }}</template></el-table-column>
-      <el-table-column label="运行状态" width="110">
+      <el-table-column label="摄像机名称" min-width="220"><template #default="{row}">{{ row.camera || '-' }}</template></el-table-column>
+      <el-table-column label="任务名称" min-width="165" show-overflow-tooltip><template #default="{row}">{{ taskName(row) }}</template></el-table-column>
+      <el-table-column label="流类型" width="90"><template #default="{row}">{{ streamType(row) }}</template></el-table-column>
+      <el-table-column label="流开始时间" width="185"><template #default="{row}">{{ fmtTime(row.start_time) }}</template></el-table-column>
+      <el-table-column label="流结束时间" width="185"><template #default="{row}">{{ fmtTime(row.end_time) }}</template></el-table-column>
+      <el-table-column label="任务开始时间" width="185"><template #default="{row}">{{ fmtTime(row.created_time) }}</template></el-table-column>
+      <el-table-column label="任务结束时间" width="185"><template #default="{row}">{{ fmtTime(row.finished_time) }}</template></el-table-column>
+      <el-table-column label="心跳时间" width="110">
         <template #default="{row}">
-          <el-tooltip :disabled="!row.error" :content="row.error" placement="top">
+          <el-tooltip :disabled="!row.heartbeat_time" :content="fmtTime(row.heartbeat_time)" placement="top">
+            <span :class="{ 'heartbeat-stale': lostContact(row) }">{{ heartbeatAgo(row) }}</span>
+          </el-tooltip>
+        </template>
+      </el-table-column>
+      <el-table-column label="任务状态" width="100">
+        <template #default="{row}">
+          <el-tooltip v-if="lostContact(row)" content="台账状态仍为运行中，但心跳超 30 秒未更新——Worker 可能已崩溃或重启（重启后不回写旧任务终态）" placement="top">
+            <el-tag type="warning">疑似失联</el-tag>
+          </el-tooltip>
+          <el-tooltip v-else :disabled="!row.error" :content="row.error" placement="top">
             <el-tag :type="statusTagTypes[row.status] || 'info'">{{ statusNames[row.status] || row.status || '未知' }}</el-tag>
           </el-tooltip>
+        </template>
+      </el-table-column>
+      <el-table-column label="任务控制" width="90" align="center">
+        <template #default="{row}">
+          <el-tooltip v-if="controllable(row)" content="任务控制功能预留，暂未开放" placement="top">
+            <span><el-button size="small" type="danger" plain disabled>停止</el-button></span>
+          </el-tooltip>
+          <template v-else>-</template>
         </template>
       </el-table-column>
     </el-table>
@@ -134,4 +196,5 @@ watch(selectedId, () => {
 .center-tasks-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}
 .center-tasks-pager{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;flex-wrap:wrap}
 .center-tasks-refreshed-at{color:#8e9297}
+.heartbeat-stale{color:#FF9830}
 </style>

@@ -32,8 +32,8 @@ func TestListDecodesTasks(t *testing.T) {
 		gotPath = r.URL.Path
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`[
-			{"task_id":"task-1","camera":"北门-01","status":"running","created_time":1762000500000,"start_time":1762000000000,"end_time":1762003600000},
-			{"task_id":"task-2","camera":"南门-02","status":"finished","created_time":1761900500000,"start_time":1761900000000,"end_time":1761903600000}
+			{"task_id":"task-1","camera":"北门-01","status":"running","created_time":1762000500000,"start_time":1762000000000,"end_time":1762003600000,"heartbeat_time":1762000530000},
+			{"task_id":"task-2","camera":"南门-02","status":"finished","created_time":1761900500000,"start_time":1761900000000,"end_time":1761903600000,"finished_time":1761900900000}
 		]`))
 	}))
 	defer server.Close()
@@ -51,8 +51,21 @@ func TestListDecodesTasks(t *testing.T) {
 	if tasks[0].TaskID != "task-1" || tasks[0].Status != "running" || tasks[0].EndTime != 1762003600000 || tasks[0].CreatedTime != 1762000500000 {
 		t.Fatalf("运行中任务解析错误: %+v", tasks[0])
 	}
-	if tasks[1].EndTime != 1761903600000 {
-		t.Fatalf("已结束任务应带窗口结束时间: %+v", tasks[1])
+	// finished_time 是任务执行终态时间（预留，Worker 终态上报）：已上报的
+	// 原样解析，未上报（运行中/上游暂未写入）为零值由前端显示占位。
+	if tasks[0].FinishedTime != 0 {
+		t.Fatalf("未上报终态时间的任务应为零值: %+v", tasks[0])
+	}
+	// heartbeat_time 是 Worker 上报心跳：已上报的原样解析，未上报（旧版
+	// 中心/终态后 Worker 停写）为零值，失联判定在前端按阈值完成。
+	if tasks[0].HeartbeatTime != 1762000530000 {
+		t.Fatalf("运行中任务应解析 Worker 心跳: %+v", tasks[0])
+	}
+	if tasks[1].HeartbeatTime != 0 {
+		t.Fatalf("未上报心跳的任务应为零值: %+v", tasks[1])
+	}
+	if tasks[1].EndTime != 1761903600000 || tasks[1].FinishedTime != 1761900900000 {
+		t.Fatalf("已结束任务应带窗口结束与任务终态时间: %+v", tasks[1])
 	}
 }
 
