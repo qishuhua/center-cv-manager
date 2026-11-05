@@ -46,16 +46,10 @@ function streamType(t: CenterTask) {
 }
 
 // 心跳时间为 Worker 上报心跳：活任务约每 5 秒前进，Worker 崩溃/重启后
-// 冻结。相对展示比绝对时间更直观（悬停查看绝对时间），未上报（旧版
-// 中心、待执行任务）显示 -。
-function heartbeatAgo(t: CenterTask) {
-  if (!t.heartbeat_time) return '-'
-  const seconds = Math.max(0, Math.round((Date.now() - t.heartbeat_time) / 1000))
-  if (seconds < 5) return '刚刚'
-  if (seconds < 60) return `${seconds} 秒前`
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes} 分钟前`
-  return new Date(t.heartbeat_time).toLocaleString('zh-CN', { hour12: false })
+// 冻结；与其他时间列同口径绝对展示，未上报（旧版中心、待执行任务）
+// 显示 -，失联任务黄色标记。
+function heartbeatClass(t: CenterTask) {
+  return { 'heartbeat-stale': lostContact(t) }
 }
 
 // 失联判定（ingress api.md 约定由查询方完成）：运行中任务心跳超 30 秒
@@ -152,11 +146,9 @@ watch(selectedId, () => {
       <el-table-column label="流结束时间" width="185"><template #default="{row}">{{ fmtTime(row.end_time) }}</template></el-table-column>
       <el-table-column label="任务开始时间" width="185"><template #default="{row}">{{ fmtTime(row.created_time) }}</template></el-table-column>
       <el-table-column label="任务结束时间" width="185"><template #default="{row}">{{ fmtTime(row.finished_time) }}</template></el-table-column>
-      <el-table-column label="心跳时间" width="110">
+      <el-table-column label="心跳时间" width="185">
         <template #default="{row}">
-          <el-tooltip :disabled="!row.heartbeat_time" :content="fmtTime(row.heartbeat_time)" placement="top">
-            <span :class="{ 'heartbeat-stale': lostContact(row) }">{{ heartbeatAgo(row) }}</span>
-          </el-tooltip>
+          <span :class="heartbeatClass(row)">{{ fmtTime(row.heartbeat_time) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="任务状态" width="100">
