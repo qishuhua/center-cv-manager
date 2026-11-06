@@ -2,7 +2,6 @@ package provision
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"testing"
 )
@@ -67,22 +66,103 @@ func TestParseGPUList(t *testing.T) {
 	}
 }
 
-func TestParseDenglinPhysicalGPUCount(t *testing.T) {
-	var output string
+// dlsmi 表格实机输出（dl-local 单卡 KS20，v2ulp.1c profile：1 个逻辑设备）。
+const denglinSingleCardTable = `Fri Nov  6 16:40:08 2026
++------------------------------------------------------------------------------------------+
+| DL-SMI 12.0                                  Driver version 2.3.55                       |
++------------------------------------------------------------------------------------------+
+| GPU  Name                                     Bus-Id    Cluster-Memory-Usage    GPU-Util |
+| Fan  Temp  Perf  Pwr:Usage/Cap          Memory-Usage     0     1     2     3      MIG M. |
+|==========================================================================================|
+|   0  KS20                               0000:01:00.0                                  0% |
+| 50%   50C  P0         12W / 38W          289 / 16384   289     0     0     0    Disabled |
++------------------------------------------------------------------------------------------+
+
++------------------------------------------------------------------------------------------+
+| Processes:                                                                               |
+|     ID    TASK                                           0     1     2     3    Usage    |
+|==========================================================================================|
+|  No running processes found                                                              |
++------------------------------------------------------------------------------------------+
+`
+
+// 生产 8 卡机拓扑：32 个逻辑设备行分属 8 个 PCI 设备（每卡 4 个逻辑设备）。
+func buildDenglinEightCardTable(t *testing.T) string {
+	t.Helper()
+	var table strings.Builder
+	table.WriteString("Fri Nov  6 16:00:00 2026\n")
+	for card := 0; card < 8; card++ {
+		for device := 0; device < 4; device++ {
+			index := card*4 + device
+			fmt.Fprintf(&table, "| %2d  KS20  0000:%02x:00.0  0%% |\n", index, 1+card)
+			fmt.Fprintf(&table, "| 50%%  50C  P0  12W / 38W  289 / 16384  Disabled |\n")
+		}
+	}
+	return table.String()
+}
+
+func TestParseDenglinTableProbe(t *testing.T) {
+	if physical, logical := parseDenglinTableProbe(denglinSingleCardTable); physical != 1 || logical != 1 {
+		t.Fatalf("single-card table = (%d, %d), want (1, 1)", physical, logical)
+	}
+	if physical, logical := parseDenglinTableProbe(buildDenglinEightCardTable(t)); physical != 8 || logical != 32 {
+		t.Fatalf("eight-card table = (%d, %d), want (8, 32)", physical, logical)
+	}
+	// 混插不同逻辑设备数的卡（5 个逻辑设备分属 3 个 PCI 设备）无法换算。
+	mixed := "| 0  KS20  0000:01:00.0 |\n| 1  KS20  0000:01:00.0 |\n| 2  KS20  0000:02:00.0 |\n| 3  KS20  0000:03:00.0 |\n| 4  KS20  0000:03:00.0 |\n"
+	if physical, logical := parseDenglinTableProbe(mixed); physical != 0 || logical != 0 {
+		t.Fatalf("mixed topology = (%d, %d), want (0, 0)", physical, logical)
+	}
+	// 设备清单输出（dlsmi -L 形态）没有 PCI 地址，表格解析不采纳。
+	if physical, _ := parseDenglinTableProbe("GPU 0: KS20 (profile: v2ulp.1c.1t.70)\n"); physical != 0 {
+		t.Fatalf("list output should not be accepted by the table parser, got %d", physical)
+	}
+}
+
+func TestParseDenglinListProbe(t *testing.T) {
+	var eightCard strings.Builder
 	for index := 0; index < 32; index++ {
-		output += "Device " + strconv.Itoa(index) + " Denglin\n"
+		fmt.Fprintf(&eightCard, "GPU %d: KS20 (profile: 4c) (UUID: GPU-%032d)\n", index, index)
 	}
-	if got := parseDenglinPhysicalGPUCount(output); got != 8 {
-		t.Fatalf("parseDenglinPhysicalGPUCount() = %d, want 8", got)
+	if physical, logical := parseDenglinListProbe(eightCard.String()); physical != 8 || logical != 32 {
+		t.Fatalf("eight-card list = (%d, %d), want (8, 32)", physical, logical)
 	}
-	if got := parseDenglinPhysicalGPUCount("Device 0 Denglin\nDevice 1 Denglin\n"); got != 0 {
-		t.Fatalf("incomplete logical device group returned %d, want 0", got)
+	single := "GPU 0: KS20 (profile: v2ulp.1c.1t.70) (UUID: GPU-cd389c17-9d6c-d178-da04-1a194030da44)\n"
+	if physical, logical := parseDenglinListProbe(single); physical != 1 || logical != 1 {
+		t.Fatalf("single-card list = (%d, %d), want (1, 1)", physical, logical)
+	}
+	// 2 个逻辑设备（可能是 2 卡各 1 设备，也可能是 1 卡 2 设备）无法可靠换算。
+	if physical, logical := parseDenglinListProbe("GPU 0: KS20\nGPU 1: KS20\n"); physical != 0 || logical != 0 {
+		t.Fatalf("ambiguous list = (%d, %d), want (0, 0)", physical, logical)
 	}
 }
 
 func TestParseDenglinDeviceNodes(t *testing.T) {
-	if got := parseDenglinDeviceNodes("dl0\ndl1\ndl2\ndl3\ndl4\ndl5\ndl6\ndl7\n"); got != 2 {
-		t.Fatalf("parseDenglinDeviceNodes() = %d, want 2", got)
+	// 驱动 2.3.55 节点命名为 dlgpuN（dl-local 实测），控制节点无数字后缀被跳过。
+	if physical, logical := parseDenglinDeviceNodes("dlgpu0\ndlgpu-ctrl\ndlgpu-shm\ndlgpu-uvm\n"); physical != 1 || logical != 1 {
+		t.Fatalf("dlgpu nodes = (%d, %d), want (1, 1)", physical, logical)
+	}
+	if physical, logical := parseDenglinDeviceNodes("dl0\ndl1\ndl2\ndl3\ndl4\ndl5\ndl6\ndl7\n"); physical != 2 || logical != 8 {
+		t.Fatalf("dl nodes = (%d, %d), want (2, 8)", physical, logical)
+	}
+}
+
+func TestParseDenglinGPUInfo(t *testing.T) {
+	single := "GPU 0: KS20 (profile: v2ulp.1c.1t.70) (UUID: GPU-cd389c17-9d6c-d178-da04-1a194030da44)\n"
+	got := parseDenglinGPUInfo(single, 1, 1)
+	if len(got) != 1 || got[0].Model != "登临 KS20" || got[0].Count != 1 {
+		t.Fatalf("single-card info = %#v, want one 登临 KS20", got)
+	}
+	var eightCard strings.Builder
+	for index := 0; index < 32; index++ {
+		fmt.Fprintf(&eightCard, "GPU %d: KS20 (profile: 4c)\n", index)
+	}
+	if got = parseDenglinGPUInfo(eightCard.String(), 8, 32); len(got) != 1 || got[0].Count != 8 {
+		t.Fatalf("eight-card info = %#v, want eight physical KS20", got)
+	}
+	// 逻辑设备数未知时不展示换算后的卡数，交由调用方回落通用条目。
+	if got = parseDenglinGPUInfo(eightCard.String(), 8, 0); got != nil {
+		t.Fatalf("unknown logical count should return nil, got %#v", got)
 	}
 }
 

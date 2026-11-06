@@ -210,6 +210,11 @@ type RenderOptions struct {
 	WorkerEnv          map[string]string
 	ServerName         string
 	FeishuWebhook      string
+	// DenglinLogicalDevices 是登临主机的逻辑设备总数（dlsmi 枚举值，如生产
+	// 8 卡机为 32、单卡 KS20 1c profile 为 1）。Worker 数仍按物理卡数，DL_DEVICES
+	// 与监控标签按「逻辑设备数 ÷ Worker 数」逐 Worker 分段；0 表示探测未知，
+	// 回落每物理卡 DenglinDevicesPerCard 个的默认换算。NVIDIA 不使用。
+	DenglinLogicalDevices int
 	// WMSURL/MisAuth 为错分检测配置：启用（WMSURL 非空且 MisSortEnabled）
 	// 时 business 模块在 module.env 写入两个服务共用的取值；关闭时配置值
 	// 保留在中心记录，模块回落 Compose 插值默认值。机构编码不配置。
@@ -272,7 +277,7 @@ func Render(mode, deployRoot string, opts RenderOptions, log func(string)) error
 		content = []byte(strings.ReplaceAll(string(content), "\r\n", "\n"))
 		if spec.EmbedPath == filepath.Join("compose", composeForMode(mode)) && mode != "business" {
 			content = renderWorkerEnvironment(content, opts.WorkerEnv)
-			content, err = renderDynamicWorkers(content, mode, opts.Workers, opts.CPUSets, opts.SingleWorker)
+			content, err = renderDynamicWorkers(content, mode, opts.Workers, opts.CPUSets, opts.SingleWorker, opts.DenglinLogicalDevices)
 			if err != nil {
 				return fmt.Errorf("生成 Worker 配置失败: %w", err)
 			}
@@ -284,7 +289,7 @@ func Render(mode, deployRoot string, opts RenderOptions, log func(string)) error
 			}
 		}
 		if spec.TargetPath == filepath.Join("monitoring", "prometheus", prometheusForMode(mode)) && mode != "business" {
-			content, err = renderDynamicPrometheus(content, mode, opts.Workers, opts.SingleWorker)
+			content, err = renderDynamicPrometheus(content, mode, opts.Workers, opts.SingleWorker, opts.DenglinLogicalDevices)
 			if err != nil {
 				return fmt.Errorf("生成 Worker 监控配置失败: %w", err)
 			}
@@ -446,11 +451,16 @@ func renderHostMounts(content []byte, mode, modelsRoot, logsRoot, mediaResources
 	return []byte(text)
 }
 
+// DenglinDevicesPerCard 是登临逻辑设备换算的默认值：探测不到逻辑设备总数时
+//（如旧记录兜底、遗留渲染入参），按每物理卡 4 个逻辑设备分段，对应生产
+// 8 卡机的拓扑。探测结果优先，见 denglinDevicesPerCard。
+const DenglinDevicesPerCard = 4
+
 // renderDynamicWorkers 生成 Worker 服务块：默认按物理显卡数一对一生成，
 // 每个 Worker 写入均分后的 CPU 集合与各自 GPU；single 时只生成一个实例，
 // 可见全部 GPU 且不绑定 cpuset（由调度器使用全部 CPU），gpuTotal 仍用于
 // 推导登临的全部逻辑卡清单。
-func renderDynamicWorkers(content []byte, mode string, gpuTotal int, cpuSets []string, single bool) ([]byte, error) {
+func renderDynamicWorkers(content []byte, mode string, gpuTotal int, cpuSets []string, single bool, denglinLogical int) ([]byte, error) {
 	workers := gpuTotal
 	if workers < 1 {
 		workers = 1
@@ -459,6 +469,10 @@ func renderDynamicWorkers(content []byte, mode string, gpuTotal int, cpuSets []s
 	count := workers
 	if single {
 		count = 1
+	}
+	perCard := 1
+	if mode == "denglin" {
+		perCard = denglinDevicesPerCard(workers, denglinLogical)
 	}
 	text := strings.ReplaceAll(string(content), "\r\n", "\n")
 	start := strings.Index(text, "  center-cv-service-0:")
@@ -476,7 +490,7 @@ func renderDynamicWorkers(content []byte, mode string, gpuTotal int, cpuSets []s
 			cpuSet = cpuSets[i]
 		}
 		if mode == "denglin" {
-			writeDenglinWorker(&generated, i, cpuSet, denglinWorkerDevices(i, gpuTotal, single))
+			writeDenglinWorker(&generated, i, cpuSet, denglinWorkerDevices(i, perCard, single, denglinLogical, workers))
 		} else {
 			writeNvidiaWorker(&generated, i, cpuSet, nvidiaWorkerDevices(i, single))
 		}
@@ -494,18 +508,37 @@ func nvidiaWorkerDevices(index int, single bool) string {
 	return strconv.Itoa(index)
 }
 
-// denglinWorkerDevices 返回 Worker 的 DL_DEVICES：默认每个物理卡对应 4 个
-// 连续逻辑卡，单实例模式一个实例占用全部逻辑卡。
-func denglinWorkerDevices(index, gpuTotal int, single bool) string {
+// denglinDevicesPerCard 返回每个 Worker（物理卡）分得的登临逻辑设备数：
+// 显式探测的逻辑设备总数能整除 Worker 数时按实际值分段（单卡 1c profile
+// 的机器每卡 1 个），未知（0）时回落每卡 DenglinDevicesPerCard 个的默认。
+func denglinDevicesPerCard(workers, denglinLogical int) int {
+	if denglinLogical > 0 && denglinLogical%workers == 0 {
+		return denglinLogical / workers
+	}
+	return DenglinDevicesPerCard
+}
+
+// denglinWorkerDevices 返回 Worker 的 DL_DEVICES：按每卡逻辑设备数分配
+// 连续逻辑卡，单实例模式一个实例占用全部逻辑卡（探测值优先，未知时按
+// Worker 数 × 每卡默认数推导）。
+func denglinWorkerDevices(index, perCard int, single bool, denglinLogical, workers int) string {
 	if single {
-		devices := make([]string, 0, gpuTotal*4)
-		for d := 0; d < gpuTotal*4; d++ {
+		total := denglinLogical
+		if total <= 0 {
+			total = workers * perCard
+		}
+		devices := make([]string, 0, total)
+		for d := 0; d < total; d++ {
 			devices = append(devices, strconv.Itoa(d))
 		}
 		return strings.Join(devices, ",")
 	}
-	start := index * 4
-	return fmt.Sprintf("%d,%d,%d,%d", start, start+1, start+2, start+3)
+	start := index * perCard
+	devices := make([]string, 0, perCard)
+	for d := 0; d < perCard; d++ {
+		devices = append(devices, strconv.Itoa(start+d))
+	}
+	return strings.Join(devices, ",")
 }
 
 func writeDenglinWorker(out *strings.Builder, index int, cpuSet, devices string) {
@@ -535,7 +568,7 @@ func writeNvidiaWorker(out *strings.Builder, index int, cpuSet, devices string) 
 	out.WriteString("\n")
 }
 
-func renderDynamicPrometheus(content []byte, mode string, gpuTotal int, single bool) ([]byte, error) {
+func renderDynamicPrometheus(content []byte, mode string, gpuTotal int, single bool, denglinLogical int) ([]byte, error) {
 	workers := gpuTotal
 	if workers < 1 {
 		workers = 1
@@ -552,16 +585,20 @@ func renderDynamicPrometheus(content []byte, mode string, gpuTotal int, single b
 		}
 		return strconv.Itoa(i)
 	}
+	perCard := 1
+	if mode == "denglin" {
+		perCard = denglinDevicesPerCard(workers, denglinLogical)
+	}
 	logicalLabel := func(i int) string {
 		if single {
-			end := gpuTotal - 1
-			if mode == "denglin" {
-				end = gpuTotal * 4 - 1
+			end := workers*perCard - 1
+			if denglinLogical > 0 {
+				end = denglinLogical - 1
 			}
 			return fmt.Sprintf("0-%d", end)
 		}
 		if mode == "denglin" {
-			return fmt.Sprintf("%d-%d", i*4, i*4+3)
+			return fmt.Sprintf("%d-%d", i*perCard, i*perCard+perCard-1)
 		}
 		return strconv.Itoa(i)
 	}

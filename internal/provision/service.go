@@ -115,7 +115,7 @@ func (s *Service) Initialize(ctx context.Context, centerID string, r Reporter) e
 	if composeFile == "" {
 		composeFile = centerpath.DefaultComposeFile
 	}
-	accelerator, cpuCount, gpuCount, err := probeHardware(ctx, remote, stored, composeFile, r)
+	accelerator, cpuCount, gpuCount, logicalGPUs, err := probeHardware(ctx, remote, stored, composeFile, r)
 	if err != nil {
 		return err
 	}
@@ -230,6 +230,7 @@ func (s *Service) Initialize(ctx context.Context, centerID string, r Reporter) e
 	if stored.Deployment != nil {
 		return s.prepareModules(ctx, remote, stored, composeFile, accelerator, cpuCount, gpuCount, templates.RenderOptions{
 			Workers: workers, CPUSets: cpuSets, ModelsRoot: modelsRoot, LogsRoot: logsRoot, MediaResourcesRoot: mediaResourcesRoot,
+			DenglinLogicalDevices: logicalGPUs,
 			ServerName: stored.Name, FeishuWebhook: alertWebhook,
 			WMSURL: stored.WMSURL, MisAuth: stored.MisAuth, MisSortEnabled: stored.MisSortEnabled, MisSortIntervalSeconds: stored.MisSortIntervalSeconds,
 			DebugLogEnabled: stored.DebugLogEnabled, SaveImageEnabled: stored.SaveImageEnabled, DecodeOnlyEnabled: stored.DecodeOnlyEnabled,
@@ -239,6 +240,7 @@ func (s *Service) Initialize(ctx context.Context, centerID string, r Reporter) e
 	}
 	if err = templates.Render(mode, root, templates.RenderOptions{
 		Workers: workers, CPUSets: cpuSets, ModelsRoot: modelsRoot, LogsRoot: logsRoot, MediaResourcesRoot: mediaResourcesRoot,
+		DenglinLogicalDevices: logicalGPUs,
 		WorkerEnv: map[string]string{"TZ": "Asia/Shanghai"}, ServerName: stored.Name, FeishuWebhook: alertWebhook,
 	}, r.Log); err != nil {
 		return err
@@ -314,7 +316,7 @@ func (s *Service) DetectHardware(ctx context.Context, centerID string) (Hardware
 	if composeFile == "" {
 		composeFile = centerpath.DefaultComposeFile
 	}
-	accelerator, logicalCores, gpuCount, err := probeHardware(ctx, remote, stored, composeFile, discardReporter{})
+	accelerator, logicalCores, gpuCount, logicalGPUs, err := probeHardware(ctx, remote, stored, composeFile, discardReporter{})
 	if err != nil {
 		return HardwareInfo{}, err
 	}
@@ -340,7 +342,7 @@ func (s *Service) DetectHardware(ctx context.Context, centerID string) (Hardware
 			PhysicalCores: physicalCores,
 			LogicalCores:  logicalCores,
 		},
-		GPUs:       detectGPUDetails(ctx, remote.SSH, accelerator, gpuCount),
+		GPUs:       detectGPUDetails(ctx, remote.SSH, accelerator, gpuCount, logicalGPUs),
 		Memory:     MemoryInfo{TotalBytes: remoteInt64(ctx, remote.SSH, "awk '/^MemTotal:/{printf \"%.0f\", $2 * 1024; exit}' /proc/meminfo")},
 		Disks:      detectDisks(ctx, remote.SSH),
 		DetectedAt: time.Now(),
@@ -351,7 +353,7 @@ func (s *Service) DetectHardware(ctx context.Context, centerID string) (Hardware
 	return info, nil
 }
 
-func detectGPUDetails(ctx context.Context, client *ssh.Client, accelerator string, expectedCount int) []GPUInfo {
+func detectGPUDetails(ctx context.Context, client *ssh.Client, accelerator string, expectedCount, logicalTotal int) []GPUInfo {
 	if accelerator == "cpu" || expectedCount < 1 {
 		return []GPUInfo{}
 	}
@@ -359,6 +361,16 @@ func detectGPUDetails(ctx context.Context, client *ssh.Client, accelerator strin
 		output, err := runSSH(ctx, client, "nvidia-smi --query-gpu=name,memory.total --format=csv,noheader,nounits", "")
 		if err == nil {
 			if result := parseNvidiaGPUInfo(output); gpuInfoCount(result) == expectedCount {
+				return result
+			}
+		}
+	}
+	if accelerator == "denglin" {
+		// dlsmi -L 每行是一个逻辑设备且带卡型名（如 KS20）；行数是逻辑设备
+		// 数，按每卡逻辑设备数换算回物理卡数后与探测值核对，对不上则回落
+		// 到通用「登临 GPU」条目，不展示可能错误的数字。
+		if output, err := runSSH(ctx, client, resolveToolCommand("dlsmi")+" -L", ""); err == nil {
+			if result := parseDenglinGPUInfo(output, expectedCount, logicalTotal); len(result) > 0 {
 				return result
 			}
 		}
@@ -403,6 +415,46 @@ func parseNvidiaGPUInfo(output string) []GPUInfo {
 	return result
 }
 
+// parseDenglinGPUInfo 把 dlsmi -L 的逻辑设备行按卡型聚合为物理卡条目：
+// 行数是逻辑设备数，按每卡逻辑设备数（logicalTotal ÷ expectedCount，探测
+// 已保证整除）换算；换算参数缺失或不整除时返回 nil，由调用方回落通用条目。
+func parseDenglinGPUInfo(output string, expectedCount, logicalTotal int) []GPUInfo {
+	perCard := 0
+	if logicalTotal > 0 && expectedCount > 0 && logicalTotal%expectedCount == 0 {
+		perCard = logicalTotal / expectedCount
+	}
+	result := make([]GPUInfo, 0)
+	indexes := map[string]int{}
+	for _, raw := range strings.Split(output, "\n") {
+		match := denglinListPattern.FindStringSubmatch(strings.TrimSpace(raw))
+		if len(match) != 2 {
+			continue
+		}
+		model := "登临 " + match[1]
+		if index, found := indexes[model]; found {
+			result[index].Count++
+			continue
+		}
+		indexes[model] = len(result)
+		result = append(result, GPUInfo{Model: model, Count: 1})
+	}
+	if len(result) == 0 || perCard < 1 {
+		return nil
+	}
+	total := 0
+	for i := range result {
+		if result[i].Count%perCard != 0 {
+			return nil
+		}
+		result[i].Count /= perCard
+		total += result[i].Count
+	}
+	if total != expectedCount {
+		return nil
+	}
+	return result
+}
+
 func gpuInfoCount(values []GPUInfo) int {
 	total := 0
 	for _, value := range values {
@@ -442,10 +494,10 @@ func remoteInt64(ctx context.Context, client *ssh.Client, command string) int64 
 	return value
 }
 
-func probeHardware(ctx context.Context, remote *sshx.DockerClient, stored domain.Center, composeFile string, r Reporter) (string, int, int, error) {
+func probeHardware(ctx context.Context, remote *sshx.DockerClient, stored domain.Center, composeFile string, r Reporter) (string, int, int, int, error) {
 	accelerator, err := build.ResolveAccelerator(ctx, remote, stored)
 	if err != nil {
-		return "", 0, 0, err
+		return "", 0, 0, 0, err
 	}
 	cpuCount := remoteCount(ctx, remote.SSH, "getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || grep -c '^processor' /proc/cpuinfo")
 	if cpuCount < 1 && stored.CPUCount > 0 {
@@ -453,20 +505,24 @@ func probeHardware(ctx context.Context, remote *sshx.DockerClient, stored domain
 		r.Logf("实时 CPU 探测失败，沿用上次检测值：%d", cpuCount)
 	}
 	if cpuCount < 1 {
-		return "", 0, 0, fmt.Errorf("无法读取中心 CPU 数量")
+		return "", 0, 0, 0, fmt.Errorf("无法读取中心 CPU 数量")
 	}
-	gpuCount, gpuMethod, gpuDiagnostics := detectGPUCount(ctx, remote, accelerator, composeFile, stored.GPUCount)
+	gpuCount, logicalGPUs, gpuMethod, gpuDiagnostics := detectGPUCount(ctx, remote, accelerator, composeFile, stored.GPUCount)
 	if gpuCount > 0 {
-		r.Logf("物理 GPU 探测：%d（%s）", gpuCount, gpuMethod)
+		if logicalGPUs > 0 {
+			r.Logf("物理 GPU 探测：%d，逻辑设备 %d（%s）", gpuCount, logicalGPUs, gpuMethod)
+		} else {
+			r.Logf("物理 GPU 探测：%d（%s）", gpuCount, gpuMethod)
+		}
 	}
 	if accelerator != "cpu" && gpuCount < 1 {
 		for _, diagnostic := range gpuDiagnostics {
 			r.Log("GPU 探测未命中：" + diagnostic)
 		}
-		return "", 0, 0, fmt.Errorf("已识别 %s 环境，但没有读取到物理 GPU；请检查显卡管理工具和驱动状态", build.AcceleratorName(accelerator))
+		return "", 0, 0, 0, fmt.Errorf("已识别 %s 环境，但没有读取到物理 GPU；请检查显卡管理工具和驱动状态", build.AcceleratorName(accelerator))
 	}
 	r.Logf("硬件检测完成：%s，CPU %d，物理 GPU %d", build.AcceleratorName(accelerator), cpuCount, gpuCount)
-	return accelerator, cpuCount, gpuCount, nil
+	return accelerator, cpuCount, gpuCount, logicalGPUs, nil
 }
 
 func writableComposeFile(ctx context.Context, client *ssh.Client, requested string) (string, error) {
@@ -573,47 +629,51 @@ func (s *Service) connect(centerID string) (*sshx.DockerClient, domain.Center, e
 	return remote, stored, nil
 }
 
+// gpuProbe 的 parser 返回（物理卡数，逻辑设备数）：逻辑设备数仅登临有意义
+// （dlsmi 枚举的是 DL runtime 逻辑设备，如生产 8 卡机 32 个、单卡 1c profile
+// 的 KS20 为 1 个），NVIDIA 与未知路径返回 0。
 type gpuProbe struct {
 	name    string
 	command string
-	parser  func(string) int
+	parser  func(string) (int, int)
 }
 
-const denglinLogicalDevicesPerPhysicalGPU = 4
 const denglinSupportedPhysicalGPUs = 8
 
 var (
-	gpuLabelPattern = regexp.MustCompile(`(?i)^(?:GPU|Device|Card)\s*(?:#\s*)?(\d+)\b`)
-	tableIDPattern  = regexp.MustCompile(`^\|?\s*(\d+)\s*(?:\||\s{2,})`)
-	workerPattern   = regexp.MustCompile(`^center-cv-service-(\d+)$`)
+	gpuLabelPattern      = regexp.MustCompile(`(?i)^(?:GPU|Device|Card)\s*(?:#\s*)?(\d+)\b`)
+	tableIDPattern       = regexp.MustCompile(`^\|?\s*(\d+)\s*(?:\||\s{2,})`)
+	denglinBusIDPattern  = regexp.MustCompile(`\b([0-9A-Fa-f]{4}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2})\.[0-9A-Fa-f]\b`)
+	denglinListPattern   = regexp.MustCompile(`^GPU\s+\d+:\s+(\S+)`)
+	workerPattern        = regexp.MustCompile(`^center-cv-service-(\d+)$`)
 )
 
-func detectGPUCount(ctx context.Context, remote *sshx.DockerClient, accelerator, composeFile string, storedCount int) (int, string, []string) {
+func detectGPUCount(ctx context.Context, remote *sshx.DockerClient, accelerator, composeFile string, storedCount int) (int, int, string, []string) {
 	if accelerator == "cpu" {
-		return 0, "CPU 环境", nil
+		return 0, 0, "CPU 环境", nil
 	}
 	probes := []gpuProbe{
-		{name: "nvidia-smi", command: "nvidia-smi", parser: parseGPUList},
-		{name: "nvidia-smi 索引", command: "nvidia-smi --query-gpu=index --format=csv,noheader,nounits", parser: parseSequentialIDs},
-		{name: "nvidia-smi -L", command: "nvidia-smi -L", parser: parseGPUList},
-		{name: "NVIDIA 驱动目录", command: "for d in /proc/driver/nvidia/gpus/*; do [ -d \"$d\" ] && basename \"$d\"; done", parser: countNonEmptyLines},
+		{name: "nvidia-smi", command: "nvidia-smi", parser: func(output string) (int, int) { return parseGPUList(output), 0 }},
+		{name: "nvidia-smi 索引", command: "nvidia-smi --query-gpu=index --format=csv,noheader,nounits", parser: func(output string) (int, int) { return parseSequentialIDs(output), 0 }},
+		{name: "nvidia-smi -L", command: "nvidia-smi -L", parser: func(output string) (int, int) { return parseGPUList(output), 0 }},
+		{name: "NVIDIA 驱动目录", command: "for d in /proc/driver/nvidia/gpus/*; do [ -d \"$d\" ] && basename \"$d\"; done", parser: func(output string) (int, int) { return countNonEmptyLines(output), 0 }},
 	}
 	if accelerator == "denglin" {
 		dlsmi := resolveToolCommand("dlsmi")
 		dlSmi := resolveToolCommand("dl-smi")
 		probes = []gpuProbe{
-			{name: "dlsmi 逻辑设备（每张物理卡 4 个）", command: dlsmi, parser: parseDenglinPhysicalGPUCount},
-			{name: "dlsmi -L 逻辑设备（每张物理卡 4 个）", command: dlsmi + " -L", parser: parseDenglinPhysicalGPUCount},
-			{name: "dl-smi 逻辑设备（每张物理卡 4 个）", command: dlSmi, parser: parseDenglinPhysicalGPUCount},
-			{name: "dl-smi -L 逻辑设备（每张物理卡 4 个）", command: dlSmi + " -L", parser: parseDenglinPhysicalGPUCount},
-			{name: "登临逻辑设备节点（每张物理卡 4 个）", command: "for d in /dev/dl[0-9]*; do [ -e \"$d\" ] && basename \"$d\"; done", parser: parseDenglinDeviceNodes},
+			{name: "dlsmi 表格（逻辑设备 ÷ PCI 地址分组）", command: dlsmi, parser: parseDenglinTableProbe},
+			{name: "dlsmi -L 逻辑设备清单", command: dlsmi + " -L", parser: parseDenglinListProbe},
+			{name: "dl-smi 表格（逻辑设备 ÷ PCI 地址分组）", command: dlSmi, parser: parseDenglinTableProbe},
+			{name: "dl-smi -L 逻辑设备清单", command: dlSmi + " -L", parser: parseDenglinListProbe},
+			{name: "登临逻辑设备节点 /dev/dlgpuN", command: "for d in /dev/dlgpu[0-9]* /dev/dl[0-9]*; do [ -e \"$d\" ] && basename \"$d\"; done", parser: parseDenglinDeviceNodes},
 		}
 	}
 	diagnostics := make([]string, 0, len(probes)+3)
 	for _, probe := range probes {
 		output, err := runSSH(ctx, remote.SSH, probe.command, "")
-		if count := probe.parser(output); count > 0 {
-			return count, probe.name, diagnostics
+		if count, logical := probe.parser(output); count > 0 {
+			return count, logical, probe.name, diagnostics
 		}
 		diagnostics = append(diagnostics, formatProbeDiagnostic(probe.name, output, err))
 	}
@@ -624,7 +684,7 @@ func detectGPUCount(ctx context.Context, remote *sshx.DockerClient, accelerator,
 		output, err := runSSH(ctx, remote.SSH, "docker compose -f "+shellQuote(composeFile)+" config --services", "")
 		if count := countWorkerServices(output); count > 0 {
 			count, correction := normalizeDenglinLegacyCount(accelerator, count)
-			return count, "已有 Compose 的 worker 配置" + correction, diagnostics
+			return count, 0, "已有 Compose 的 worker 配置" + correction, diagnostics
 		}
 		diagnostics = append(diagnostics, formatProbeDiagnostic("已有 Compose", output, err))
 	}
@@ -640,7 +700,7 @@ func detectGPUCount(ctx context.Context, remote *sshx.DockerClient, accelerator,
 		}
 		if len(ids) > 0 {
 			count, correction := normalizeDenglinLegacyCount(accelerator, len(ids))
-			return count, "已有 Docker worker 容器" + correction, diagnostics
+			return count, 0, "已有 Docker worker 容器" + correction, diagnostics
 		}
 		diagnostics = append(diagnostics, "已有 Docker 容器：未找到 center-cv-service-N")
 	} else {
@@ -648,53 +708,101 @@ func detectGPUCount(ctx context.Context, remote *sshx.DockerClient, accelerator,
 	}
 	if storedCount > 0 {
 		count, correction := normalizeDenglinLegacyCount(accelerator, storedCount)
-		return count, "上次成功检测值" + correction, diagnostics
+		return count, 0, "上次成功检测值" + correction, diagnostics
 	}
 	if accelerator == "denglin" {
 		output, err := runSSH(ctx, remote.SSH, "lspci -D 2>/dev/null | grep -Ei 'Denglin|Goldwasser' | head -n 20", "")
 		diagnostics = append(diagnostics, formatProbeDiagnostic("登临 PCI 设备（仅诊断，不据此猜测物理卡数）", output, err))
 	}
-	return 0, "", diagnostics
+	return 0, 0, "", diagnostics
 }
 
 // Versions before the physical/logical split could persist 32 Denglin workers
 // on the supported eight-card topology. Correct that legacy value when live
 // probes are unavailable so retrying initialization does not reproduce it.
 func normalizeDenglinLegacyCount(accelerator string, count int) (int, string) {
-	if accelerator == "denglin" && count == denglinSupportedPhysicalGPUs*denglinLogicalDevicesPerPhysicalGPU {
-		return count / denglinLogicalDevicesPerPhysicalGPU, "（旧逻辑设备计数已按 4:1 修正）"
+	if accelerator == "denglin" && count == denglinSupportedPhysicalGPUs*templates.DenglinDevicesPerCard {
+		return count / templates.DenglinDevicesPerCard, "（旧逻辑设备计数已按 4:1 修正）"
 	}
 	return count, ""
 }
 
-// Denglin exposes four DL runtime device indexes for each physical GPU. dlsmi
-// lists those logical indexes, so treating its 0..31 output as physical cards
-// creates 32 workers and assigns non-existent device indexes 32..127.
-func parseDenglinPhysicalGPUCount(output string) int {
-	logicalDevices := parseGPUList(output)
-	if logicalDevices < denglinLogicalDevicesPerPhysicalGPU || logicalDevices%denglinLogicalDevicesPerPhysicalGPU != 0 {
-		return 0
+// Denglin logical devices are a per-card property of the card profile (a KS20
+// with the v2ulp.1c profile exposes one DL runtime device, production cards
+// expose four), not a constant of the platform. dlsmi table rows enumerate the
+// logical devices and carry the PCI address of the physical card, so the
+// physical count comes from unique bus/device pairs (function number stripped:
+// a card may expose its logical devices as separate PCI functions).
+func parseDenglinTableProbe(output string) (int, int) {
+	ids := map[int]struct{}{}
+	buses := map[string]struct{}{}
+	for _, raw := range strings.Split(output, "\n") {
+		line := strings.TrimSpace(raw)
+		bus := denglinBusIDPattern.FindStringSubmatch(line)
+		id := tableIDPattern.FindStringSubmatch(line)
+		if len(bus) != 2 || len(id) != 2 {
+			continue
+		}
+		number, err := strconv.Atoi(id[1])
+		if err != nil || number < 0 || number >= 256 {
+			continue
+		}
+		ids[number] = struct{}{}
+		buses[bus[1]] = struct{}{}
 	}
-	return logicalDevices / denglinLogicalDevicesPerPhysicalGPU
+	logical := contiguousIDCount(ids)
+	physical := len(buses)
+	// 混插不同逻辑设备数的卡（逻辑设备数不整除物理卡数）无法均匀分段，
+	// 视为不可靠而不采纳，交由后续探测兜底。
+	if physical < 1 || logical < physical || logical%physical != 0 {
+		return 0, 0
+	}
+	return physical, logical
 }
 
-func parseDenglinDeviceNodes(output string) int {
+// parseDenglinListProbe parses the dlsmi -L device list, which carries no PCI
+// addresses: a single logical device can only belong to a single card, and a
+// multiple of the production four-devices-per-card layout maps back to that
+// topology. Any other size cannot be converted reliably and is left to the
+// next probe.
+func parseDenglinListProbe(output string) (int, int) {
+	logical := parseGPUList(output)
+	if physical := denglinPhysicalFromLogical(logical); physical > 0 {
+		return physical, logical
+	}
+	return 0, 0
+}
+
+func denglinPhysicalFromLogical(logical int) int {
+	if logical == 1 {
+		return 1
+	}
+	if logical >= templates.DenglinDevicesPerCard && logical%templates.DenglinDevicesPerCard == 0 {
+		return logical / templates.DenglinDevicesPerCard
+	}
+	return 0
+}
+
+func parseDenglinDeviceNodes(output string) (int, int) {
 	ids := map[int]struct{}{}
 	for _, raw := range strings.Split(output, "\n") {
 		name := strings.TrimSpace(raw)
 		if !strings.HasPrefix(name, "dl") {
 			continue
 		}
-		id, err := strconv.Atoi(strings.TrimPrefix(name, "dl"))
+		// 节点命名既有 dlN 也有 dlgpuN（驱动 2.3.55 实测），控制节点如
+		// dlgpu-ctrl / dlgpu-shm 不带数字后缀，解析失败自然跳过。
+		number := strings.TrimPrefix(strings.TrimPrefix(name, "dl"), "gpu")
+		id, err := strconv.Atoi(number)
 		if err == nil && id >= 0 && id < 256 {
 			ids[id] = struct{}{}
 		}
 	}
-	logicalDevices := contiguousIDCount(ids)
-	if logicalDevices < denglinLogicalDevicesPerPhysicalGPU || logicalDevices%denglinLogicalDevicesPerPhysicalGPU != 0 {
-		return 0
+	logical := contiguousIDCount(ids)
+	if physical := denglinPhysicalFromLogical(logical); physical > 0 {
+		return physical, logical
 	}
-	return logicalDevices / denglinLogicalDevicesPerPhysicalGPU
+	return 0, 0
 }
 
 func resolveToolCommand(name string) string {

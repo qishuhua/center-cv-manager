@@ -78,3 +78,30 @@ func TestRenderModulesSingleWorkerDenglin(t *testing.T) {
 		t.Fatalf("单实例登临监控标签应标注全部逻辑卡:\n%s", prom)
 	}
 }
+
+// 单卡 KS20（v2ulp.1c profile，仅 1 个逻辑设备）：单实例与非单实例都只能
+// 占用设备 0，不引用不存在的设备。
+func TestRenderModulesSingleWorkerDenglinSingleCard(t *testing.T) {
+	base := RenderOptions{Workers: 1, DenglinLogicalDevices: 1, ModelsRoot: "/data/models", LogsRoot: "/data/logs", MediaResourcesRoot: "/data/media", ServerName: "单卡测试", SingleWorker: true}
+
+	files, err := RenderModules("denglin", base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	compose := files["business/compose.yml"]
+	if !strings.Contains(compose, `DL_DEVICES: "0"`) || strings.Contains(compose, "center-cv-service-1:") {
+		t.Fatalf("单卡单逻辑设备只应有一个占用设备 0 的 Worker:\n%s", compose)
+	}
+	prom := files["monitoring/prometheus/prometheus.denglin.yml"]
+	if !strings.Contains(prom, `logical_gpus: "0-0"`) || !strings.Contains(prom, `physical_gpu: "0-0"`) {
+		t.Fatalf("单卡监控标签应只标注设备 0:\n%s", prom)
+	}
+
+	base.SingleWorker = false
+	if files, err = RenderModules("denglin", base); err != nil {
+		t.Fatal(err)
+	}
+	if compose = files["business/compose.yml"]; !strings.Contains(compose, `DL_DEVICES: "0"`) || strings.Contains(compose, "center-cv-service-1:") {
+		t.Fatalf("单卡常规模式同样只有一个占用设备 0 的 Worker:\n%s", compose)
+	}
+}

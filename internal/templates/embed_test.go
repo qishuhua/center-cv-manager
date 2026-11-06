@@ -32,7 +32,7 @@ func TestCleanupStaleManagedTemplates(t *testing.T) {
 
 func TestRenderDynamicDenglinWorkers(t *testing.T) {
 	source := []byte("services:\n  center-cv-service-0:\n    old: true\n  center-cv-service-1:\n    old: true\n  center-cv-ingress:\n    image: ingress\n")
-	result, err := renderDynamicWorkers(source, "denglin", 2, []string{"0-3", "4-7"}, false)
+	result, err := renderDynamicWorkers(source, "denglin", 2, []string{"0-3", "4-7"}, false, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,7 @@ func TestRenderEightDenglinPhysicalGPUsCover32LogicalDevices(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := renderDynamicWorkers(content, "denglin", 8, nil, false)
+	result, err := renderDynamicWorkers(content, "denglin", 8, nil, false, 32)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,6 +69,55 @@ func TestRenderEightDenglinPhysicalGPUsCover32LogicalDevices(t *testing.T) {
 	}
 	if strings.Contains(text, "center-cv-service-8:") || strings.Contains(text, `DL_DEVICES: "32,33,34,35"`) {
 		t.Fatal("generated compose created a ninth worker or referenced logical devices above 31")
+	}
+}
+
+// 单卡 KS20（v2ulp.1c profile）只暴露 1 个逻辑设备：1 个 Worker 分到设备 0，
+// 不得引用不存在的设备 1~3。
+func TestRenderDenglinSingleCardSingleLogicalDevice(t *testing.T) {
+	source := []byte("services:\n  center-cv-service-0:\n    old: true\n  center-cv-service-1:\n    old: true\n  center-cv-ingress:\n    image: ingress\n")
+	result, err := renderDynamicWorkers(source, "denglin", 1, []string{"0-3"}, false, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(result)
+	for _, want := range []string{"center-cv-service-0:", `DL_DEVICES: "0"`} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("single-card compose missing %q:\n%s", want, text)
+		}
+	}
+	if strings.Contains(text, "center-cv-service-1:") || strings.Contains(text, "DL_DEVICES: \"0,1") {
+		t.Fatalf("single-card compose must not create extra workers or reference missing devices:\n%s", text)
+	}
+
+	single, err := renderDynamicWorkers(source, "denglin", 1, nil, true, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if text = string(single); !strings.Contains(text, `DL_DEVICES: "0"`) {
+		t.Fatalf("single-instance mode on a single logical device should still expose device 0:\n%s", text)
+	}
+
+	promSource := []byte("  - job_name: center-cv-service\n    static_configs:\n      - targets: [\"127.0.0.1:8181\"]\n        labels: {worker: old}\n    metric_relabel_configs:\n      - action: drop\n  - job_name: service-http-health\n    static_configs:\n      - targets: [\"http://127.0.0.1:8181/api/healthz\"]\n        labels: {worker: old}\n      - targets: [\"http://127.0.0.1:8090/readyz\"]\n        labels: {service: ingress}\n    relabel_configs:\n  - job_name: service-readiness\n    static_configs:\n      - targets: [\"http://127.0.0.1:8181/api/readyz\"]\n        labels: {name: old}\n      - targets: [\"http://127.0.0.1:8090/readyz\"]\n        labels: {name: ingress}\n    relabel_configs:\n")
+	prom, err := renderDynamicPrometheus(promSource, "denglin", 1, false, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if text = string(prom); !strings.Contains(text, `logical_gpus: "0-0"`) {
+		t.Fatalf("single-card prometheus labels should cover logical device 0 only:\n%s", text)
+	}
+}
+
+// 探测到的逻辑设备数不整除 Worker 数（混插拓扑）时不采纳，回落每卡 4 个。
+func TestRenderDenglinIndivisibleLogicalDevicesFallBackToFour(t *testing.T) {
+	source := []byte("services:\n  center-cv-service-0:\n    old: true\n  center-cv-ingress:\n    image: ingress\n")
+	result, err := renderDynamicWorkers(source, "denglin", 2, nil, false, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(result)
+	if !strings.Contains(text, `DL_DEVICES: "0,1,2,3"`) || !strings.Contains(text, `DL_DEVICES: "4,5,6,7"`) {
+		t.Fatalf("indivisible logical count should fall back to four devices per card:\n%s", text)
 	}
 }
 
@@ -94,7 +143,7 @@ func TestActualComposeTemplatesRenderDetectedTopology(t *testing.T) {
 				t.Fatalf("%s compose missing Kibana initialization %q", mode, required)
 			}
 		}
-		result, err := renderDynamicWorkers(content, mode, 2, []string{"0-7", "8-15"}, false)
+		result, err := renderDynamicWorkers(content, mode, 2, []string{"0-7", "8-15"}, false, 0)
 		if err != nil {
 			t.Fatalf("%s: %v", mode, err)
 		}
@@ -285,7 +334,7 @@ func TestRenderHostMounts(t *testing.T) {
 
 func TestRenderDynamicPrometheus(t *testing.T) {
 	source := []byte("  - job_name: center-cv-service\r\n    static_configs:\r\n      - targets: [\"127.0.0.1:8181\"]\r\n        labels: {worker: old}\r\n    metric_relabel_configs:\r\n      - action: drop\r\n  - job_name: service-http-health\r\n    static_configs:\r\n      - targets: [\"http://127.0.0.1:8181/api/healthz\"]\r\n        labels: {worker: old}\r\n      - targets: [\"http://127.0.0.1:8090/readyz\"]\r\n        labels: {service: ingress}\r\n    relabel_configs:\r\n  - job_name: service-readiness\r\n    static_configs:\r\n      - targets: [\"http://127.0.0.1:8181/api/readyz\"]\r\n        labels: {name: old}\r\n      - targets: [\"http://127.0.0.1:8090/readyz\"]\r\n        labels: {name: ingress}\r\n    relabel_configs:\r\n")
-	result, err := renderDynamicPrometheus(source, "tensorrt", 2, false)
+	result, err := renderDynamicPrometheus(source, "tensorrt", 2, false, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,7 +406,7 @@ func TestRenderUsesOneWorkerEnvironment(t *testing.T) {
 		"LOG_LEVEL": "debug",
 		"CUSTOM":    "a:b # value",
 	})
-	rendered, err := renderDynamicWorkers(selected, "tensorrt", 2, []string{"0-3", "4-7"}, false)
+	rendered, err := renderDynamicWorkers(selected, "tensorrt", 2, []string{"0-3", "4-7"}, false, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

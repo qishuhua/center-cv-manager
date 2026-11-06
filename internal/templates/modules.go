@@ -48,7 +48,7 @@ func RenderModules(platform string, opts RenderOptions) (map[string]string, erro
 		}
 		content = []byte(strings.ReplaceAll(string(content), "\r\n", "\n"))
 		if strings.HasPrefix(rel, "business/compose.") {
-			content, err = renderDynamicWorkers(content, mode, opts.Workers, opts.CPUSets, opts.SingleWorker)
+			content, err = renderDynamicWorkers(content, mode, opts.Workers, opts.CPUSets, opts.SingleWorker, opts.DenglinLogicalDevices)
 			if err != nil {
 				return err
 			}
@@ -64,7 +64,7 @@ func RenderModules(platform string, opts RenderOptions) (map[string]string, erro
 			rel = path.Join(path.Dir(rel), "compose.yml")
 		}
 		if strings.HasPrefix(rel, "monitoring/prometheus/prometheus.") {
-			content, err = renderDynamicPrometheus(content, mode, opts.Workers, opts.SingleWorker)
+			content, err = renderDynamicPrometheus(content, mode, opts.Workers, opts.SingleWorker, opts.DenglinLogicalDevices)
 			if err != nil {
 				return err
 			}
