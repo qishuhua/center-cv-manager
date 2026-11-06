@@ -1,0 +1,58 @@
+README.md
+  s_7841ccc7cefab6::t_89f3286f563fbe 187
+internal/templates/modules.go
+  s_7841ccc7cefab6::t_33bc6f51fb3263 51
+  s_7841ccc7cefab6::t_1fd37a9af5fb60 67
+internal/templates/singleworker_test.go
+  s_7841ccc7cefab6::t_a580c2213dfb91 81-107
+internal/provision/service_test.go
+  s_7841ccc7cefab6::t_5137d75a223f9e 69-123,125-128,130-132,134-136,141-165
+internal/provision/service.go
+  s_7841ccc7cefab6::t_549eeef1458f9e 345
+  s_7841ccc7cefab6::t_40de0ccd8b3906 118
+  s_7841ccc7cefab6::t_ee17de7ebaf212 356,368-373
+  s_7841ccc7cefab6::t_af67e769787b0d 233
+  s_7841ccc7cefab6::t_25ae5e5d74aea7 418-457
+  s_7841ccc7cefab6::t_381a944fa229a4 319
+  s_7841ccc7cefab6::t_5f6990a6fc0ba3 508,510,512-516,522,525
+  s_7841ccc7cefab6::t_2d3992c2aa8a8a 243
+  s_7841ccc7cefab6::t_37d4bdbc0a4c72 497,500
+  s_7841ccc7cefab6::t_73482e58962be4 632-634,638
+  s_7841ccc7cefab6::t_dd6e6054b247f4 644-648
+  s_7841ccc7cefab6::t_dee5db991095f3 651,653,656-659,665-669,675-676,687,703,711,717
+  s_7841ccc7cefab6::t_5336bffd7be68a 724-725
+  s_7841ccc7cefab6::t_4839733ff20ae6 376-377,730-778,780-783,786,793-796,801-803,805
+  s_7841ccc7cefab6::t_c0ec60624e41a0 374-375
+CLAUDE.md
+  s_7841ccc7cefab6::t_bffa176732a5f9 88-89
+internal/templates/embed_test.go
+  s_7841ccc7cefab6::t_56ed54d04ea79b 146
+  s_7841ccc7cefab6::t_129c952235a95d 55
+  s_7841ccc7cefab6::t_763b507e20e930 409
+  s_7841ccc7cefab6::t_be666b37b0a450 35
+  s_7841ccc7cefab6::t_93ab41996c6747 337
+  s_7841ccc7cefab6::t_cba60a10129c0d 75-100,103-123
+  s_7841ccc7cefab6::t_26a3473033c185 101-102
+internal/templates/embed.go
+  s_7841ccc7cefab6::t_a3f589d65fc4d6 213-217
+  s_7841ccc7cefab6::t_2eec0de1a2ed0e 292
+  s_7841ccc7cefab6::t_41ef184ba8168a 280
+  s_7841ccc7cefab6::t_59ee3baa945211 454-458,463,473-476,493,511-524,526-531,536-541
+  s_7841ccc7cefab6::t_c13b23f3ace083 571,588-591,594-596,601
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "0a1ecb733b0a66c7dca3b8cd4374844741a74b08",
+  "prompts": {},
+  "sessions": {
+    "s_7841ccc7cefab6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3b13cf12-a592-4cfa-bd0e-f291562cb4b4",
+        "model": "glm-5.3"
+      },
+      "human_author": "henry.qi <heny.qi@jtexpress.com>"
+    }
+  }
+}
